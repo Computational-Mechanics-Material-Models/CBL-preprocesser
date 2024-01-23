@@ -45,7 +45,7 @@ from freecad.woodWorkbench                                     import ICONPATH
 from freecad.woodWorkbench                                     import GUIPATH
 from freecad.woodWorkbench                                     import SRCPATH
 
-from freecad.woodWorkbench.src                                 import verif
+from freecad.woodWorkbench.src                                 import Verifications_cube_v11
 
 from freecad.woodWorkbench.util.cwloadUIfile                    import cwloadUIfile
 from freecad.woodWorkbench.util.cwloadUIicon                    import cwloadUIicon
@@ -101,7 +101,7 @@ class genWindow_CBL:
     def chronoGeneration(self):
 
         # Run file
-        verif.verific()
+        Verifications_cube_v11.verif()
 
         print('Writing files.')
         # print("Chrono data package written to: " + outDir + outName)
