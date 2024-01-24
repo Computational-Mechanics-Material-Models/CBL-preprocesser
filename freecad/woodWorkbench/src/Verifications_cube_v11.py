@@ -26,8 +26,8 @@ def verif():
     geoName = 'Debug_QML_v11_010824'
     outdir = App.ConfigGet('UserHomePath') + '/woodWorkbench'
 
-    radial_growth_rule = 'binary_lloyd'   
-    # radial_growth_rule = '1x1_notched_I50000_v71_sites.npy'
+    radial_growth_rule = 'binary'   
+    iter_max = 10 # increase this number to achieve a more regular geometry
     print_interval = 500 # interval for printing prgress info
 
     # Radial cell growth parameters
