@@ -62,18 +62,21 @@ class genWindow_CBL:
         self.form = []
 
         # Load UI's for Side Panel
-        self.form.append(cwloadUIfile("ui_CBL_runOld.ui"))
+        self.form.append(cwloadUIfile("ui_CBL_cellParams.ui"))       
+        self.form.append(cwloadUIfile("ui_CBL_generation.ui"))
 
         # Label, Load Icons, and Initialize Panels
-        self.form[0].setWindowTitle("Test")
-
-        cwloadUIicon(self.form[0],"ldpmOutput.svg")
+        self.form[0].setWindowTitle("Model Properties")
+        self.form[1].setWindowTitle("Model Generation")
+        
+        # cwloadUIicon(self.form[0],"ldpmOutput.svg")
+        # cwloadUIicon(self.form[1],"PartDesign_AdditiveBox.svg")
 
         # # Set initial output directory
-        # self.form[0].outputDir.setText(str(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench')))
+        self.form[1].outputDir.setText(str(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench')))
         
         # Run generation for CBL
-        QtCore.QObject.connect(self.form[0].writeChrono, QtCore.SIGNAL("clicked()"), self.chronoGeneration)
+        QtCore.QObject.connect(self.form[1].generate, QtCore.SIGNAL("clicked()"), self.generation)
 
     def getStandardButtons(self):
 
@@ -99,16 +102,16 @@ class genWindow_CBL:
 
         return OpenName
 
-    def chronoGeneration(self):
+    def generation(self):
 
         # Run file
-        mainCBL.main()
+        mainCBL.main(self)
 
-        print('Writing files.')
-        # print("Chrono data package written to: " + outDir + outName)
+        print('Fin.')
+        # print("CModel package written to: " + outDir + outName)
 
         
-    # What to do when "Close" Button Clicked
+# What to do when "Close" Button Clicked
     def reject(self):
         try:
             Gui.ActiveDocument.resetEdit()

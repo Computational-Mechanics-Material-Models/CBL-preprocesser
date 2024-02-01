@@ -1,4 +1,16 @@
-# -*- coding: utf-8 -*-
+## ================================================================================
+## CHRONO WOOD WORKBENCH
+##
+## Copyright (c) 2024 
+## All rights reserved. 
+##
+## Use of this source code is governed by a BSD-style license that can be found
+## in the LICENSE file at the top level of the distribution
+##
+## ================================================================================
+## Developed by Cusatis Computational Serivces, Inc.
+## Primary Authors: Susan Alexis Brown, Hao Yin
+## ===========================================================================
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,8 +19,10 @@ from pylab import *
 import os
 import time
 import shutil
+import tempfile
 from pathlib import Path
 import FreeCAD as App
+import FreeCADGui as Gui
 
 from freecad.woodWorkbench.src.inputParams import inputParams
 from freecad.woodWorkbench.src.genSites import genSites
@@ -18,13 +32,37 @@ from freecad.woodWorkbench.src.outputParams import outputParams
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 
 
-def main():
+def main(self):
 
     # performance check only
     startTime = time.time()
-    outdir = App.ConfigGet('UserHomePath') + '/woodWorkbench'
 
+    # Make output directory if does not exist
+    outDir = self.form[1].outputDir.text()
+    try:
+        os.mkdir(outDir)
+    except:
+        pass
 
+    # Make a temporary path location
+    tempPath = tempfile.gettempdir() + "/tempCBL" + str(int(np.random.uniform(1e7,1e8))) + '/'
+    os.mkdir(tempPath)
+
+    # Store document
+    docGui = Gui.activeDocument()
+
+    # Make new document and set view if does not exisit
+    try:
+        docGui.activeView().viewAxonometric()
+    except:
+        App.newDocument("Unnamed")
+        docGui = Gui.activeDocument()
+        docGui.activeView().viewAxonometric()
+    Gui.runCommand('Std_PerspectiveCamera',1)
+
+    
+    self.form[1].progressBar.setValue(10) 
+    self.form[1].statusWindow.setText("Status: Reading Parameters.") 
     # ==================================================================
     # Input parameters
     [geoName, radial_growth_rule, iter_max, print_interval, \
@@ -33,8 +71,9 @@ def main():
         boundaryFlag, box_shape, box_center, box_size, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         skeleton_density, merge_operation, merge_tol, precrack_widths, precrackFlag, \
-        stlFlag, inpFlag, inpType] = inputParams()
+        stlFlag, inpFlag, inpType] = inputParams(self.form)
     
+
     dumForm = [geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
@@ -43,32 +82,35 @@ def main():
         skeleton_density, merge_operation, merge_tol, precrack_widths, precrackFlag, \
         stlFlag, inpFlag, inpType]
 
-
+    
     # ==================================================================
     # Remove directory/files if exists already
     try:
-        shutil.rmtree(outdir + '/' + geoName)
+        shutil.rmtree(outDir + '/' + geoName)
     except:
         pass
 
-    if not os.path.exists(Path(outdir + '/' + geoName)):
-        os.makedirs(Path(outdir + '/' + geoName))
+    if not os.path.exists(Path(outDir + '/' + geoName)):
+        os.makedirs(Path(outDir + '/' + geoName))
     
     # Set Path
     filpath = os.path.dirname(__file__)
     print(filpath)    
 
-
+    self.form[1].progressBar.setValue(20) 
+    self.form[1].statusWindow.setText("Status: Placing Cells.") 
     # ==================================================================
     # Place cells with a specific radial growth pattern
 
-    [sites,radii] = genSites(dumForm,outdir)
+    [sites,radii] = genSites(dumForm,outDir)
 
     placementTime = time.time()
     nParticles = len(sites)
     print('{:d} particles/cells placed in {:.3f} seconds'.format(nParticles, (placementTime - startTime)))
 
 
+    self.form[1].progressBar.setValue(30) 
+    self.form[1].statusWindow.setText("Status: Clipping Box.") 
     # ==================================================================
     # Clipping box (boundaries) of the model
     
@@ -84,6 +126,9 @@ def main():
     ax.add_patch(boundarylines)
 
 
+
+    self.form[1].progressBar.setValue(40) 
+    self.form[1].statusWindow.setText("Status: Rebuilding Mesh.") 
     # ==================================================================
     # Rebuild the Voronoi mesh
     if merge_operation in ['on','On','Y','y','Yes','yes']:
@@ -110,6 +155,9 @@ def main():
                         finite_ridges_new,boundary_ridges_new,nfinite_ridge,\
                         nboundary_ridge,nboundary_pts,nboundary_pts_featured)
 
+
+    self.form[1].progressBar.setValue(50) 
+    self.form[1].statusWindow.setText("Status: Writing Vertices.") 
     # ==================================================================        
     # Generate a file for vertices and ridges info
     [all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges] = \
@@ -117,7 +165,11 @@ def main():
                         npt_per_layer,npt_per_layer_normal,\
                         npt_per_layer_vtk,nridge,geoName,radii,generation_center,\
                         cellwallthickness_early,cellwallthickness_late)
-        
+    
+
+
+    self.form[1].progressBar.setValue(60) 
+    self.form[1].statusWindow.setText("Status: Extruding Cells.") 
     ###############################################################################
     # Extrude in the parallel-to-grain (longitudinal) direction
     NURBS_degree = 2
@@ -136,6 +188,7 @@ def main():
     BeamTime = time.time() 
     print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
 
+
     # ==================================================================
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
@@ -151,6 +204,8 @@ def main():
         nconnector_t_precrack = 0
         nconnector_l_precrack = 0
 
+    self.form[1].progressBar.setValue(70) 
+    self.form[1].statusWindow.setText("Status: Calculating Mesh Info.") 
     # ==================================================================
     # Calculate mesh info
     [ConnMeshData,conn_l_tangents,height_connector_t] = \
@@ -173,6 +228,8 @@ def main():
     mkBezierBeamFile = WoodMeshGen.BezierBeamFile(geoName,NURBS_degree,nctrlpt_per_beam,\
                     nconnector_t_per_beam,npatch,knotVec)
 
+    self.form[1].progressBar.setValue(80) 
+    self.form[1].statusWindow.setText("Status: Generating Vizualiation Files.") 
     # ==================================================================
     # Generate Paraview visulization files
     WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_2D,\
@@ -181,13 +238,16 @@ def main():
                     nconnector_l,nctrlpt_per_beam,ConnMeshData,conn_l_tangents,\
                     all_vertices_2D,max_wings,flattened_all_vertices_2D)
         
-    plt.savefig(Path(outdir + '/' + geoName + '/' + geoName + '.png'))
+    plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
 
     # ==================================================================
     # Generate 3D model files
     if stlFlag in ['on','On','Y','y','Yes','yes']:
         WoodMeshGen.StlModelFile(geoName)
 
+
+    self.form[1].progressBar.setValue(90) 
+    self.form[1].statusWindow.setText("Status: Generating Model Files.") 
     # ==================================================================
     # Generate input files for numerical simulations
 
@@ -219,8 +279,8 @@ def main():
                         nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
                         precrackFlag,precrack_elem)
         else:
-            np.save(Path(outdir + geoName + '/' + geoName + '_sites.npy'),sites)
-            np.save(Path(outdir + geoName + '/' + geoName + '_radii.npy'),radii)
+            np.save(Path(outDir + geoName + '/' + geoName + '_sites.npy'),sites)
+            np.save(Path(outDir + geoName + '/' + geoName + '_radii.npy'),radii)
             print('Input files type: {:s} is not supported for the current version, please check the README for more details.'.format(inpType))
             print('Generated cells and rings info has been saved.')
             print('Now exitting...')
@@ -241,5 +301,8 @@ def main():
             stlFlag,inpFlag,inpType,radial_growth_rule,\
             startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime)
     
+    self.form[1].progressBar.setValue(100) 
+    self.form[1].statusWindow.setText("Status: Complete.") 
+
 if __name__ == '__main__':
     main()
