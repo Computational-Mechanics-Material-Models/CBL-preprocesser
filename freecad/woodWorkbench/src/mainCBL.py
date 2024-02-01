@@ -23,9 +23,10 @@ import tempfile
 from pathlib import Path
 import FreeCAD as App
 import FreeCADGui as Gui
+import feminout.importVTKResults #as importVTK
 
 from freecad.woodWorkbench.src.inputParams import inputParams
-from freecad.woodWorkbench.src.genSites import genSites
+# from freecad.woodWorkbench.src.genSites import genSites
 from freecad.woodWorkbench.src.clipBox import clipBox
 from freecad.woodWorkbench.src.outputParams import outputParams
 
@@ -61,6 +62,7 @@ def main(self):
     Gui.runCommand('Std_PerspectiveCamera',1)
 
     
+    # ==================================================================
     self.form[1].progressBar.setValue(10) 
     self.form[1].statusWindow.setText("Status: Reading Parameters.") 
     # ==================================================================
@@ -73,17 +75,7 @@ def main(self):
         skeleton_density, merge_operation, merge_tol, precrack_widths, precrackFlag, \
         stlFlag, inpFlag, inpType] = inputParams(self.form)
     
-
-    dumForm = [geoName, radial_growth_rule, iter_max, print_interval, \
-        r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
-        cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-        boundaryFlag, box_shape, box_center, box_size, \
-        nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        skeleton_density, merge_operation, merge_tol, precrack_widths, precrackFlag, \
-        stlFlag, inpFlag, inpType]
-
-    
-    # ==================================================================
+    # ===========================================
     # Remove directory/files if exists already
     try:
         shutil.rmtree(outDir + '/' + geoName)
@@ -97,18 +89,51 @@ def main(self):
     filpath = os.path.dirname(__file__)
     print(filpath)    
 
+    # ==================================================================
     self.form[1].progressBar.setValue(20) 
     self.form[1].statusWindow.setText("Status: Placing Cells.") 
     # ==================================================================
     # Place cells with a specific radial growth pattern
 
-    [sites,radii] = genSites(dumForm,outDir)
+    # [sites,radii] = genSites(self.form)
+    if radial_growth_rule == 'binary':
+        # ---------------------------------------------
+        # binary radial growth pattern (e.g. wood microstructure with earlywood-latewood alternations)
+        sites,radii = WoodMeshGen.CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,\
+                            width_early,width_late,cellsize_early,cellsize_late,\
+                            iter_max,print_interval)
+    elif radial_growth_rule == 'binary_lloyd':
+        # ---------------------------------------------
+        # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
+        sites,radii = WoodMeshGen.CellPlacement_Binary_Lloyd(geoName,outDir,generation_center,r_max,r_min,\
+                                                    nrings,width_heart,width_early,width_late,\
+                                                    cellsize_early,cellsize_late,iter_max,\
+                                                    print_interval)            
+    elif radial_growth_rule == 'regular_hexagonal':
+        # ----------------------------------
+        # hexagonal honeycomb-like geometry
+        sites,radii = WoodMeshGen.CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,\
+                            box_center,box_size,width_heart,\
+                            width_early,width_late,\
+                            cellsize_early,cellsize_late,\
+                            cellwallthickness_early,cellwallthickness_late,\
+                            iter_max,print_interval)
+    elif os.path.splitext(radial_growth_rule)[1] == '.npy':
+        # ----------------------------------
+        # load saved cell sites and radii data
+        print('Loading saved sites')
+        sites_path = Path(os.path.dirname(os.path.abspath(__file__)))
+        sites,radii = WoodMeshGen.ReadSavedSites(sites_path,radial_growth_rule)
+    else:
+        print('Growth rule: {:s} is not supported for the current version, please check the README for more details.'.format(radial_growth_rule))
+        # print('Now exiting...')
+        # # exit()
 
     placementTime = time.time()
     nParticles = len(sites)
     print('{:d} particles/cells placed in {:.3f} seconds'.format(nParticles, (placementTime - startTime)))
 
-
+    # ==================================================================
     self.form[1].progressBar.setValue(30) 
     self.form[1].statusWindow.setText("Status: Clipping Box.") 
     # ==================================================================
@@ -126,7 +151,7 @@ def main(self):
     ax.add_patch(boundarylines)
 
 
-
+    # ==================================================================
     self.form[1].progressBar.setValue(40) 
     self.form[1].statusWindow.setText("Status: Rebuilding Mesh.") 
     # ==================================================================
@@ -156,6 +181,7 @@ def main(self):
                         nboundary_ridge,nboundary_pts,nboundary_pts_featured)
 
 
+    # ==================================================================
     self.form[1].progressBar.setValue(50) 
     self.form[1].statusWindow.setText("Status: Writing Vertices.") 
     # ==================================================================        
@@ -167,10 +193,10 @@ def main(self):
                         cellwallthickness_early,cellwallthickness_late)
     
 
-
+    # ==================================================================
     self.form[1].progressBar.setValue(60) 
     self.form[1].statusWindow.setText("Status: Extruding Cells.") 
-    ###############################################################################
+    # ==================================================================
     # Extrude in the parallel-to-grain (longitudinal) direction
     NURBS_degree = 2
     [IGAvertices,vertex_connectivity,beam_connectivity_original,nbeam_total,\
@@ -189,7 +215,7 @@ def main(self):
     print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
 
 
-    # ==================================================================
+    # ===============================================
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
         precrack_nodes = np.array([[x_indent, y_precrack, x_precrack, y_precrack]])
@@ -204,6 +230,7 @@ def main(self):
         nconnector_t_precrack = 0
         nconnector_l_precrack = 0
 
+    # ==================================================================
     self.form[1].progressBar.setValue(70) 
     self.form[1].statusWindow.setText("Status: Calculating Mesh Info.") 
     # ==================================================================
@@ -215,12 +242,12 @@ def main(self):
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict)
 
-    # ==================================================================
+    # ===============================================
     # Calculate model properties
     [mass,bulk_volume,bulk_density,porosity] = \
         WoodMeshGen.ModelInfo(box_shape,boundary_points,z_min,z_max,skeleton_density,ConnMeshData)
 
-    # ==================================================================
+    # ===============================================
     # Bezier extraction 
     knotVec = WoodMeshGen.BezierExtraction(NURBS_degree,nbeam_total)
     npatch = beam_connectivity_original.shape[0]
@@ -228,6 +255,7 @@ def main(self):
     mkBezierBeamFile = WoodMeshGen.BezierBeamFile(geoName,NURBS_degree,nctrlpt_per_beam,\
                     nconnector_t_per_beam,npatch,knotVec)
 
+    # ==================================================================
     self.form[1].progressBar.setValue(80) 
     self.form[1].statusWindow.setText("Status: Generating Vizualiation Files.") 
     # ==================================================================
@@ -240,12 +268,13 @@ def main(self):
         
     plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
 
-    # ==================================================================
+    # =================================================
     # Generate 3D model files
     if stlFlag in ['on','On','Y','y','Yes','yes']:
         WoodMeshGen.StlModelFile(geoName)
 
 
+    # ==================================================================
     self.form[1].progressBar.setValue(90) 
     self.form[1].statusWindow.setText("Status: Generating Model Files.") 
     # ==================================================================
@@ -289,7 +318,7 @@ def main(self):
     FileTime = time.time() 
     print('Files generated in {:.3f} seconds'.format(FileTime - BeamTime))
 
-    # ==================================================================
+    # ==============================================
     # Generate log file for the generation
     WoodMeshGen.LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_early,width_late,\
             generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
@@ -301,8 +330,24 @@ def main(self):
             stlFlag,inpFlag,inpType,radial_growth_rule,\
             startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime)
     
+    
+    # ==================================================================    
+    self.form[1].progressBar.setValue(95) 
+    self.form[1].statusWindow.setText("Status: Visualizing.") 
+    # ==================================================================
+    filname = geoName + '_beams.vtu'
+    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'),"Unnamed")
+    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),"Unnamed")
+    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),"Unnamed")
+    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),"Unnamed")
+
+    Gui.SendMsgToActiveView("ViewFit")
+    Gui.runCommand('Std_PerspectiveCamera',1)
+
+    # ==================================================================    
     self.form[1].progressBar.setValue(100) 
     self.form[1].statusWindow.setText("Status: Complete.") 
+    # ==================================================================
 
 if __name__ == '__main__':
     main()

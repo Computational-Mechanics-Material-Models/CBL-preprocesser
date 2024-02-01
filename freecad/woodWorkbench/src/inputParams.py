@@ -14,7 +14,7 @@
 
 def inputParams(form):
 
-    geoName = form[0].geoName.text()
+    geoName = (form[0].geoName.text() or 'test')
 
     # Cell Growth Parameters
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
@@ -38,7 +38,7 @@ def inputParams(form):
     iter_max = int(form[0].iter_max.text() or 10) # increase this number to achieve a more regular geometry
     print_interval = int(form[0].print_interval.text() or 500) # interval for printing prgress info
 
-    box_center = (0.0,0.0) # coordinates of clipping box center
+    box_center = eval(form[0].box_center.text() or (0.0,0.0)) # coordinates of clipping box center
     box_size = float(form[0].box_size.text() or 20) # side length
 
     # longitudinal direction parameters

@@ -1,8 +1,23 @@
+## ================================================================================
+## CHRONO WOOD WORKBENCH
+##
+## Copyright (c) 2024 
+## All rights reserved. 
+##
+## Use of this source code is governed by a BSD-style license that can be found
+## in the LICENSE file at the top level of the distribution
+##
+## ================================================================================
+## Developed by Cusatis Computational Serivces, Inc.
+## Primary Authors: Susan Alexis Brown, Hao Yin
+## ===========================================================================
+
+
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 from pathlib import Path
 import os
 
-def genSites(dumForm,outdir):
+def genSites(form):
 
     [geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
