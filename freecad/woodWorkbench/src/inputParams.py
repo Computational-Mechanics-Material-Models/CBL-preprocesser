@@ -14,7 +14,7 @@
 
 def inputParams(form):
 
-    geoName = (form[0].geoName.text() or 'test')
+    geoName = (form[0].geoName.text() or 'cube_debug_1')
 
     # Cell Growth Parameters
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
@@ -50,6 +50,13 @@ def inputParams(form):
     long_connector_ratio = float(form[0].long_connector_ratio.text() or 0.2) # longitudinal joint length = ratio * segment_length
 
 
+    # Precrack Parameters
+    # notch and precrack are always centered on leftmost edge
+    x_indent_size = float(form[0].x_indent_size.text() or box_size*0.120) # depth of notch
+    y_indent_size = float(form[0].y_indent_size.text() or box_size*0.125) # width of notch
+    x_precrack_size = float(form[0].x_precrack_size.text() or box_size*0.1) # depth of precrack
+    y_precrack_size = float(form[0].y_precrack_size.text() or box_size*0.02) # depth of notch
+
     # Flags
 
     boundaryFlag = form[0].boundaryFlag.currentText()
@@ -59,7 +66,7 @@ def inputParams(form):
     merge_tol = float(form[0].merge_tol.text() or 0.015)
 
     precrackFlag = form[0].precrackFlag.currentText()
-    precrack_widths = float(form[0].precrack_widths.text() or 0.1)
+    # precrack_widths = float(form[0].precrack_widths.text() or 0.1) # not used
 
     stlFlag = form[0].stlFlag.currentText()
 
@@ -71,5 +78,6 @@ def inputParams(form):
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        skeleton_density, merge_operation, merge_tol, precrack_widths, precrackFlag, \
+        x_indent_size, y_indent_size, x_precrack_size, y_precrack_size, \
+        skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType

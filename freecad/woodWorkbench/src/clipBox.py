@@ -2,16 +2,12 @@ import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 from scipy.spatial import Voronoi, voronoi_plot_2d
 import matplotlib.pyplot as plt
 
-def clipBox(box_shape,box_center,box_size,boundaryFlag,sites):
+def clipBox(box_shape,box_center,box_size,\
+            x_indent_size, y_indent_size, x_precrack_size, y_precrack_size,boundaryFlag,sites):
+    
     x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines = \
         WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,boundaryFlag)
     # *** boundary lines overwritting?
-
-    # if precracked - make inputs eventually ***
-    x_indent_size = box_size*0.120
-    y_indent_size = box_size*0.125
-    x_precrack_size = box_size*0.1
-    y_precrack_size = box_size*0.02
 
     x_indent = x_min + x_indent_size
     y_indent_min = box_center[1] - y_indent_size/2

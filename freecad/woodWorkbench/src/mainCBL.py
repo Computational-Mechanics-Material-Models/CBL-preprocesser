@@ -23,12 +23,15 @@ import tempfile
 from pathlib import Path
 import FreeCAD as App
 import FreeCADGui as Gui
-import feminout.importVTKResults #as importVTK
+import feminout.importVTKResults as importVTK
+import ObjectsFem
+import FemGui
 
 from freecad.woodWorkbench.src.inputParams import inputParams
 # from freecad.woodWorkbench.src.genSites import genSites
 from freecad.woodWorkbench.src.clipBox import clipBox
 from freecad.woodWorkbench.src.outputParams import outputParams
+from freecad.woodWorkbench.src.chronoInput import chronoInput
 
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 
@@ -61,6 +64,7 @@ def main(self):
         docGui.activeView().viewAxonometric()
     Gui.runCommand('Std_PerspectiveCamera',1)
 
+
     
     # ==================================================================
     self.form[1].progressBar.setValue(10) 
@@ -72,9 +76,35 @@ def main(self):
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        skeleton_density, merge_operation, merge_tol, precrack_widths, precrackFlag, \
+        x_indent_size, y_indent_size, x_precrack_size, y_precrack_size, \
+        skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType] = inputParams(self.form)
-    
+        
+    precrack_widths = 0 # for future use
+
+    # Prep naming variables
+    meshName = geoName + "_mesh"
+    analysisName = geoName + "_analysis"
+    materialName = geoName + "_material"
+    dataFilesName = geoName + '_dataFiles'
+    visualFilesName = geoName + '_visualFiles'
+
+    # Generate new analysis object with associated material
+    try:
+        test = (App.getDocument(App.ActiveDocument.Name).getObjectsByLabel(analysisName)[0] != None)
+    except:
+        test = (App.getDocument(App.ActiveDocument.Name).getObjectsByLabel(analysisName) != [])
+    if test == False:
+        # Analysis
+        analysis_object = ObjectsFem.makeAnalysis(App.ActiveDocument,analysisName)
+        # Store Material
+        material_object = ObjectsFem.makeMaterialSolid(App.ActiveDocument, materialName)
+        mat = material_object.Material
+        mat['Name'] = materialName
+        material_object.Material = mat
+        analysis_object.addObject(material_object)
+
+
     # ===========================================
     # Remove directory/files if exists already
     try:
@@ -140,8 +170,10 @@ def main(self):
     # Clipping box (boundaries) of the model
     
     [x_min, x_max, y_min, y_max, \
-     x_indent, y_indent_min, y_indent_max, x_precrack, y_precrack, \
-        vor, boundaries, boundarylines, boundary_points] = clipBox(box_shape,box_center,box_size,boundaryFlag,sites)
+      x_indent, y_indent_min, y_indent_max, x_precrack, y_precrack, \
+      vor, boundaries, boundarylines, boundary_points] = clipBox(box_shape,box_center,box_size, \
+                                                                 x_indent_size, y_indent_size, x_precrack_size, y_precrack_size,\
+                                                                    boundaryFlag,sites)
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
@@ -224,6 +256,7 @@ def main(self):
                                     npt_per_layer_normal,npt_per_layer_vtk,\
                                     nlayers,precrack_nodes,precrack_widths,\
                                     cellsize_early)
+
     else:
         precrack_nodes = []
         precrack_elem = []
@@ -307,6 +340,8 @@ def main(self):
                         x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
                         nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
                         precrackFlag,precrack_elem)
+        elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
+            chronoInput(self.form)
         else:
             np.save(Path(outDir + geoName + '/' + geoName + '_sites.npy'),sites)
             np.save(Path(outDir + geoName + '/' + geoName + '_radii.npy'),radii)
@@ -335,19 +370,52 @@ def main(self):
     self.form[1].progressBar.setValue(95) 
     self.form[1].statusWindow.setText("Status: Visualizing.") 
     # ==================================================================
-    filname = geoName + '_beams.vtu'
-    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'),"Unnamed")
-    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),"Unnamed")
-    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),"Unnamed")
-    feminout.importVTKResults.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),"Unnamed")
 
-    Gui.SendMsgToActiveView("ViewFit")
-    Gui.runCommand('Std_PerspectiveCamera',1)
+    App.activeDocument().addObject('App::DocumentObjectGroup',visualFilesName)
+    App.activeDocument().getObject(visualFilesName).Label = 'Visualization Files'
+
+    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'),App.ActiveDocument.Name)
+    CBLbeamsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_beams')
+    CBLbeamsVTU.Label = geoName + '_beams'
+    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLbeamsVTU)
+    CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
+    
+    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
+    CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
+    CBLconnsVTU.Label = geoName + '_conns'
+    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
+    CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'))
+
+    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),App.ActiveDocument.Name)
+    CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
+    CBLconnsVTU.Label = geoName + '_conns_vol'
+    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
+    CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
+
+    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
+    CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')
+    CBLvertsVTU.Label = geoName + '_vertices'
+    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLvertsVTU)
+    CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
+
 
     # ==================================================================    
     self.form[1].progressBar.setValue(100) 
     self.form[1].statusWindow.setText("Status: Complete.") 
     # ==================================================================
+
+    # Switch to FEM GUI
+    App.ActiveDocument.recompute()
+
+    Gui.Control.closeDialog()
+    Gui.activateWorkbench("FemWorkbench")
+    FemGui.setActiveAnalysis(App.activeDocument().getObject(analysisName))
+
+    # Set view
+    docGui.activeView().viewAxonometric()
+    Gui.SendMsgToActiveView("ViewFit")
+    Gui.runCommand('Std_DrawStyle',6)
+    Gui.runCommand('Std_PerspectiveCamera',1)
 
 if __name__ == '__main__':
     main()
