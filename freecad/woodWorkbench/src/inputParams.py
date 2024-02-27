@@ -52,15 +52,15 @@ def inputParams(form):
 
     # Precrack Parameters
     # notch and precrack are always centered on leftmost edge
-    x_indent_size = float(form[0].x_indent_size.text() or box_size*0.120) # depth of notch
-    y_indent_size = float(form[0].y_indent_size.text() or box_size*0.125) # width of notch
-    x_precrack_size = float(form[0].x_precrack_size.text() or box_size*0.1) # depth of precrack
-    y_precrack_size = float(form[0].y_precrack_size.text() or box_size*0.02) # depth of notch
+    x_notch_size = float(form[0].x_indent_size.text() or box_size*0.120) # depth of notch
+    y_notch_size = float(form[0].y_indent_size.text() or box_size*0.125) # width of notch
+    precrack_size = float(form[0].x_precrack_size.text() or box_size*0.1) # depth of precrack
 
     # Flags
 
     boundaryFlag = form[0].boundaryFlag.currentText()
     box_shape = form[0].box_shape.currentText()
+    box_shape = box_shape.lower().replace(' ','_')
 
     merge_operation = form[0].merge_operation.currentText() # does what?
     merge_tol = float(form[0].merge_tol.text() or 0.015)
@@ -78,6 +78,6 @@ def inputParams(form):
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        x_indent_size, y_indent_size, x_precrack_size, y_precrack_size, \
+        x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType

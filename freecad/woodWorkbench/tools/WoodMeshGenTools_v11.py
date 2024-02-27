@@ -94,26 +94,26 @@ def check_isinside_boundbox2D(circC,x_min,x_max,y_min,y_max):
     
     return within
 
-def check_isinside_boundbox2Dindent(circC,x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max):
-    """ Make sure this circle does not protrude outside the indent bounding box """
+def check_isinside_boundbox2Dnotched(circC,x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max):
+    """ Make sure this circle does not protrude outside the notched bounding box """
     x = circC[0]
     y = circC[1]
     w = circC[2]
     within = ( x > x_min+w ) and ( x < x_max-w ) and ( y > y_min+w ) and ( y < y_max-w )
-    within_indent = ( x > x_min+w ) and ( x < x_indent-w ) and ( y > y_indent_min+w ) and ( y < y_indent_max-w )
-    within = np.subtract(within,within_indent,dtype=np.float32)
+    within_notch = ( x > x_min+w ) and ( x < x_notch-w ) and ( y > y_notch_min+w ) and ( y < y_notch_max-w )
+    within = np.subtract(within,within_notch,dtype=np.float32)
     return within
 
-def check_isinside_boundbox2Dprecrack(circC,x_min,x_max,y_min,y_max,x_indent,y_indent,x_precrack,y_precrack):
+def check_isinside_boundbox2Dprecrack(circC,x_min,x_max,y_min,y_max,x_notch,y_notch,x_precrack,y_precrack):
     """ Make sure this circle does not protrude outside the ring's bounding box """
 # Neither/nor set operation, ref:https://math.stackexchange.com/questions/1257097/how-to-represent-a-neither-nor-set-operation
     x = circC[0]
     y = circC[1]
     w = circC[2]
     within = ( x > x_min+w ) and ( x < x_max-w ) and ( y > y_min+w ) and ( y < y_max-w )
-    within_indent = ( x > x_min+w ) and ( x < x_indent-w ) and ( y > -y_indent+w ) and ( y < y_indent-w )
-    within_precrack = ( x > x_indent+w ) and ( x < x_precrack-w ) and ( y > -y_precrack+w ) and ( y < y_precrack-w )
-    within_both = within_indent or within_precrack
+    within_notch = ( x > x_min+w ) and ( x < x_notch-w ) and ( y > -y_notch+w ) and ( y < y_notch-w )
+    within_precrack = ( x > x_notch+w ) and ( x < x_precrack-w ) and ( y > -y_precrack+w ) and ( y < y_precrack-w )
+    within_both = within_notch or within_precrack
     within = np.subtract(within,within_both,dtype=np.float32)
     return within
 
@@ -188,7 +188,7 @@ def rotate_around_point_highperf(xy, radians, origin=(0, 0)):
     return qx, qy
 
 
-def Clipping_Box(box_shape,box_center,box_size,boundaryFlag):
+def Clipping_Box(box_shape,box_center,box_size,boundaryFlag,x_notch_size=0,y_notch_size=0):
     """
     clipping box for the 2D Voronoi diagram
     """
@@ -206,6 +206,34 @@ def Clipping_Box(box_shape,box_center,box_size,boundaryFlag):
         l3 = [(x_min, y_max), (x_min, y_min)]
         boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
 
+        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
+        else:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
+
+    elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE','rectangle','Rectangle','RECTANGLE','cube','Cube','CUBE','s']: # notched sqaure box
+        x_min = box_center[0] - box_size/2
+        x_max = box_center[0] + box_size/2
+        y_min = box_center[1] - box_size/2
+        y_max = box_center[1] + box_size/2
+        x_notch = x_min + x_notch_size
+        y_notch_min = box_center[1] - y_notch_size/2
+        y_notch_max = box_center[1] + y_notch_size/2
+        
+        boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
+                            [x_notch,y_notch_min],[x_min,y_notch_min]])
+            
+        l0 = [(x_min, y_min), (x_max, y_min)]
+        l1 = [(x_max, y_min), (x_max, y_max)]
+        l2 = [(x_max, y_max), (x_min, y_max)]
+        l3 = [(x_min, y_max), (x_min, y_notch_max)]
+        l4 = [(x_min, y_notch_max), (x_notch, y_notch_max)]
+        l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
+        l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
+        l7 = [(x_min,y_notch_min), (x_min, y_min)]
+        
+        boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
+        
         if boundaryFlag in ['on','On','Y','y','Yes','yes']:
             boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
         else:
@@ -622,30 +650,30 @@ def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_
         x_max = boundaries[1][1][0][0]
         y_min = boundaries[0][1][0][1]
         y_max = boundaries[2][1][0][1]
-        x_indent = boundaries[5][1][0][0]
-        y_indent_min = boundaries[6][1][0][1]
-        y_indent_max = boundaries[4][1][0][1]
+        x_notch = boundaries[5][1][0][0]
+        y_notch_min = boundaries[6][1][0][1]
+        y_notch_max = boundaries[4][1][0][1]
         
         
         for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
             simplex = np.asarray(simplex)
             simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) and check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max):
+            if np.all(simplex >= 0) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max):
                 voronoi_vertices_in.append(vor.vertices[simplex[0]])
                 voronoi_vertices_in.append(vor.vertices[simplex[1]])
                 finite_ridges.append(simplex)
                 finite_ridges_pointid.append(pointidx)
                 plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-')
             else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                if np.all(simplex >= 0) and (check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) or check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max)): # finite Voronoi ridge but one vertex is far
+                if np.all(simplex >= 0) and (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) or check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max)): # finite Voronoi ridge but one vertex is far
 
-                    if (check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) == 0):# if vertex is out-of-bound, inverse its index
+                    if (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):# if vertex is out-of-bound, inverse its index
                         voronoi_vertices_out.append(vor.vertices[simplex[0]])
                         if simplex[0] == 0:
                             simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
                         else:
                             simplex[0] = -simplex[0]
-                    elif (check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) == 0):
+                    elif (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):
                         voronoi_vertices_out.append(vor.vertices[simplex[1]])
                         if simplex[1] == 0:
                             simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
@@ -653,7 +681,7 @@ def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_
                             simplex[1] = -simplex[1]
                     infinite_ridges.append(simplex)
                     infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max): # index of finite end Voronoi vertex of the infinite ridge
+                elif check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max): # index of finite end Voronoi vertex of the infinite ridge
                     infinite_ridges.append(simplex)
                     infinite_ridges_pointid.append(pointidx) 
     else:
@@ -825,28 +853,28 @@ def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_
         x_max = boundaries[1][1][0][0]
         y_min = boundaries[0][1][0][1]
         y_max = boundaries[2][1][0][1]
-        x_indent = boundaries[5][1][0][0]
-        y_indent_min = boundaries[6][1][0][1]
-        y_indent_max = boundaries[4][1][0][1]
+        x_notch = boundaries[5][1][0][0]
+        y_notch_min = boundaries[6][1][0][1]
+        y_notch_max = boundaries[4][1][0][1]
         
         for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
             simplex = np.asarray(simplex)
             simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) and check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max):
+            if np.all(simplex >= 0) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max):
                 voronoi_vertices_in.append(vor.vertices[simplex[0]])
                 voronoi_vertices_in.append(vor.vertices[simplex[1]])
                 finite_ridges.append(simplex)
                 finite_ridges_pointid.append(pointidx)
                 plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-')
             else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                if np.all(simplex >= 0) and (check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) or check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max)): # finite Voronoi ridge but one vertex is far
-                    if (check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) == 0):# if vertex is out-of-bound, inverse its index
+                if np.all(simplex >= 0) and (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) or check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max)): # finite Voronoi ridge but one vertex is far
+                    if (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):# if vertex is out-of-bound, inverse its index
                         voronoi_vertices_out.append(vor.vertices[simplex[0]])
                         if simplex[0] == 0:
                             simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
                         else:
                             simplex[0] = -simplex[0]
-                    elif (check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max) == 0):
+                    elif (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):
                         voronoi_vertices_out.append(vor.vertices[simplex[1]])
                         if simplex[1] == 0:
                             simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
@@ -854,7 +882,7 @@ def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_
                             simplex[1] = -simplex[1]
                     infinite_ridges.append(simplex)
                     infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundbox2Dindent(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max,x_indent,y_indent_min,y_indent_max): # index of finite end Voronoi vertex of the infinite ridge
+                elif check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max): # index of finite end Voronoi vertex of the infinite ridge
                     infinite_ridges.append(simplex)
                     infinite_ridges_pointid.append(pointidx) 
     else:
@@ -1644,8 +1672,8 @@ Number of long connectors\n'+ str(nelem_connector_l) +
 
 def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
                      npt_per_layer_normal,npt_per_layer_vtk,\
-                     nlayer,precrack_nodes,precrack_widths,\
-                     cellsize_early,nbeam_per_grain):
+                     nlayer,precrack_nodes,precrack_size,\
+                     cellsize_early,nsegments):
     
     precrack_midpts = (precrack_nodes[:,0:2]+precrack_nodes[:,2:4])/2.0
     ridge_midpts = all_pts_2D[all_ridges[:,2]]
@@ -1668,15 +1696,17 @@ def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
                 
     nprecracked_elem = len(precrack_elem)
     
-    # Apply to every beam on one grain
-    precrack_elem = precrack_elem*nbeam_per_grain # repeat list 
-    offset = np.repeat(list(range(0,nbeam_per_grain)),nprecracked_elem)
+    # Apply precrack to every layer of beam segment
+    precrack_elem = precrack_elem*nsegments # repeat list 
+    offset = np.repeat(list(range(0,nsegments)),nprecracked_elem)
     offset = [i * nridge for i in offset]
     precrack_elem = [a + b for a, b in zip(precrack_elem, offset)]
     
+    nconnector_t_precrack = len(precrack_elem)*3 # times 3 for bot,reg,top layers
+    nconnector_l_precrack = 0
     # Visualize the precracks in the preview plot
     plt.plot(precrack_nodes[0,0::2],precrack_nodes[0,1::2],'r-',linewidth=2)
-    return precrack_elem
+    return precrack_elem, nconnector_t_precrack, nconnector_l_precrack
 
 
 def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_2D,\
@@ -4077,8 +4107,8 @@ def ReadSavedSites(sites_path, radial_growth_rule):
         
         if time.time() >= tCurrent + timeout_limit:
             print('Could not find file: {:s}, please check if the existing site file is under the same directory with the input script.'.format(radial_growth_rule))
-            # print('Now exiting...')
-            # exit()
+            print('Now exitting...')
+            exit()
             return None
         
     
@@ -4118,7 +4148,7 @@ def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
               props_connector_t_top,props_connector_l,iprops_beam,\
               beam_connectivity,connector_t_bot_connectivity,\
               connector_t_reg_connectivity,connector_t_top_connectivity,\
-              connector_l_connectivity,MeshData,x_indent_size,y_indent_size):
+              connector_l_connectivity,MeshData,x_notch_size,y_notch_size):
     
     beam_length = fiberlength/nbeam_per_grain
     nelem_beam = beam_connectivity.shape[0]
@@ -4152,7 +4182,7 @@ def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
     
     hull = ConvexHull(boundary_points) 
     
-    volume = (z_max-z_min)*hull.volume - x_indent_size*y_indent_size
+    volume = (z_max-z_min)*hull.volume - x_notch_size*y_notch_size
 
     density = mass/volume
     
@@ -4162,18 +4192,18 @@ def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
     return mass,volume,density,porosity
 
 
-# def StlModelFile(geoName):
+def StlModelFile(geoName):
     
-#     """Generate the 3D model file (geoName.stl file) for the generated geometry.
+    """Generate the 3D model file (geoName.stl file) for the generated geometry.
 
-#     Arguments:
-#     ---------
-#     geoName :: string, geometry name.
+    Arguments:
+    ---------
+    geoName :: string, geometry name.
 
-#     Returns
-#     -------
-#     None or error message, if generation failed (TBD)
-#     """
+    Returns
+    -------
+    None or error message, if generation failed (TBD)
+    """
     
 #     import vtk
 #     import os
@@ -4206,7 +4236,7 @@ def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
 def LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_sparse,width_dense,\
         generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
         cellsize_sparse,cellsize_dense,cellwallthickness_sparse,cellwallthickness_dense,\
-        merge_operation,merge_tol,precrackFlag,precrack_widths,boundaryFlag,\
+        merge_operation,merge_tol,precrackFlag,precrack_size,boundaryFlag,\
         segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
         NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
         nParticles,nbeamElem,skeleton_density,mass,volume,density,porosity,\
@@ -4269,7 +4299,7 @@ def LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_sparse,width_d
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
         logfile.write('\n')
         logfile.write('PRECRACK INSERTION PARAMETERS:\n')
-        logfile.write('precrack_widths:                         ' + str(precrack_widths) + '\n')
+        logfile.write('precrack_size:                           ' + str(precrack_size) + '\n')
         logfile.write('nconnector_t_precrack:                   ' + str(nconnector_t_precrack) + '\n')
         logfile.write('nconnector_l_precrack:                   ' + str(nconnector_l_precrack) + '\n')
     logfile.write('\n')

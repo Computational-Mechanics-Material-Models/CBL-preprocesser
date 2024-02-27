@@ -850,6 +850,11 @@
            </item>
            <item>
             <property name="text">
+             <string>Notched Square</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
              <string>Circle</string>
             </property>
            </item>
@@ -1029,7 +1034,7 @@
               </size>
              </property>
              <property name="text">
-              <string/>
+              <string>TBI</string>
              </property>
              <property name="maxLength">
               <number>32767</number>

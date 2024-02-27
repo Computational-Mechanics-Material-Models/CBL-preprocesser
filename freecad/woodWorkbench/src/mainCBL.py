@@ -21,6 +21,7 @@ import time
 import shutil
 import tempfile
 from pathlib import Path
+from scipy.spatial import Voronoi, voronoi_plot_2d
 import FreeCAD as App
 import FreeCADGui as Gui
 import feminout.importVTKResults as importVTK
@@ -76,7 +77,7 @@ def main(self):
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        x_indent_size, y_indent_size, x_precrack_size, y_precrack_size, \
+        x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType] = inputParams(self.form)
         
@@ -169,14 +170,26 @@ def main(self):
     # ==================================================================
     # Clipping box (boundaries) of the model
     
-    [x_min, x_max, y_min, y_max, \
-      x_indent, y_indent_min, y_indent_max, x_precrack, y_precrack, \
-      vor, boundaries, boundarylines, boundary_points] = clipBox(box_shape,box_center,box_size, \
-                                                                 x_indent_size, y_indent_size, x_precrack_size, y_precrack_size,\
-                                                                    boundaryFlag,sites)
+    x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines = \
+        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,boundaryFlag,x_notch_size,y_notch_size)
+
+    x_notch = x_min + x_notch_size
+    y_notch_min = box_center[1] - y_notch_size/2
+    y_notch_max = box_center[1] + y_notch_size/2
+    x_precrack = x_notch + precrack_size
+    y_precrack = box_center[1]
+
+    # Visualize the original 2D Voronoi diagram
+    vor = Voronoi(sites[:,0:2])
+    voronoi_plot_2d(vor, show_vertices=False,line_width=0.5, line_alpha=0.6, point_size=2)
+    plt.xlim(x_min-0.1*abs(x_max-x_min), x_max+0.1*abs(x_max-x_min))
+    plt.ylim(y_min-0.1*abs(y_max-y_min), y_max+0.1*abs(y_max-y_min))
+    plt.plot(boundary_points[:, 0], boundary_points[:, 1], 'bo')
+    # plt.show()
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
+
     ax = plt.gca()
     boundarylines = patches.Polygon(boundary_points,closed=True,linewidth=2,edgecolor='k',facecolor='none')
     ax.set_aspect('equal', adjustable='box')
@@ -250,13 +263,20 @@ def main(self):
     # ===============================================
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
-        precrack_nodes = np.array([[x_indent, y_precrack, x_precrack, y_precrack]])
+        
+
+        x_notch = x_min + x_notch_size
+        y_notch_min = box_center[1] - y_notch_size/2
+        y_notch_max = box_center[1] + y_notch_size/2
+        x_precrack = x_notch + precrack_size
+        y_precrack = box_center[1]
+        
+        precrack_nodes = np.array([[x_notch, y_precrack, x_precrack, y_precrack]])
         [precrack_elem,nconnector_t_precrack,nconnector_l_precrack] = \
             WoodMeshGen.insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
                                     npt_per_layer_normal,npt_per_layer_vtk,\
-                                    nlayers,precrack_nodes,precrack_widths,\
-                                    cellsize_early)
-
+                                    nlayers,precrack_nodes,precrack_size,\
+                                    cellsize_early,nsegments)
     else:
         precrack_nodes = []
         precrack_elem = []
