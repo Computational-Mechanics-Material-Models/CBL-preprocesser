@@ -1495,6 +1495,9 @@ def GenerateBeamElement(NURBS_degree,nsegments,theta_min,theta_max,\
     for i in range(0,nlayers):
         for j in range(0,npt_per_layer):
             vertices_new[i,j,:2] = rotate_around_point_highperf(voronoi_vertices[j,:], theta[i], generation_center)
+            # added randomness to morphology in the L plane - not calibrated yet
+            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()/10+1)
+            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()/10+1)
             vertices_new[i,j,2] = z_coord[i]
     
     # Vertex Data for IGA

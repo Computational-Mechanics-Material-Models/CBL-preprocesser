@@ -29,8 +29,6 @@ import ObjectsFem
 import FemGui
 
 from freecad.woodWorkbench.src.inputParams import inputParams
-# from freecad.woodWorkbench.src.genSites import genSites
-from freecad.woodWorkbench.src.clipBox import clipBox
 from freecad.woodWorkbench.src.outputParams import outputParams
 from freecad.woodWorkbench.src.chronoInput import chronoInput
 
@@ -71,7 +69,9 @@ def main(self):
     self.form[1].progressBar.setValue(10) 
     self.form[1].statusWindow.setText("Status: Reading Parameters.") 
     # ==================================================================
-    # Input parameters
+    # Input parameters 
+
+    # if loaded read from log file (and print to gui?) otherwise read from gui
     [geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
@@ -82,6 +82,10 @@ def main(self):
         stlFlag, inpFlag, inpType] = inputParams(self.form)
         
     precrack_widths = 0 # for future use
+
+    grain_length = 5 # mm
+    height = z_max-z_min
+    nsegments = int(height/grain_length)
 
     # Prep naming variables
     meshName = geoName + "_mesh"
@@ -166,18 +170,12 @@ def main(self):
 
     # ==================================================================
     self.form[1].progressBar.setValue(30) 
-    self.form[1].statusWindow.setText("Status: Clipping Box.") 
+    self.form[1].statusWindow.setText("Status: Defining Boundaries.") 
     # ==================================================================
     # Clipping box (boundaries) of the model
     
     x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines = \
         WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,boundaryFlag,x_notch_size,y_notch_size)
-
-    x_notch = x_min + x_notch_size
-    y_notch_min = box_center[1] - y_notch_size/2
-    y_notch_max = box_center[1] + y_notch_size/2
-    x_precrack = x_notch + precrack_size
-    y_precrack = box_center[1]
 
     # Visualize the original 2D Voronoi diagram
     vor = Voronoi(sites[:,0:2])
@@ -198,7 +196,7 @@ def main(self):
 
     # ==================================================================
     self.form[1].progressBar.setValue(40) 
-    self.form[1].statusWindow.setText("Status: Rebuilding Mesh.") 
+    self.form[1].statusWindow.setText("Status: Clipping Mesh.") 
     # ==================================================================
     # Rebuild the Voronoi mesh
     if merge_operation in ['on','On','Y','y','Yes','yes']:
@@ -218,18 +216,18 @@ def main(self):
         RebuildvorTime = time.time() 
         print('Voronoi tessellation rebuilt in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
 
-    # ===============================================
+
+    # ==================================================================
+    self.form[1].progressBar.setValue(50) 
+    self.form[1].statusWindow.setText("Status: Writing Vertices.") 
+    # ================================================================== 
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
     [all_pts_2D,all_ridges,npt_per_layer,npt_per_layer_normal,npt_per_layer_vtk] = \
         WoodMeshGen.RidgeMidQuarterPts(voronoi_vertices,nvertex,nvertices_in,voronoi_ridges,\
                         finite_ridges_new,boundary_ridges_new,nfinite_ridge,\
                         nboundary_ridge,nboundary_pts,nboundary_pts_featured)
 
-
-    # ==================================================================
-    self.form[1].progressBar.setValue(50) 
-    self.form[1].statusWindow.setText("Status: Writing Vertices.") 
-    # ==================================================================        
+    # ===============================================
     # Generate a file for vertices and ridges info
     [all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges] = \
         WoodMeshGen.VertexandRidgeinfo(all_pts_2D,all_ridges,\
@@ -244,6 +242,26 @@ def main(self):
     # ==================================================================
     # Extrude in the parallel-to-grain (longitudinal) direction
     NURBS_degree = 2
+
+    # varfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-temp.txt'),'w')                                      
+    # varfile.write(repr(nsegments)+ '\n')
+    # varfile.write(repr(theta_min)+ '\n')
+    # varfile.write(repr(theta_max)+ '\n')
+    # varfile.write(repr(z_min)+ '\n')
+    # varfile.write(repr(z_max)+ '\n')
+    # varfile.write(repr(long_connector_ratio)+ '\n')
+    # varfile.write(repr(npt_per_layer)+ '\n')
+    # varfile.write(repr(voronoi_vertices)+ '\n')
+    # varfile.write(repr(nvertex)+ '\n')
+    # varfile.write(repr(voronoi_ridges)+ '\n')
+    # varfile.write(repr(nridge)+ '\n')
+    # varfile.write(repr(generation_center)+ '\n')
+    # varfile.write(repr(all_vertices_2D)+ '\n')
+    # varfile.write(repr(max_wings)+ '\n')
+    # varfile.write(repr(flattened_all_vertices_2D)+ '\n')
+    # varfile.write(repr(all_ridges)+ '\n')
+    
+
     [IGAvertices,vertex_connectivity,beam_connectivity_original,nbeam_total,\
     beam_connectivity,nbeamElem,nctrlpt_per_beam,nlayers,segment_length,connector_t_connectivity,\
     connector_t_bot_connectivity,connector_t_top_connectivity,\
@@ -264,10 +282,9 @@ def main(self):
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
         
-
         x_notch = x_min + x_notch_size
-        y_notch_min = box_center[1] - y_notch_size/2
-        y_notch_max = box_center[1] + y_notch_size/2
+        # y_notch_min = box_center[1] - y_notch_size/2
+        # y_notch_max = box_center[1] + y_notch_size/2
         x_precrack = x_notch + precrack_size
         y_precrack = box_center[1]
         
@@ -305,7 +322,7 @@ def main(self):
     knotVec = WoodMeshGen.BezierExtraction(NURBS_degree,nbeam_total)
     npatch = beam_connectivity_original.shape[0]
 
-    mkBezierBeamFile = WoodMeshGen.BezierBeamFile(geoName,NURBS_degree,nctrlpt_per_beam,\
+    WoodMeshGen.BezierBeamFile(geoName,NURBS_degree,nctrlpt_per_beam,\
                     nconnector_t_per_beam,npatch,knotVec)
 
     # ==================================================================
@@ -399,25 +416,27 @@ def main(self):
     CBLbeamsVTU.Label = geoName + '_beams'
     App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLbeamsVTU)
     CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
-    
+    CBLbeamsVTU.Visibility = False
+
     importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
     CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
     CBLconnsVTU.Label = geoName + '_conns'
     App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
     CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'))
-
+    CBLconnsVTU.Visibility = False
+    
     importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),App.ActiveDocument.Name)
-    CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
-    CBLconnsVTU.Label = geoName + '_conns_vol'
-    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
-    CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
+    CBLconnsvVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
+    CBLconnsvVTU.Label = geoName + '_conns_vol'
+    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsvVTU)
+    CBLconnsvVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
 
     importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
     CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')
     CBLvertsVTU.Label = geoName + '_vertices'
     App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLvertsVTU)
     CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
-
+    CBLvertsVTU.Visibility = False
 
     # ==================================================================    
     self.form[1].progressBar.setValue(100) 
@@ -436,6 +455,8 @@ def main(self):
     Gui.SendMsgToActiveView("ViewFit")
     Gui.runCommand('Std_DrawStyle',6)
     Gui.runCommand('Std_PerspectiveCamera',1)
+
+    plt.show()
 
 if __name__ == '__main__':
     main()

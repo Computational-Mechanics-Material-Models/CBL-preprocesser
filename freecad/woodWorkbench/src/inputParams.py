@@ -42,7 +42,7 @@ def inputParams(form):
     box_size = float(form[0].box_size.text() or 20) # side length
 
     # longitudinal direction parameters
-    nsegments = int(form[0].nsegments.text() or 8) # increase this number to achieve a smoother transition in longitudinal direction if theta is large
+    nsegments = int(form[0].nsegments.text() or 2) 
     theta_min = float(form[0].theta_min.text() or 0) # unit: radian
     theta_max = 0.00 # unit: radian
     z_min = 0
