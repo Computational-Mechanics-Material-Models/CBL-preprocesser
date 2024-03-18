@@ -31,6 +31,7 @@ import FemGui
 from freecad.woodWorkbench.src.inputParams import inputParams
 from freecad.woodWorkbench.src.outputParams import outputParams
 from freecad.woodWorkbench.src.chronoInput import chronoInput
+from freecad.woodWorkbench.src.chronoInput import chronoAux
 
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 
@@ -79,13 +80,14 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType] = inputParams(self.form)
+        stlFlag, inpFlag, inpType, random_noise] = inputParams(self.form)
         
     precrack_widths = 0 # for future use
 
-    grain_length = 5 # mm
-    height = z_max-z_min
-    nsegments = int(height/grain_length)
+    # for future implementation - SA
+    # grain_length = 5 # mm
+    # height = z_max-z_min
+    # nsegments = int(height/grain_length)
 
     # Prep naming variables
     meshName = geoName + "_mesh"
@@ -272,7 +274,7 @@ def main(self):
                             theta_min,theta_max,z_min,z_max,\
                             long_connector_ratio,npt_per_layer,voronoi_vertices,\
                             nvertex,voronoi_ridges,nridge,generation_center,\
-                            all_vertices_2D,max_wings,flattened_all_vertices_2D,all_ridges)
+                            all_vertices_2D,max_wings,flattened_all_vertices_2D,all_ridges,random_noise)
 
     BeamTime = time.time() 
     print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
@@ -378,7 +380,8 @@ def main(self):
                         nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
                         precrackFlag,precrack_elem)
         elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
-            chronoInput(self.form)
+            # chronoInput(self.form)
+            chronoAux(geoName,IGAvertices,beam_connectivity)
         else:
             np.save(Path(outDir + geoName + '/' + geoName + '_sites.npy'),sites)
             np.save(Path(outDir + geoName + '/' + geoName + '_radii.npy'),radii)

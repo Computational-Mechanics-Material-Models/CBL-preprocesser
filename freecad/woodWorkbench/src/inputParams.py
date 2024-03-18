@@ -19,8 +19,8 @@ def inputParams(form):
     # Cell Growth Parameters
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
     r_min = float(form[0].r_min.text() or 0)   # inner radius of generation domain
-    r_max = float(form[0].r_max.text() or 50)   # outer radius of generation domain
-    nrings = int(form[0].nrings.text() or 15) # number of rings
+    r_max = float(form[0].r_max.text() or 5)   # outer radius of generation domain
+    nrings = int(form[0].nrings.text() or 1) # number of rings
     width_heart = 0.15*(r_max-r_min)/nrings # ring width for the innermost ring
     width_early = 0.85*(r_max-r_min)/nrings # ring width for rings with early cells
     width_late = 0.15*(r_max-r_min)/nrings # ring width for rings with late cells
@@ -32,6 +32,7 @@ def inputParams(form):
     cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
 
     skeleton_density = float(form[0].skeleton_density.text() or 1.5e-9) # unit: tonne/mm3
+    random_noise = float(form[0].random_noise.text() or 0) # unit: ?
 
 
     # Model Parameters     
@@ -39,7 +40,7 @@ def inputParams(form):
     print_interval = int(form[0].print_interval.text() or 500) # interval for printing prgress info
 
     box_center = eval(form[0].box_center.text() or (0.0,0.0)) # coordinates of clipping box center
-    box_size = float(form[0].box_size.text() or 20) # side length
+    box_size = float(form[0].box_size.text() or 5) # side length
 
     # longitudinal direction parameters
     nsegments = int(form[0].nsegments.text() or 2) 
@@ -80,4 +81,4 @@ def inputParams(form):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType
+        stlFlag, inpFlag, inpType, random_noise

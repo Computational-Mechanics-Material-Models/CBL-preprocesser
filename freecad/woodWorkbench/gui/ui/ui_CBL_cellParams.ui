@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>859</width>
-    <height>1111</height>
+    <width>864</width>
+    <height>1423</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -190,7 +190,7 @@
               <string/>
              </property>
              <property name="placeholderText">
-              <string>50</string>
+              <string>5</string>
              </property>
             </widget>
            </item>
@@ -229,7 +229,7 @@
               <string/>
              </property>
              <property name="placeholderText">
-              <string>15</string>
+              <string>1</string>
              </property>
             </widget>
            </item>
@@ -422,6 +422,39 @@
            </item>
           </layout>
          </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_20">
+           <item>
+            <widget class="QLineEdit" name="random_noise">
+             <property name="minimumSize">
+              <size>
+               <width>75</width>
+               <height>20</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>75</width>
+               <height>20</height>
+              </size>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="placeholderText">
+              <string>0</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_19">
+             <property name="text">
+              <string>Cell L Randomness</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
         </layout>
        </widget>
       </item>
@@ -564,7 +597,7 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>20</string>
+            <string>5</string>
            </property>
           </widget>
          </item>
@@ -600,7 +633,7 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>20</string>
+            <string>5</string>
            </property>
           </widget>
          </item>
@@ -633,10 +666,10 @@
             </size>
            </property>
            <property name="text">
-            <string>10</string>
+            <string/>
            </property>
            <property name="placeholderText">
-            <string>10</string>
+            <string>2</string>
            </property>
           </widget>
          </item>
@@ -1202,7 +1235,7 @@
             <number>-1</number>
            </property>
            <property name="currentIndex">
-            <number>0</number>
+            <number>1</number>
            </property>
            <item>
             <property name="text">
@@ -1235,7 +1268,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>859</width>
+     <width>864</width>
      <height>21</height>
     </rect>
    </property>

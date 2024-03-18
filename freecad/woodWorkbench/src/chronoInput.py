@@ -17,6 +17,33 @@ from pathlib import Path
 import FreeCAD as App
 from femtools import membertools
 
+def chronoAux(geoName,woodIGAvertices,beam_connectivity):
+
+    # Beam
+   
+    numnode = woodIGAvertices.shape[0]
+    nelem = beam_connectivity.shape[0]
+    nnode = beam_connectivity.shape[1]
+
+
+    # Generate a .inp file which can be directly imported and played in Abaqus
+    nodefile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoNodes.dat'),'w')
+    elementfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoElements.dat'),'w')
+
+    # nodes
+    for i in range(0,numnode):
+        nodefile.write('{:#.9e}, {:#.9e},  {:#.9e}\n'.format(woodIGAvertices[i,0],woodIGAvertices[i,1],woodIGAvertices[i,2]))
+
+    # beam element connectivity 
+    for i in range(0,nelem):
+        for j in range(0,nnode):
+            elementfile.write('{:d}'.format(beam_connectivity[i,j])) 
+        elementfile.write('\n')
+
+    elementfile.close()
+    nodefile.close()
+
+
 def chronoInput(form):
 
     """
@@ -43,7 +70,7 @@ def chronoInput(form):
     elementType = 'IGA'
     analysisName = form[0].geoName.text()
     geoName = form[0].geoName.text()
-    outDir = self.form[1].outputDir.text()
+    outDir = form[1].outputDir.text()
     outName = form[0].geoName.text()
 
     doc = App.ActiveDocument

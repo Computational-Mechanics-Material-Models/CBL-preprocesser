@@ -462,11 +462,12 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
         else:
             cellsize = cellsize_sparse/2
 
-        OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellsize)))
+        OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellsize))) # this should be constant
         
         t = np.linspace(0, 2*np.pi, OuterPerimeter_npoint, endpoint=False)
         x = OuterPerimeter_radii * np.cos(t)
         y = OuterPerimeter_radii * np.sin(t)
+        ### here put in the restriction on x/y location?
         w = cellsize*np.ones(x.shape)
         OuterPerimeterPoints.append(np.c_[x, y])
         OuterPerimeterPointsSites = np.concatenate(OuterPerimeterPoints, axis=0)
@@ -483,6 +484,7 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
             t = np.linspace(0, 2*np.pi, subnpoint, endpoint=False)
             x = subr * np.cos(t)
             y = subr * np.sin(t)
+            ### here put in the restriction on x/y location?
             circles.append(np.c_[x, y])
             
         inside_cells = np.concatenate(circles, axis=0)
@@ -1459,7 +1461,7 @@ Number of ridges\n'+ str(nridge) +
 def GenerateBeamElement(NURBS_degree,nsegments,theta_min,theta_max,\
                         z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
                         nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
-                        flattened_all_vertices_2D,all_ridges):
+                        flattened_all_vertices_2D,all_ridges,random_noise):
     
 
     nctrlpt_per_elem = NURBS_degree + 1
@@ -1495,9 +1497,9 @@ def GenerateBeamElement(NURBS_degree,nsegments,theta_min,theta_max,\
     for i in range(0,nlayers):
         for j in range(0,npt_per_layer):
             vertices_new[i,j,:2] = rotate_around_point_highperf(voronoi_vertices[j,:], theta[i], generation_center)
-            # added randomness to morphology in the L plane - not calibrated yet
-            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()/10+1)
-            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()/10+1)
+            # added randomness to morphology in the L plane - not calibrated yet -SA
+            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise/10+1)
+            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise/10+1)
             vertices_new[i,j,2] = z_coord[i]
     
     # Vertex Data for IGA
