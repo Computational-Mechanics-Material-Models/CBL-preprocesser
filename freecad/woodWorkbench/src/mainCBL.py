@@ -381,7 +381,7 @@ def main(self):
                         precrackFlag,precrack_elem)
         elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
             # chronoInput(self.form)
-            chronoAux(geoName,IGAvertices,beam_connectivity)
+            chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
         else:
             np.save(Path(outDir + geoName + '/' + geoName + '_sites.npy'),sites)
             np.save(Path(outDir + geoName + '/' + geoName + '_radii.npy'),radii)

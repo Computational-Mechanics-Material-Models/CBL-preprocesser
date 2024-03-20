@@ -17,7 +17,7 @@ from pathlib import Path
 import FreeCAD as App
 from femtools import membertools
 
-def chronoAux(geoName,woodIGAvertices,beam_connectivity):
+def chronoAux(geoName,woodIGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec):
 
     # Beam
    
@@ -41,6 +41,30 @@ def chronoAux(geoName,woodIGAvertices,beam_connectivity):
     elementfile.close()
     nodefile.close()
 
+    # IGA file
+    igafile = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoIGA.dat'),'w')
+    igafile.write('# Dimension of beam elements \n')
+    igafile.write('1 \n')
+    igafile.write('# Order of basis function \n')
+    igafile.write('{:d} \n'.format(NURBS_degree))
+    igafile.write('# Number of control points per patch \n')
+    igafile.write('{:d} \n'.format(nctrlpt_per_beam))
+    igafile.write('# Number of elements per patch \n') 
+    igafile.write('{:d} \n'.format(nconnector_t_per_beam-1))
+    igafile.write('# Number of Patches \n') 
+    igafile.write('{:d} \n'.format(npatch))
+    # Loop over patches
+    for i in range(0,npatch):
+        igafile.write('{:s} \n'.format('PATCH-'+str(i+1)))
+        igafile.write('Size of knot vectors \n') 
+        igafile.write('{:d} \n'.format(knotVec.shape[1])) 
+        igafile.write('knot vectors \n')
+        for j in range(0,knotVec.shape[1]):
+            igafile.write('{:f} '.format(knotVec[i,j])) 
+        igafile.write('\n')
+        igafile.write('{:d}, {:d}, {:d}, {:d}, {:d}\n'.format(beam_connectivity[2*i,0],beam_connectivity[2*i,1],beam_connectivity[2*i,2],beam_connectivity[2*i+1,1],beam_connectivity[2*i+1,2]))
+    
+    igafile.close()
 
 def chronoInput(form):
 
