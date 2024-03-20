@@ -19,7 +19,7 @@ def inputParams(form):
     # Cell Growth Parameters
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
     r_min = float(form[0].r_min.text() or 0)   # inner radius of generation domain
-    r_max = float(form[0].r_max.text() or 5)   # outer radius of generation domain
+    r_max = float(form[0].r_max.text() or 10)   # outer radius of generation domain
     nrings = int(form[0].nrings.text() or 1) # number of rings
     width_heart = 0.15*(r_max-r_min)/nrings # ring width for the innermost ring
     width_early = 0.85*(r_max-r_min)/nrings # ring width for rings with early cells

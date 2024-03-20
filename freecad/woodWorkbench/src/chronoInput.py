@@ -36,9 +36,7 @@ def chronoAux(geoName,woodIGAvertices,beam_connectivity):
 
     # beam element connectivity 
     for i in range(0,nelem):
-        for j in range(0,nnode):
-            elementfile.write('{:d}'.format(beam_connectivity[i,j])) 
-        elementfile.write('\n')
+        elementfile.write('{:d}, {:d},  {:d}\n'.format(beam_connectivity[i,0],beam_connectivity[i,1],beam_connectivity[i,2]))
 
     elementfile.close()
     nodefile.close()
