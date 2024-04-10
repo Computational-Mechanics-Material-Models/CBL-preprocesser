@@ -462,12 +462,11 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
         else:
             cellsize = cellsize_sparse/2
 
-        OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellsize))) # this should be constant
+        OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellsize)))
         
         t = np.linspace(0, 2*np.pi, OuterPerimeter_npoint, endpoint=False)
         x = OuterPerimeter_radii * np.cos(t)
         y = OuterPerimeter_radii * np.sin(t)
-        ### here put in the restriction on x/y location?
         w = cellsize*np.ones(x.shape)
         OuterPerimeterPoints.append(np.c_[x, y])
         OuterPerimeterPointsSites = np.concatenate(OuterPerimeterPoints, axis=0)
@@ -484,7 +483,6 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
             t = np.linspace(0, 2*np.pi, subnpoint, endpoint=False)
             x = subr * np.cos(t)
             y = subr * np.sin(t)
-            ### here put in the restriction on x/y location?
             circles.append(np.c_[x, y])
             
         inside_cells = np.concatenate(circles, axis=0)
@@ -1263,9 +1261,189 @@ def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_
            nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
            
 
-def RidgeMidQuarterPts(voronoi_vertices,nvertex,nvertices_in,voronoi_ridges,\
-                       finite_ridges_new,boundary_ridges_new,nfinite_ridge,\
-                       nboundary_ridge,nboundary_pts,nboundary_pts_featured):
+
+def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
+                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise):
+    
+    npt_per_layer = nvertex
+    npt_per_layer_normal = npt_per_layer - nboundary_pts_featured
+            
+    nctrlpt_per_elem = NURBS_degree + 1
+    nctrlpt_per_beam = 2*NURBS_degree + 1
+
+    nlayers = nctrlpt_per_beam*nsegments
+    
+    nconnector_t_per_beam = int((nctrlpt_per_beam-1)/NURBS_degree+1)
+    nconnector_t_per_grain = int(nconnector_t_per_beam*nsegments)
+    
+    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
+    segment_angle = (theta_max-theta_min) / (nsegments + (nsegments-1)*long_connector_ratio)
+
+    connector_l_angle = segment_angle*long_connector_ratio
+    connector_l_length = segment_length*long_connector_ratio
+    
+    # theta = np.linspace(theta_min,theta_max,nlayers-(nsegments-1))
+    # z_coord = np.linspace(z_min,z_max,nlayers-(nsegments-1))
+
+    theta = np.linspace(theta_min,theta_max-connector_l_angle*(nsegments-1),nlayers-(nsegments-1))
+    z_coord = np.linspace(z_min,z_max-connector_l_length*(nsegments-1),nlayers-(nsegments-1))
+    
+    # Insert repeated layers for the longitudinal connectors
+    for i in range(nlayers-(nsegments-1)-(nctrlpt_per_beam-1),1,-(nctrlpt_per_beam-1)): 
+        theta = np.insert(theta,i,theta[i-1])
+        theta[i:] += connector_l_angle
+    for i in range(nlayers-(nsegments-1)-(nctrlpt_per_beam-1),1,-(nctrlpt_per_beam-1)):
+        z_coord = np.insert(z_coord,i,z_coord[i-1])
+        z_coord[i:] += connector_l_length
+    
+    # Rotate and add randomness in each layer in 3D
+    vertices_new = np.zeros((nlayers,npt_per_layer,3))
+    for i in range(0,nlayers):
+        for j in range(0,npt_per_layer):
+            vertices_new[i,j,:2] = rotate_around_point_highperf(voronoi_vertices[j,:], theta[i], generation_center)
+            # added randomness to morphology in the L plane - not calibrated yet -SA
+            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise/10+1)
+            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise/10+1)
+            
+            # # add artificial waviness
+            # vertices_new[i,j,0] = vertices_new[i,j,0] + z_coord[i]**2*random_noise
+            # vertices_new[i,j,1] = vertices_new[i,j,1] + 0
+            
+            vertices_new[i,j,2] = z_coord[i]
+
+    # Vertex Data in 3D
+    voronoi_vertices_3D = np.reshape(vertices_new,(-1,3))
+    nvertices_3D = voronoi_vertices_3D.shape[0]
+    
+    
+    # Voronoi Ridge Data in 3D 
+    finite_ridges_3D = np.tile(finite_ridges_new, (nlayers,1)) # temporarily assume each layer has the same number of finite_ridges and same finite ridge connectivities
+    # calculate offset 
+    x = np.arange(0,nlayers)*npt_per_layer
+    finite_ridges_3D_offset = np.repeat(x, nfinite_ridge)
+    finite_ridges_3D_offset = np.tile(finite_ridges_3D_offset, (2,1))
+    finite_ridges_3D = finite_ridges_3D + finite_ridges_3D_offset.T 
+
+    
+    # Voronoi Ridge Data in 3D 
+    boundary_ridges_3D = np.tile(boundary_ridges_new, (nlayers,1)) # temporarily assume each layer has the same number of finite_ridges and same finite ridge connectivities
+    # calculate offset 
+    x = np.arange(0,nlayers)*npt_per_layer
+    boundary_ridges_3D_offset = np.repeat(x, nboundary_ridge)
+    boundary_ridges_3D_offset = np.tile(boundary_ridges_3D_offset, (2,1))
+    boundary_ridges_3D = boundary_ridges_3D + boundary_ridges_3D_offset.T
+    
+    
+    return voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
+           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D
+        
+        
+def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
+                       finite_ridges_new,boundary_ridges_new,finite_ridges_3D,boundary_ridges_3D,nfinite_ridge,\
+                       nboundary_ridge,nboundary_pts,nboundary_pts_featured,nlayers,voronoi_vertices):
+    
+    count = 0 # count for vertex (point) index
+    
+    for i in range(0,nlayers):
+        ######################### For finite Voronoi ridges ###########################
+        # Form a list of middle points of finite Voronoi edges
+        finite_ridge_mid = []
+        finite_midpt_indices = []
+        count += nvertex
+        
+        for vpair in finite_ridges_3D[i*nfinite_ridge+0:i*nfinite_ridge+nfinite_ridge,:]: # for vpair in finite_ridges_new:
+            midpoint = (voronoi_vertices_3D[vpair[0]] + voronoi_vertices_3D[vpair[1]])/2
+            finite_ridge_mid.append(midpoint)
+            finite_midpt_indices.append(count)
+            count += 1
+            
+        finite_ridge_mid = np.tile(finite_ridge_mid, (2,1)) # duplicate the mid point list
+        finite_second_midpt_indices = [x+nfinite_ridge for x in finite_midpt_indices]
+        finite_midpt_indices = np.concatenate((finite_midpt_indices,finite_second_midpt_indices))
+        count += nfinite_ridge
+        nfinite_midpt = nfinite_ridge*2
+        
+        # Form a list of quarter points of Voronoi edges
+        finite_ridge_quarter = []
+        finite_quarterpt_indices = []
+        for vpair in finite_ridges_3D[i*nfinite_ridge+0:i*nfinite_ridge+nfinite_ridge,:]: # for vpair in finite_ridges_new:
+            quarterpoint = 3./4*voronoi_vertices_3D[vpair[0]] + 1./4*voronoi_vertices_3D[vpair[1]]
+            finite_ridge_quarter.append(quarterpoint)
+            finite_quarterpt_indices.append(count)
+            count += 1
+        
+        for vpair in finite_ridges_3D[i*nfinite_ridge+0:i*nfinite_ridge+nfinite_ridge,:]: # for vpair in finite_ridges_new:
+            quarterpoint = 1./4*voronoi_vertices_3D[vpair[0]] + 3./4*voronoi_vertices_3D[vpair[1]]
+            finite_ridge_quarter.append(quarterpoint)
+            finite_quarterpt_indices.append(count)
+            count += 1
+        finite_quarterpt_indices = np.asarray(finite_quarterpt_indices)
+        
+        nfinite_quarterpt = nfinite_ridge*2
+        
+        nfinitept_per_layer = nvertices_in + nfinite_midpt + nfinite_quarterpt
+        
+        ######################### For boundary Voronoi ridges #########################
+        # Form a list of mid-points of boundary Voronoi edges
+        boundary_ridge_mid = []
+        boundary_midpt_indices = []
+        for vpair in boundary_ridges_3D[i*nboundary_ridge+0:i*nboundary_ridge+nboundary_ridge,:]: # for vpair in boundary_ridges_new:
+            boundary_midpoint = (voronoi_vertices_3D[vpair[0]] + voronoi_vertices_3D[vpair[1]])/2
+            boundary_ridge_mid.append(boundary_midpoint)
+            boundary_midpt_indices.append(count)
+            count += 1
+        
+        boundary_ridge_mid = np.tile(boundary_ridge_mid, (2,1))
+        boundary_second_midpt_indices = [x+nboundary_ridge for x in boundary_midpt_indices]
+        boundary_midpt_indices = np.concatenate((boundary_midpt_indices,boundary_second_midpt_indices))
+        count += nboundary_ridge
+        nboundary_midpt = nboundary_ridge*2
+        
+        # Form a list of quarter-points of boundary Voronoi edges
+        boundary_ridge_quarter = []
+        boundary_quarterpt_indices = []
+        for vpair in boundary_ridges_3D[i*nboundary_ridge+0:i*nboundary_ridge+nboundary_ridge,:]: # for vpair in boundary_ridges_new:
+            boundary_quarterpoint = 3./4*voronoi_vertices_3D[vpair[0]] + 1./4*voronoi_vertices_3D[vpair[1]]
+            boundary_ridge_quarter.append(boundary_quarterpoint)
+            boundary_quarterpt_indices.append(count)
+            count += 1
+        
+        for vpair in boundary_ridges_3D[i*nboundary_ridge+0:i*nboundary_ridge+nboundary_ridge,:]: # for vpair in boundary_ridges_new:
+            boundary_quarterpoint = 1./4*voronoi_vertices_3D[vpair[0]] + 3./4*voronoi_vertices_3D[vpair[1]]
+            boundary_ridge_quarter.append(boundary_quarterpoint)
+            boundary_quarterpt_indices.append(count)
+            count += 1
+        boundary_quarterpt_indices = np.asarray(boundary_quarterpt_indices)
+            
+            
+        nboundary_quarterpt = nboundary_ridge*2
+        
+        nboundary_pt_per_layer = nboundary_pts + nboundary_midpt + nboundary_quarterpt
+        
+        npt_per_layer_vtk = nfinitept_per_layer + nboundary_pt_per_layer
+        
+        voronoi_ridges_2D = voronoi_ridges + np.ones(voronoi_ridges.shape)*(i*npt_per_layer_vtk)
+    
+        all_midpt_indices = np.vstack((np.reshape(finite_midpt_indices,(2,-1)).T,np.reshape(boundary_midpt_indices,(2,-1)).T))
+        all_quarterpt_indices = np.vstack((np.reshape(finite_quarterpt_indices,(2,-1)).T,np.reshape(boundary_quarterpt_indices,(2,-1)).T))
+    
+        all_pts_2D = np.vstack((voronoi_vertices_3D[i*nvertex+0:i*nvertex+nvertex],finite_ridge_mid,finite_ridge_quarter,boundary_ridge_mid,boundary_ridge_quarter))
+        
+        # voronoi_ridges_2D = np.vstack((finite_ridges_3D[i*nfinite_ridge+0:i*nfinite_ridge+nfinite_ridge,:],boundary_ridges_3D[i*nboundary_ridge+0:i*nboundary_ridge+nboundary_ridge,:]))
+        all_ridges_2D = np.hstack((voronoi_ridges_2D,all_midpt_indices,all_quarterpt_indices))
+        
+        
+        if i == 0:
+            all_pts_3D = all_pts_2D
+            all_ridges_3D = all_ridges_2D
+        else:
+            all_pts_3D = np.vstack((all_pts_3D,all_pts_2D))
+            all_ridges_3D = np.vstack((all_ridges_3D,all_ridges_2D))
+
+    
+### Old code
+
     ######################### For finite Voronoi ridges ###########################
     # Form a list of middle points of finite Voronoi edges
     finite_ridge_mid = []
@@ -1352,7 +1530,10 @@ def RidgeMidQuarterPts(voronoi_vertices,nvertex,nvertices_in,voronoi_ridges,\
     all_pts_2D = np.vstack((voronoi_vertices,finite_ridge_mid,finite_ridge_quarter,boundary_ridge_mid,boundary_ridge_quarter))
     all_ridges = np.hstack((voronoi_ridges,all_midpt_indices,all_quarterpt_indices))
     
-    return all_pts_2D,all_ridges,npt_per_layer,npt_per_layer_normal,npt_per_layer_vtk
+    
+
+
+    return all_pts_3D,all_ridges_3D,npt_per_layer_vtk,all_pts_2D,all_ridges
 
 
 
@@ -1458,60 +1639,20 @@ Number of ridges\n'+ str(nridge) +
     return all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges
 
 
-def GenerateBeamElement(NURBS_degree,nsegments,theta_min,theta_max,\
+def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,theta_min,theta_max,\
                         z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
                         nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
-                        flattened_all_vertices_2D,all_ridges,random_noise):
+                        flattened_all_vertices_2D,all_ridges,random_noise,nconnector_t_per_beam,nconnector_t_per_grain):
     
-
-    nctrlpt_per_elem = NURBS_degree + 1
-    nctrlpt_per_beam = 2*NURBS_degree + 1
-
-    nlayers = nctrlpt_per_beam*nsegments
-    
-    nconnector_t_per_beam = int((nctrlpt_per_beam-1)/NURBS_degree+1)
-    nconnector_t_per_grain = int(nconnector_t_per_beam*nsegments)
-    
-    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
-    segment_angle = (theta_max-theta_min) / (nsegments + (nsegments-1)*long_connector_ratio)
-
-    connector_l_angle = segment_angle*long_connector_ratio
-    connector_l_length = segment_length*long_connector_ratio
-    
-    # theta = np.linspace(theta_min,theta_max,nlayers-(nsegments-1))
-    # z_coord = np.linspace(z_min,z_max,nlayers-(nsegments-1))
-
-    theta = np.linspace(theta_min,theta_max-connector_l_angle*(nsegments-1),nlayers-(nsegments-1))
-    z_coord = np.linspace(z_min,z_max-connector_l_length*(nsegments-1),nlayers-(nsegments-1))
-    
-    # Insert repeated layers for the longitudinal connectors
-    for i in range(nlayers-(nsegments-1)-(nctrlpt_per_beam-1),1,-(nctrlpt_per_beam-1)): 
-        theta = np.insert(theta,i,theta[i-1])
-        theta[i:] += connector_l_angle
-    for i in range(nlayers-(nsegments-1)-(nctrlpt_per_beam-1),1,-(nctrlpt_per_beam-1)):
-        z_coord = np.insert(z_coord,i,z_coord[i-1])
-        z_coord[i:] += connector_l_length
-    
-    # Data for IGA use
-    vertices_new = np.zeros((nlayers,npt_per_layer,3))
-    for i in range(0,nlayers):
-        for j in range(0,npt_per_layer):
-            vertices_new[i,j,:2] = rotate_around_point_highperf(voronoi_vertices[j,:], theta[i], generation_center)
-            # added randomness to morphology in the L plane - not calibrated yet -SA
-            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise/10+1)
-            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise/10+1)
-            vertices_new[i,j,2] = z_coord[i]
-    
-    # Vertex Data for IGA
-    IGAvertices = np.reshape(vertices_new,(-1,3))
-    
-    # Connectivity for IGA
-    npt_total = nlayers*npt_per_layer
+    IGAvertices = np.copy(voronoi_vertices_3D)
+    # Connectivity for IGA Control Points (Vertices)
+    npt_total = nvertices_3D
     vertex_connectivity = np.linspace(0,npt_total-1,npt_total)
     
     # Beams
     ngrain = nvertex
     nbeam_total = ngrain*nsegments
+    
     beam_connectivity_original = np.zeros((nbeam_total,nctrlpt_per_beam))
     for i in range(0,nsegments):
         for j in range(0, ngrain):
@@ -1574,18 +1715,18 @@ def GenerateBeamElement(NURBS_degree,nsegments,theta_min,theta_max,\
     nconnector_total = nconnector_t + nconnector_l
     
     return IGAvertices,vertex_connectivity,beam_connectivity_original,nbeam_total,\
-        beam_connectivity,nbeamElem,nctrlpt_per_beam,nlayers,segment_length,connector_t_connectivity,\
+        beam_connectivity,nbeamElem,connector_t_connectivity,\
         connector_t_bot_connectivity,connector_t_top_connectivity,\
-        connector_t_reg_connectivity,connector_l_connectivity,nconnector_t_per_beam,\
-        nconnector_t_per_grain,nconnector_t,nconnector_l,nconnector_total,\
-        theta,z_coord,connector_l_vertex_dict
+        connector_t_reg_connectivity,connector_l_connectivity,\
+        nconnector_t,nconnector_l,nconnector_total,connector_l_vertex_dict
 
 
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
-                      nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict):
+                      nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
+                      random_field,RF):
 ######### txt File stores the connector data for Abaqus analyses ##############
     nelem_connector_t_bot = connector_t_bot_connectivity.shape[0]
     nelem_connector_t_reg = connector_t_reg_connectivity.shape[0]
@@ -1634,16 +1775,30 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,0:3] = np.copy(IGAvertices)[connector_l_connectivity[i,0]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,16] = conn_l_lengths[i]
-        
+    
+    # Calculate connector center    
     Meshdata[:,6:9] = (Meshdata[:,0:3] + Meshdata[:,3:6])/2
     # Meshdata[0:nelem_connector_t_bot,8] = Meshdata[0:nelem_connector_t_bot,8]
     # Meshdata[nelem_total-nelem_connector_t_top:nelem_total,8] = Meshdata[nelem_total-nelem_connector_t_top:nelem_total,8]
+    
+    # Calculate distance from center to vertex 1
     Meshdata[:,9:12] = Meshdata[:,6:9] - Meshdata[:,0:3]
+    
+    # Calculate distance from center to vertex 2
     Meshdata[:,12:15] = Meshdata[:,6:9] - Meshdata[:,3:6]
 
     # Add random field h(x) 
-    Meshdata[:nelem_total-nelem_connector_l,17] = np.ones(nelem_total-nelem_connector_l) # temporarily no random field for transverse connectors
-    Meshdata[nelem_total-nelem_connector_l:nelem_total,17] = np.random.normal(1,0.05,nelem_connector_l) # random_field
+    if random_field in ['on','On','Y','y','Yes','yes']:
+        RF.GenerateRandVariables(5, seed = 8) # generation of random numbers, critical step
+        RF.precomputeEOLE()                  # calculation of preparation files, can be used for any LDPM geometry
+        GF = RF.GenerateField(Meshdata[:,6:9])           # EOLE projection
+        Meshdata[:,17] = GF[0,:,0]
+    else:
+        GF = np.ones(nelem_total)
+        Meshdata[:,17] = GF
+    
+    # Meshdata[:nelem_total-nelem_connector_l,17] = np.ones(nelem_total-nelem_connector_l) # temporarily no random field for transverse connectors
+    # Meshdata[nelem_total-nelem_connector_l:nelem_total,17] = np.random.normal(1,0.25,nelem_connector_l) # random_field
 
     # Add z-variation/random field for cellwall thicknesses/connector widths
     for i in range(0,nridge):
@@ -1714,7 +1869,7 @@ def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
     return precrack_elem, nconnector_t_precrack, nconnector_l_precrack
 
 
-def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_2D,\
+def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                        segment_length,theta,z_coord,nsegments,nridge,\
                        voronoi_ridges,generation_center,all_ridges,nvertex,\
                        nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
@@ -1726,16 +1881,9 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_2D
     nlayers_conn_l = nsegments - 1
     ninterval_per_beam_vtk = int((nctrlpt_per_beam-1)/2) # 2 layers ----> 1 interval
     nconnector_t_per_beam = int((nctrlpt_per_beam-1)/NURBS_degree+1)
-    
-    # Data for VTK use
-    vertices_new = np.zeros((nlayers,npt_per_layer_vtk,3))
-    for i in range(0,nlayers):
-        for j in range(0,npt_per_layer_vtk):
-            vertices_new[i,j,:2] = rotate_around_point_highperf(all_pts_2D[j,:], theta[i], generation_center)
-            vertices_new[i,j,2] = z_coord[i]
-    
+
     # Vertex Data for VTK use
-    VTKvertices = np.reshape(vertices_new,(-1,3))
+    VTKvertices = np.copy(all_pts_3D)
     
     # Connectivity for VTK use
     # Vertex
@@ -1808,7 +1956,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_2D
     Quad_tangent = np.zeros((nquad_conn_total,3))
     Quad_tangent[0:nconnector_t] = np.tile(np.array([0.0,0.0,1.0]),(nconnector_t,1)) # assume a tangent of (0,0,1) for all conn_t
 
-    Quad_tangent[nconnector_t:nquad_conn] = conn_l_tangents
+    Quad_tangent[nconnector_t:nquad_conn] = conn_l_tangents # conn_l
     Quad_bitangent = np.cross(Quad_normal,Quad_tangent)
     
     nconnector_t_bot = int(nconnector_t/3)
@@ -4210,39 +4358,39 @@ def StlModelFile(geoName):
     None or error message, if generation failed (TBD)
     """
     
-#     import vtk
-#     import os
+    # import vtk
+    # import os
     
-#     vtufilename = geoName + '_conns_vol'+'.vtu'
-#     cwd = os.getcwd()
-#     vtupath = os.path.join(cwd,'meshes',geoName)
-#     stlfilename = os.path.join(vtupath, geoName+".stl")
-#     file_name = os.path.join(vtupath,vtufilename)
+    # vtufilename = geoName + '_conns_vol'+'.vtu'
+    # cwd = os.getcwd()
+    # vtupath = os.path.join(cwd,'meshes',geoName)
+    # stlfilename = os.path.join(vtupath, geoName+".stl")
+    # file_name = os.path.join(vtupath,vtufilename)
     
-#     # create a new 'XML Unstructured Grid Reader'
-#     reader = vtk.vtkXMLUnstructuredGridReader()
-#     reader.SetFileName(file_name)
-#     reader.Update()
-#     output = reader.GetOutputPort()
+    # # create a new 'XML Unstructured Grid Reader'
+    # reader = vtk.vtkXMLUnstructuredGridReader()
+    # reader.SetFileName(file_name)
+    # reader.Update()
+    # output = reader.GetOutputPort()
 
-#     # Extract the outer (polygonal) surface.
-#     surface = vtk.vtkDataSetSurfaceFilter()
-#     surface.SetInputConnection(0, output)
-#     surface.Update()
-#     sufaceoutput = surface.GetOutputPort()
+    # # Extract the outer (polygonal) surface.
+    # surface = vtk.vtkDataSetSurfaceFilter()
+    # surface.SetInputConnection(0, output)
+    # surface.Update()
+    # sufaceoutput = surface.GetOutputPort()
 
-#     # Write the stl file to disk
-#     stlWriter = vtk.vtkSTLWriter()
-#     stlWriter.SetFileName(stlfilename)
-#     stlWriter.SetInputConnection(sufaceoutput)
-#     stlWriter.Write()
+    # # Write the stl file to disk
+    # stlWriter = vtk.vtkSTLWriter()
+    # stlWriter.SetFileName(stlfilename)
+    # stlWriter.SetInputConnection(sufaceoutput)
+    # stlWriter.Write()
 
 
 def LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_sparse,width_dense,\
         generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
         cellsize_sparse,cellsize_dense,cellwallthickness_sparse,cellwallthickness_dense,\
         merge_operation,merge_tol,precrackFlag,precrack_size,boundaryFlag,\
-        segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
+        nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
         NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
         nParticles,nbeamElem,skeleton_density,mass,volume,density,porosity,\
         stlFlag,inpFlag,inpType,radial_growth_rule,\
@@ -4309,7 +4457,10 @@ def LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_sparse,width_d
         logfile.write('nconnector_l_precrack:                   ' + str(nconnector_l_precrack) + '\n')
     logfile.write('\n')
     logfile.write('GRAIN EXTRUSION PARAMETERS:\n')
+    logfile.write('nsegments:                               ' + str(nsegments) + '\n')
     logfile.write('segment_length:                          ' + str(segment_length) + '\n')
+    logfile.write('z_min:                                   ' + str(z_min) + '\n')
+    logfile.write('z_max:                                   ' + str(z_max) + '\n')
     logfile.write('theta_min:                               ' + str(theta_min) + '\n')
     logfile.write('theta_max:                               ' + str(theta_max) + '\n')
     logfile.write('long_connector_ratio:                    ' + str(long_connector_ratio) + '\n')

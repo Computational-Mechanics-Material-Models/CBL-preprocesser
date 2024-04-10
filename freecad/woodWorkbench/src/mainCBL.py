@@ -34,6 +34,7 @@ from freecad.woodWorkbench.src.chronoInput import chronoInput
 from freecad.woodWorkbench.src.chronoInput import chronoAux
 
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
+from freecad.woodWorkbench.tools.rand_field_generator import RandomField
 
 
 def main(self):
@@ -80,9 +81,18 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise] = inputParams(self.form)
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree] = inputParams(self.form)
         
     precrack_widths = 0 # for future use
+
+    # random field parameters - SA to implement as input eventually
+    random_field = 'off'
+    RF_dimension = 1
+    RF_dist_types= ["TruncatedGaussian"]
+    RF_dist_params = [[1.,0.5,0]]
+    RF_corr_l = 0.05
+    RF_sampling_type="MC"
+
 
     # for future implementation - SA
     # grain_length = 5 # mm
@@ -223,11 +233,19 @@ def main(self):
     self.form[1].progressBar.setValue(50) 
     self.form[1].statusWindow.setText("Status: Writing Vertices.") 
     # ================================================================== 
+    [voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
+           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D] = \
+    WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
+                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise)
+    
+
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
-    [all_pts_2D,all_ridges,npt_per_layer,npt_per_layer_normal,npt_per_layer_vtk] = \
-        WoodMeshGen.RidgeMidQuarterPts(voronoi_vertices,nvertex,nvertices_in,voronoi_ridges,\
-                        finite_ridges_new,boundary_ridges_new,nfinite_ridge,\
-                        nboundary_ridge,nboundary_pts,nboundary_pts_featured)
+    [all_pts_3D,all_ridges_3D,npt_per_layer_vtk,all_pts_2D,all_ridges] = \
+    WoodMeshGen.RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
+                    finite_ridges_new,boundary_ridges_new,finite_ridges_3D,boundary_ridges_3D,nfinite_ridge,\
+                    nboundary_ridge,nboundary_pts,nboundary_pts_featured,nlayers,voronoi_vertices)
+
 
     # ===============================================
     # Generate a file for vertices and ridges info
@@ -243,42 +261,32 @@ def main(self):
     self.form[1].statusWindow.setText("Status: Extruding Cells.") 
     # ==================================================================
     # Extrude in the parallel-to-grain (longitudinal) direction
-    NURBS_degree = 2
-
-    # varfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-temp.txt'),'w')                                      
-    # varfile.write(repr(nsegments)+ '\n')
-    # varfile.write(repr(theta_min)+ '\n')
-    # varfile.write(repr(theta_max)+ '\n')
-    # varfile.write(repr(z_min)+ '\n')
-    # varfile.write(repr(z_max)+ '\n')
-    # varfile.write(repr(long_connector_ratio)+ '\n')
-    # varfile.write(repr(npt_per_layer)+ '\n')
-    # varfile.write(repr(voronoi_vertices)+ '\n')
-    # varfile.write(repr(nvertex)+ '\n')
-    # varfile.write(repr(voronoi_ridges)+ '\n')
-    # varfile.write(repr(nridge)+ '\n')
-    # varfile.write(repr(generation_center)+ '\n')
-    # varfile.write(repr(all_vertices_2D)+ '\n')
-    # varfile.write(repr(max_wings)+ '\n')
-    # varfile.write(repr(flattened_all_vertices_2D)+ '\n')
-    # varfile.write(repr(all_ridges)+ '\n')
     
-
     [IGAvertices,vertex_connectivity,beam_connectivity_original,nbeam_total,\
-    beam_connectivity,nbeamElem,nctrlpt_per_beam,nlayers,segment_length,connector_t_connectivity,\
+    beam_connectivity,nbeamElem,connector_t_connectivity,\
     connector_t_bot_connectivity,connector_t_top_connectivity,\
-    connector_t_reg_connectivity,connector_l_connectivity,nconnector_t_per_beam,\
-    nconnector_t_per_grain,nconnector_t,nconnector_l,nconnector_total,\
-    theta,z_coord,connector_l_vertex_dict] = \
-        WoodMeshGen.GenerateBeamElement(NURBS_degree,nsegments,\
-                            theta_min,theta_max,z_min,z_max,\
-                            long_connector_ratio,npt_per_layer,voronoi_vertices,\
-                            nvertex,voronoi_ridges,nridge,generation_center,\
-                            all_vertices_2D,max_wings,flattened_all_vertices_2D,all_ridges,random_noise)
+    connector_t_reg_connectivity,connector_l_connectivity,\
+    nconnector_t,nconnector_l,nconnector_total,connector_l_vertex_dict] = \
+    WoodMeshGen.GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,theta_min,theta_max,\
+                        z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
+                        nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
+                        flattened_all_vertices_2D,all_ridges,random_noise,nconnector_t_per_beam,nconnector_t_per_grain)
 
     BeamTime = time.time() 
     print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
 
+
+    # ==================================================================
+    # Calculate random field
+    if random_field in ['on','On','Y','y','Yes','yes']:
+        # RF = RandomField(RF_dimension,RF_dist_types,RF_dist_params,geoName,RF_corr_l,"text",[z_min,z_max],RF_sampling_type)
+        # RF = RandomField(dimension=RF_dimension,"none",RF_dist_types,np.array([[1]]),RF_dist_params,geoName,RF_corr_l,"text",x_range=[x_min,x_max],RF_sampling_type,"binary")
+        RF = RandomField(dimension = 1, readFromFolder = "none", dist_types=RF_dist_types, CC = np.array([[1]]), \
+                         dist_params=RF_dist_params, name=geoName,corr_l =RF_corr_l, corr_f='exponential_square',\
+                         x_range=[x_min,x_max], sampling_type = RF_sampling_type, filesavetype="binary")
+        # RF = RandomField(dist_types=["TruncatedGaussian"], dist_params=[[1.,0.5,0]], name = "FIELD_1D_TruncNormal", corr_l = 0.05,filesavetype="text", x_range=[x_min,x_max],y_range=[y_min,y_max],z_range=[z_min,z_max], sampling_type="MC")
+    else:
+        RF = []
 
     # ===============================================
     # Insert precracks
@@ -312,7 +320,8 @@ def main(self):
                     connector_t_reg_connectivity,connector_t_top_connectivity,\
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
-                    nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict)
+                    nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
+                    random_field,RF)
 
     # ===============================================
     # Calculate model properties
@@ -332,7 +341,7 @@ def main(self):
     self.form[1].statusWindow.setText("Status: Generating Vizualiation Files.") 
     # ==================================================================
     # Generate Paraview visulization files
-    WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_2D,\
+    WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                     segment_length,theta,z_coord,nsegments,nridge,\
                     voronoi_ridges,generation_center,all_ridges,nvertex,nconnector_t,\
                     nconnector_l,nctrlpt_per_beam,ConnMeshData,conn_l_tangents,\
@@ -399,7 +408,7 @@ def main(self):
             generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
             cellsize_early,cellsize_late,cellwallthickness_early,cellwallthickness_late,\
             merge_operation,merge_tol,precrackFlag,precrack_widths,boundaryFlag,\
-            segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
+            nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
             NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
             nParticles,nbeamElem,skeleton_density,mass,bulk_volume,bulk_density,porosity,\
             stlFlag,inpFlag,inpType,radial_growth_rule,\
@@ -419,7 +428,7 @@ def main(self):
     CBLbeamsVTU.Label = geoName + '_beams'
     App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLbeamsVTU)
     CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
-    CBLbeamsVTU.Visibility = False
+    CBLbeamsVTU.Visibility = True
 
     importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
     CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
@@ -433,6 +442,7 @@ def main(self):
     CBLconnsvVTU.Label = geoName + '_conns_vol'
     App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsvVTU)
     CBLconnsvVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
+    CBLconnsvVTU.Visibility = False
 
     importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
     CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')

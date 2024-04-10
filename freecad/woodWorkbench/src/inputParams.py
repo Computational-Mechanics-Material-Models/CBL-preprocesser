@@ -32,7 +32,7 @@ def inputParams(form):
     cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
 
     skeleton_density = float(form[0].skeleton_density.text() or 1.5e-9) # unit: tonne/mm3
-    random_noise = float(form[0].random_noise.text() or 0) # unit: ?
+    random_noise = float(form[0].random_noise.text() or 0.05) # unit: ?
 
 
     # Model Parameters     
@@ -49,6 +49,8 @@ def inputParams(form):
     z_min = 0
     z_max = box_size # segment_length = (z_max - z_min) / nsegments
     long_connector_ratio = float(form[0].long_connector_ratio.text() or 0.2) # longitudinal joint length = ratio * segment_length
+
+    NURBS_degree = 2
 
 
     # Precrack Parameters
@@ -81,4 +83,4 @@ def inputParams(form):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree

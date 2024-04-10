@@ -89,10 +89,10 @@ def outputParams(nconnector_l,nconnector_l_precrack,nconnector_t,nconnector_t_pr
 
     props_connector_l[0]     = 1.5E-7 # Wood substance density [tonne/mm^3]
     props_connector_l[1]     = 0.8E+4 # Mesoscale elastic modulus [MPa]
-    props_connector_l[2]     = 0.25 # Shear-Normal coupling coefficient
+    props_connector_l[2]     = 0.18 # Shear-Normal coupling coefficient
     props_connector_l[3]     = cellwallthickness_early*cellwallthickness_late # Connector sectional area [mm^2]
-    props_connector_l[4]     = 20 # Tensile Strength [MPa]
-    props_connector_l[5]     = long_connector_ratio*segment_length*1.05# 0.0105 # Tensile characteristic length [mm] will be updated to # Tensile fracture energy [mJ/mm^2]
+    props_connector_l[4]     = 3.0E+2 # Tensile Strength [MPa]
+    props_connector_l[5]     = 0.2E+1# 0.0105 # Tensile characteristic length [mm] will be updated to # Tensile fracture energy [mJ/mm^2]
     props_connector_l[6]     = 2.6 # Shear Strength Ratio
     props_connector_l[7]     = 0.2 # Softening Exponent
     props_connector_l[8]     = 0.2 # Initial Friction
