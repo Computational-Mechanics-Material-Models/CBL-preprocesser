@@ -1755,26 +1755,30 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     rot = np.hstack((rot[:,0,:],np.zeros(len(conn_l_angles))[:, np.newaxis])) # convert to 3D rotation matrix, assumes rotation remains still in-plane
     conn_l_tangents = rot
     
-# Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 width height random_field]    
-    Meshdata = np.zeros((nelem_total,18))
+# Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 width height random_field connector_flag]    
+    Meshdata = np.zeros((nelem_total,19))
     
     for i in range(0,nelem_connector_t_bot):
         Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:]
         Meshdata[i,3:6] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,1]-1,:]
         Meshdata[i,16] = height_connector_t
+        Meshdata[i,18] = 1
     for i in range(0,nelem_connector_t_reg):
         Meshdata[i+nelem_connector_t_bot,0:3] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,0]-1,:]
         Meshdata[i+nelem_connector_t_bot,3:6] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,1]-1,:]
         Meshdata[i+nelem_connector_t_bot,16] = height_connector_t*2
+        Meshdata[i+nelem_connector_t_bot,18] = 2
     for i in range(0,nelem_connector_t_top):
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,0:3] = np.copy(IGAvertices)[connector_t_top_connectivity[i,0]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,3:6] = np.copy(IGAvertices)[connector_t_top_connectivity[i,1]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,16] = height_connector_t
+        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,18] = 3
         
     for i in range(0,nelem_connector_l):
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,0:3] = np.copy(IGAvertices)[connector_l_connectivity[i,0]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,16] = conn_l_lengths[i]
+        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,18] = 4
     
     # Calculate connector center    
     Meshdata[:,6:9] = (Meshdata[:,0:3] + Meshdata[:,3:6])/2
@@ -1825,7 +1829,7 @@ Number of top connectors\n'+ str(nelem_connector_t_top) +
 '\n\
 Number of long connectors\n'+ str(nelem_connector_l) +
 '\n\
-[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 width height random_field]', comments='')  
+[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 width height random_field connector_flag]', comments='')  
 
     return Meshdata,conn_l_tangents,height_connector_t
 
