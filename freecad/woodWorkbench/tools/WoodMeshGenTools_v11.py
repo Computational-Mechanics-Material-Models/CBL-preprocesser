@@ -1799,9 +1799,12 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     tvects[:,0:3] = (Meshdata[:,0:3] - Meshdata[:,3:6])/np.linalg.norm((Meshdata[:,0:3] - Meshdata[:,3:6])) #n1 - n2 = t
     # Calculate cross product with z axis (*** temporary until full connector rotation is added - SA)
     zvects = np.zeros((nelem_total,3))
-    zvects[:,2] = 1
+    zvects[:nelem_total-nelem_connector_l,2] = 1
+    zvects[nelem_total-nelem_connector_l:nelem_total,0] = 1
     # n vectors of beam (n1 for bot, reg, top, and n2 for long)
-    nvects = np.cross(tvects[:,0:3],zvects)
+    nvects = np.zeros((nelem_total,3))
+    nvects[:nelem_total-nelem_connector_l,:] = np.cross(tvects[:nelem_total-nelem_connector_l,:],zvects[:nelem_total-nelem_connector_l,:])
+    nvects[nelem_total-nelem_connector_l:nelem_total,:] = np.cross(tvects[nelem_total-nelem_connector_l:nelem_total,:],zvects[nelem_total-nelem_connector_l:nelem_total,:])
     Meshdata[:,15:18] = zvects
     Meshdata[:,18:21] = nvects
 
