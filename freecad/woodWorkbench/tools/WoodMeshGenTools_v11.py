@@ -1322,13 +1322,13 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
         for j in range(0,npt_per_layer):
             vertices_new[i,j,:2] = rotate_around_point_highperf(voronoi_vertices[j,:], theta[i], generation_center)
             # added randomness to morphology in the L plane - not calibrated yet -SA
-            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise/10+1)
-            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise/10+1)
+            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.sin(z_coord[i]/z_max*5)*random_noise+np.random.random()*random_noise/5+1) # sin(z_coord[i]/z_max)
+            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.sin(z_coord[i]/z_max*5)*random_noise+np.random.random()*random_noise/5+1) #(np.random.random()*random_noise/10+1)
             
             # # add artificial waviness
             # vertices_new[i,j,0] = vertices_new[i,j,0] + z_coord[i]**2*random_noise
             # vertices_new[i,j,1] = vertices_new[i,j,1] + 0
-            
+            # 
             vertices_new[i,j,2] = z_coord[i]
 
     # Vertex Data in 3D
@@ -1776,7 +1776,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     
 # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
 # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag]    
-    Meshdata = np.zeros((nelem_total,25))
+    Meshdata = np.zeros((nelem_total,28))
     
     for i in range(0,nelem_connector_t_bot):
         Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:]
@@ -1802,14 +1802,18 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     
     # Calculate connector center    
     Meshdata[:,6:9] = (Meshdata[:,0:3] + Meshdata[:,3:6])/2
+    # print(Meshdata[:,6:9])
+    # Meshdata[:,25:28] = Meshdata[:,6:9]
     # Meshdata[0:nelem_connector_t_bot,8] = Meshdata[0:nelem_connector_t_bot,8]
     # Meshdata[nelem_total-nelem_connector_t_top:nelem_total,8] = Meshdata[nelem_total-nelem_connector_t_top:nelem_total,8]
     
     # Calculate distance from center to vertex 1
     Meshdata[:,9:12] = Meshdata[:,6:9] - Meshdata[:,0:3]
+    # print(Meshdata[nelem_total-5:nelem_total,0:3])
     
     # Calculate distance from center to vertex 2
     Meshdata[:,12:15] = Meshdata[:,6:9] - Meshdata[:,3:6]
+    # print(Meshdata[nelem_total-5:nelem_total,3:6])
 
     # Calculate unit t vector
     tvects = np.zeros((nelem_total,3))
@@ -1845,10 +1849,12 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
 
     # Add the eccentricity to the centers for longitudinal connectors (new center is correct)
     Meshdata[nelem_total-nelem_connector_l:nelem_total,6:9] += conn_l_tangents*Meshdata[nelem_total-nelem_connector_l:nelem_total,22][:, np.newaxis]/2
+    # print(conn_l_tangents)
 
     # Replace nodal coordinates with nodal indices
     Meshdata[:,0:2] = np.concatenate((connector_t_bot_connectivity,connector_t_reg_connectivity,connector_t_top_connectivity,connector_l_connectivity))
     Meshdata = np.delete(Meshdata,[2,3,4,5],1)
+
     
     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName+'-mesh.txt'), Meshdata, fmt='%.16g', delimiter=' '\
     ,header='# Connector Data Generated with RingsPy Mesh Generation Tool\n\
@@ -1985,8 +1991,8 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     Quad_normal2 = np.copy(ConnMeshData[:,8:11])
     Quad_length1 = np.linalg.norm(Quad_normal1, axis=1)
     Quad_length2 = np.linalg.norm(Quad_normal2, axis=1)
-    Quad_width = np.copy(ConnMeshData[:,11])
-    Quad_height = np.copy(ConnMeshData[:,12])
+    Quad_width = np.copy(ConnMeshData[:,17])
+    Quad_height = np.copy(ConnMeshData[:,18])
     Quad_normal = Quad_normal1/Quad_length1[:, np.newaxis]
     Quad_tangent = np.zeros((nquad_conn_total,3))
     Quad_tangent[0:nconnector_t] = np.tile(np.array([0.0,0.0,1.0]),(nconnector_t,1)) # assume a tangent of (0,0,1) for all conn_t
@@ -4315,7 +4321,7 @@ def ModelInfo(box_shape,boundary_points,z_min,z_max,skeleton_density,MeshData):
     mass = 0
     
     for i in range(0,MeshData.shape[0]):
-        mass += skeleton_density*MeshData[i,11]*MeshData[i,12]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+        mass += skeleton_density*MeshData[i,17]*MeshData[i,18]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
 
     
     hull = ConvexHull(boundary_points)
@@ -4357,13 +4363,13 @@ def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
     mass += nelem_beam*density_beam*props_beam[3]*props_beam[4]*beam_length
     # mass of bot transverse connector
     for i in range(0,nelem_connector_t_bot):
-        mass += density_connector_t_bot*props_connector_t_bot[3]*MeshData[i,11]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+        mass += density_connector_t_bot*props_connector_t_bot[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     # mass of reg transverse connector
     for i in range(nelem_connector_t_bot,nelem_connector_t_bot+nelem_connector_t_reg):
-        mass += density_connector_t_reg*props_connector_t_reg[3]*MeshData[i,11]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+        mass += density_connector_t_reg*props_connector_t_reg[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     # mass of top transverse connector
     for i in range(nelem_connector_t_bot+nelem_connector_t_reg,nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top):
-        mass += density_connector_t_top*props_connector_t_top[3]*MeshData[i,11]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+        mass += density_connector_t_top*props_connector_t_top[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     # mass of longitudinal connector
     for i in range(nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,MeshData.shape[0]):
         mass += density_connector_l*props_connector_l[3]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])

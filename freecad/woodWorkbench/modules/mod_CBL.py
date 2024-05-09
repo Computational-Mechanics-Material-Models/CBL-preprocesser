@@ -54,6 +54,9 @@ from freecad.woodWorkbench.util.cwloadUIicon                    import cwloadUIi
 # from freecad.woodWorkbench.output.mkChronoInput                  import mkChronoInput
 # from freecad.woodWorkbench.output.mkAbaqusInput                  import mkAbaqusInput
 
+from freecad.woodWorkbench.src.outputLog import outputLog
+from freecad.woodWorkbench.src.readInput import readInput
+
 
 
 class genWindow_CBL:
@@ -75,6 +78,8 @@ class genWindow_CBL:
         # # Set initial output directory
         self.form[1].outputDir.setText(str(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench')))
         
+        # If input parameter file is clicked
+        QtCore.QObject.connect(self.form[0].readFileButton, QtCore.SIGNAL("clicked()"), self.openFilePara)
         # Run generation for CBL
         QtCore.QObject.connect(self.form[1].generate, QtCore.SIGNAL("clicked()"), self.generation)
 
@@ -101,6 +106,27 @@ class genWindow_CBL:
             self.form[5].outputDir.setText(OpenName)
 
         return OpenName
+    
+
+    def openFilePara(self):
+
+        path = App.ConfigGet("UserHomePath")
+        filetype = "CW Parameter input format (*.cwPar)"
+
+        OpenName = ""
+        try:
+            OpenName = QtGui.QFileDialog.getOpenFileName(None,QString.fromLocal8Bit("Read a file parameter file"),path,             filetype) # type: ignore
+        #                                                                     "here the text displayed on windows" "here the filter (extension)"   
+        except Exception:
+            OpenName, Filter = QtGui.QFileDialog.getOpenFileName(None, "Read a file parameter file", path,             filetype) #PySide
+        #                                                                     "here the text displayed on windows" "here the filter (extension)"   
+        if OpenName == "":                                                            # if the name file are not selected then Abord process
+            App.Console.PrintMessage("Process aborted"+"\n")
+        else:
+            self.form[0].setupFile.setText(OpenName)
+        
+        readInput(self)
+
 
     def generation(self):
 

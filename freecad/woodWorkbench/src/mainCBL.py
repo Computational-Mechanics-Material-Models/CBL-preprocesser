@@ -22,14 +22,17 @@ import shutil
 import tempfile
 from pathlib import Path
 from scipy.spatial import Voronoi, voronoi_plot_2d
-import FreeCAD as App
-import FreeCADGui as Gui
-import feminout.importVTKResults as importVTK
-import ObjectsFem
-import FemGui
+import FreeCAD as App # type: ignore
+import FreeCADGui as Gui # type: ignore
+import feminout.importVTKResults as importVTK # type: ignore
+import ObjectsFem # type: ignore
+import FemGui # type: ignore
+from PySide import QtCore, QtGui # type: ignore
 
 from freecad.woodWorkbench.src.inputParams import inputParams
 from freecad.woodWorkbench.src.outputParams import outputParams
+from freecad.woodWorkbench.src.outputLog import outputLog
+from freecad.woodWorkbench.src.readInput import readInput
 from freecad.woodWorkbench.src.chronoInput import chronoInput
 from freecad.woodWorkbench.src.chronoInput import chronoAux
 
@@ -42,49 +45,22 @@ def main(self):
     # performance check only
     startTime = time.time()
 
-    # Make output directory if does not exist
-    outDir = self.form[1].outputDir.text()
-    try:
-        os.mkdir(outDir)
-    except:
-        pass
-
-    # Make a temporary path location
-    tempPath = tempfile.gettempdir() + "/tempCBL" + str(int(np.random.uniform(1e7,1e8))) + '/'
-    os.mkdir(tempPath)
-
-    # Store document
-    docGui = Gui.activeDocument()
-
-    # Make new document and set view if does not exisit
-    try:
-        docGui.activeView().viewAxonometric()
-    except:
-        App.newDocument("Unnamed")
-        docGui = Gui.activeDocument()
-        docGui.activeView().viewAxonometric()
-    Gui.runCommand('Std_PerspectiveCamera',1)
-
-
-    
     # ==================================================================
     self.form[1].progressBar.setValue(10) 
     self.form[1].statusWindow.setText("Status: Reading Parameters.") 
     # ==================================================================
     # Input parameters 
-
-    # if loaded read from log file (and print to gui?) otherwise read from gui
     [geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-        boundaryFlag, box_shape, box_center, box_size, \
+        boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree] = inputParams(self.form)
-        
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth]\
+            = inputParams(self.form)
+    
     precrack_widths = 0 # for future use
-
     # random field parameters - SA to implement as input eventually
     random_field = 'off'
     RF_dimension = 1
@@ -93,11 +69,11 @@ def main(self):
     RF_corr_l = 0.05
     RF_sampling_type="MC"
 
-
     # for future implementation - SA
     # grain_length = 5 # mm
     # height = z_max-z_min
     # nsegments = int(height/grain_length)
+    # z_max = 100
 
     # Prep naming variables
     meshName = geoName + "_mesh"
@@ -105,6 +81,42 @@ def main(self):
     materialName = geoName + "_material"
     dataFilesName = geoName + '_dataFiles'
     visualFilesName = geoName + '_visualFiles'
+    
+
+    # ==================================================================
+    self.form[1].progressBar.setValue(15) 
+    self.form[1].statusWindow.setText("Status: Initializing Files.") 
+    # ==================================================================
+
+    # Make output directory if does not exist
+    outDir = self.form[1].outputDir.text()
+
+    try:
+        shutil.rmtree(outDir + '/' + geoName)
+    except:
+        pass
+
+    if not os.path.exists(Path(outDir + '/' + geoName)):
+        os.makedirs(Path(outDir + '/' + geoName))
+
+    # Write input parameters to log file for repeated use
+    outputLog(geoName, radial_growth_rule, iter_max, r_min, r_max, nrings, \
+        cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
+        boundaryFlag, box_shape, box_center, box_height, \
+        nsegments, theta_min, long_connector_ratio, \
+        x_notch_size, y_notch_size, precrack_size, \
+        skeleton_density, merge_operation, merge_tol, precrackFlag, \
+        stlFlag, inpFlag, inpType, random_noise, box_width, box_depth)
+        
+
+    # Make new freecad document and set view if does not exisit
+    try:
+        docGui.activeView().viewAxonometric()
+    except:
+        App.newDocument(geoName)
+        docGui = Gui.activeDocument()
+        docGui.activeView().viewAxonometric()
+    Gui.runCommand('Std_PerspectiveCamera',1)
 
     # Generate new analysis object with associated material
     try:
@@ -120,21 +132,6 @@ def main(self):
         mat['Name'] = materialName
         material_object.Material = mat
         analysis_object.addObject(material_object)
-
-
-    # ===========================================
-    # Remove directory/files if exists already
-    try:
-        shutil.rmtree(outDir + '/' + geoName)
-    except:
-        pass
-
-    if not os.path.exists(Path(outDir + '/' + geoName)):
-        os.makedirs(Path(outDir + '/' + geoName))
-    
-    # Set Path
-    filpath = os.path.dirname(__file__)
-    print(filpath)    
 
     # ==================================================================
     self.form[1].progressBar.setValue(20) 
@@ -187,7 +184,7 @@ def main(self):
     # Clipping box (boundaries) of the model
     
     x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines = \
-        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,boundaryFlag,x_notch_size,y_notch_size)
+        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size, box_width, box_depth,boundaryFlag,x_notch_size,y_notch_size)
 
     # Visualize the original 2D Voronoi diagram
     vor = Voronoi(sites[:,0:2])
@@ -460,7 +457,7 @@ def main(self):
     App.ActiveDocument.recompute()
 
     Gui.Control.closeDialog()
-    Gui.activateWorkbench("FemWorkbench")
+    # Gui.activateWorkbench("FemWorkbench")
     FemGui.setActiveAnalysis(App.activeDocument().getObject(analysisName))
 
     # Set view
