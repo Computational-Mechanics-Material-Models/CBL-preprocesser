@@ -190,16 +190,34 @@ def rotate_around_point_highperf(xy, radians, origin=(0, 0)):
     return qx, qy
 
 
-def Clipping_Box(box_shape,box_center,box_size,boundaryFlag,x_notch_size=0,y_notch_size=0):
+def Clipping_Box(box_shape,box_center,box_size, box_width, box_depth,boundaryFlag,x_notch_size=0,y_notch_size=0):
     """
     clipping box for the 2D Voronoi diagram
     """
     
-    if box_shape in ['square','Square','SQUARE','rectangle','Rectangle','RECTANGLE','cube','Cube','CUBE','s']: # sqaure box
+    if box_shape in ['square','Square','SQUARE','cube','Cube','CUBE','s']: # square box
         x_min = box_center[0] - box_size/2
         x_max = box_center[0] + box_size/2 
         y_min = box_center[1] - box_size/2
         y_max = box_center[1] + box_size/2
+        
+        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+        l0 = [(x_min, y_min), (x_max, y_min)]
+        l1 = [(x_max, y_min), (x_max, y_max)]
+        l2 = [(x_max, y_max), (x_min, y_max)]
+        l3 = [(x_min, y_max), (x_min, y_min)]
+        boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
+
+        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
+        else:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
+    
+    elif box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangle box
+        x_min = box_center[0] - box_width/2
+        x_max = box_center[0] + box_width/2 
+        y_min = box_center[1] - box_depth/2
+        y_max = box_center[1] + box_depth/2
         
         boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
         l0 = [(x_min, y_min), (x_max, y_min)]
@@ -506,7 +524,6 @@ def CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,box_center,box_
                             cellsize_sparse,cellsize_dense,\
                             cellwallthickness_sparse,cellwallthickness_dense,\
                             iter_max,print_interval):
-    from hexalattice.hexalattice import create_hex_grid
     """
     packing cells in hexagonal grids
     """
@@ -522,7 +539,7 @@ def CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,box_center,box_
     nx = int(2*r_max/cellsize)
     ny = int(2*r_max/cellsize)
     # The hexagonal lattice sites are generated via hexalattice: https://pypi.org/project/hexalattice/
-    hex_centers, _ = create_hex_grid(nx=nx,
+    hex_centers, _ = create_hex_grid(nx=nx, # type: ignore
                                      ny=ny,
                                      min_diam=cellsize,
                                      rotate_deg=cellangle,
