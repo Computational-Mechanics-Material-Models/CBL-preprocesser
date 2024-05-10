@@ -250,7 +250,7 @@ def main(self):
         WoodMeshGen.VertexandRidgeinfo(all_pts_2D,all_ridges,\
                         npt_per_layer,npt_per_layer_normal,\
                         npt_per_layer_vtk,nridge,geoName,radii,generation_center,\
-                        cellwallthickness_early,cellwallthickness_late)
+                        cellwallthickness_early,cellwallthickness_late,inpType)
     
 
     # ==================================================================
