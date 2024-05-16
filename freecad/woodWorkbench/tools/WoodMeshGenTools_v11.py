@@ -1629,8 +1629,7 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,npt_per_layer_normal,
     all_vertices_info_2D_nparray = np.zeros((npt_per_layer,1+max_wings*5))
     all_vertices_info_2D_nparray[:,0] = [vertex_info[0] for vertex_info in all_vertices_info_2D]
     
-    if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
-        for i in range(0,npt_per_layer):
+    for i in range(0,npt_per_layer):
             nwings = all_vertices_info_2D[i][0]
             all_vertices_info_2D_nparray[i,1:nwings+1] = all_vertices_info_2D[i][1]
             all_vertices_info_2D_nparray[i,max_wings+1:max_wings+nwings+1] = all_vertices_info_2D[i][2]
@@ -1638,7 +1637,9 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,npt_per_layer_normal,
             all_vertices_info_2D_nparray[i,3*max_wings+1:3*max_wings+nwings+1] = all_vertices_info_2D[i][4]
             all_vertices_info_2D_nparray[i,4*max_wings+1:4*max_wings+nwings+1] = all_vertices_info_2D[i][5]
         # Save info to txt files
-        all_vertices_2D = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
+    all_vertices_2D = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
+
+    if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
         np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2D, fmt='%.16g', delimiter=' '\
             ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
 Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
@@ -1653,8 +1654,8 @@ Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one verte
                 all_vertices_info_2D_nparray[i,4+j*5] = all_vertices_info_2D[i][4][j]
                 all_vertices_info_2D_nparray[i,5+j*5] = all_vertices_info_2D[i][5][j]
         # Save info to txt files
-        all_vertices_2D = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
-        np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2D, fmt='%.16g', delimiter=' '\
+        all_vertices_2Dchrono = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
+        np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono, fmt='%.16g', delimiter=' '\
             ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
 Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
 [xcoord ycoord nwings ridge1 farvertex1 length1 width1 angle1 ... ridgen farvertexn lengthn widthn anglen]', comments='')
