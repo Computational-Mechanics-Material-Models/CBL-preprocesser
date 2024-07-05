@@ -13,14 +13,18 @@
 ## ===========================================================================
 
 import numpy as np
+from scipy.spatial import Voronoi, voronoi_plot_2d
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.tri as mtri
 from pylab import *
 import os
 import time
+
 import shutil
 import tempfile
 from pathlib import Path
+import triangle as tr
 from scipy.spatial import Voronoi, voronoi_plot_2d
 import FreeCAD as App # type: ignore
 import FreeCADGui as Gui # type: ignore
@@ -183,24 +187,103 @@ def main(self):
     # ==================================================================
     # Clipping box (boundaries) of the model
     
-    x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines = \
-        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size, box_width, box_depth,boundaryFlag,x_notch_size,y_notch_size)
+    # x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
+    #     WoodMeshGen.Clipping_Box(box_shape,box_center,box_size, box_width, box_depth,boundaryFlag,x_notch_size,y_notch_size)
+    x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
+        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,boundaryFlag)
 
-    # Visualize the original 2D Voronoi diagram
-    vor = Voronoi(sites[:,0:2])
-    voronoi_plot_2d(vor, show_vertices=False,line_width=0.5, line_alpha=0.6, point_size=2)
-    plt.xlim(x_min-0.1*abs(x_max-x_min), x_max+0.1*abs(x_max-x_min))
-    plt.ylim(y_min-0.1*abs(y_max-y_min), y_max+0.1*abs(y_max-y_min))
-    plt.plot(boundary_points[:, 0], boundary_points[:, 1], 'bo')
-    # plt.show()
+    sites_in = []
+    for i in range(0,sites.shape[0]):
+        if WoodMeshGen.check_isinside_boundbox2D(np.append(sites[i,:],0),x_min,x_max,y_min,y_max):
+            sites_in.append(sites[i,:])
+                    
+    delaunay_vetices = np.concatenate((np.array(sites_in), boundary_points_original))
+    
+    A = {'vertices': delaunay_vetices}
+    t = tr.triangulate(A, 'pc')
+
+    ## Conforming Delaunay
+    conforming_delaunay = tr.triangulate(t, 'pq0D')
+  
+    ttvertices, ttedges, ttray_origins, ttray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
+    tt = dict(vertices=ttvertices, edges=ttedges,ray_origins=ttray_origins, ray_directions=ttray_directions)
+
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
 
+    # ---------------------------------------------
+    # Visualize the original 2D Voronoi diagram
+    vor = Voronoi(sites[:,0:2])
+
+    plt.figure()
     ax = plt.gca()
-    boundarylines = patches.Polygon(boundary_points,closed=True,linewidth=2,edgecolor='k',facecolor='none')
     ax.set_aspect('equal', adjustable='box')
+    boundarylines = patches.Polygon(boundary_points_original,closed=True,linewidth=2,edgecolor='k',facecolor='none')
     ax.add_patch(boundarylines)
+    
+    verts = np.array(conforming_delaunay['vertices'])
+    segs = np.array(conforming_delaunay['segments'])
+    for beg, end in segs:
+        x0, y0 = verts[beg, :]
+        x1, y1 = verts[end, :]
+        ax.fill(
+            [x0, x1],
+            [y0, y1],
+            facecolor='none',
+            edgecolor='k',
+            linewidth=3,
+            zorder=0,
+        )
+
+    ax.triplot(verts[:, 0], verts[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=5.)
+        
+    verts = np.array(conforming_delaunay['vertices'])
+    ax.scatter(*verts.T, color='b',s=0.5)
+    if 'labels' in conforming_delaunay:
+        for i in range(verts.shape[0]):
+            ax.text(verts[i, 0], verts[i, 1], str(i))
+    if 'markers' in conforming_delaunay:
+        vm = conforming_delaunay['vertex_markers']
+        for i in range(verts.shape[0]):
+            ax.text(verts[i, 0], verts[i, 1], str(vm[i]))
+
+
+    # tr.plot(ax, **conforming_delaunay)
+    # plt.show()
+
+        
+    verts = tt['vertices']
+    edges = tt['edges']
+    for beg, end in edges:
+        x0, y0 = verts[beg, :]
+        x1, y1 = verts[end, :]
+        ax.fill(
+            [x0, x1],
+            [y0, y1],
+            facecolor='none',
+            edgecolor='k',
+            linewidth=1.0,
+        )
+
+    lim = ax.axis()
+    ray_origin = tt['ray_origins']
+    ray_direct = tt['ray_directions']
+    for (beg, (vx, vy)) in zip(ray_origin.flatten(), ray_direct):
+        x0, y0 = verts[beg, :]
+        scale = 100.0  # some large number
+        x1, y1 = x0 + scale * vx, y0 + scale * vy
+        ax.fill(
+            [x0, x1],
+            [y0, y1],
+            facecolor='none',
+            edgecolor='k',
+            linewidth=1.0,
+        )
+    ax.axis(lim)  # make sure figure is not rescaled by ifinite ray
+        
+    # tr.plot(ax, **tt)
+    plt.show()
 
 
     # ==================================================================
@@ -212,7 +295,8 @@ def main(self):
         [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-            WoodMeshGen.RebuildVoronoi_merge(vor,sites,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,merge_tol,boundaryFlag)
+            WoodMeshGen.RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttray_directions,\
+                                                                boundaries,merge_tol,boundaryFlag)
         
         RebuildvorTime = time.time() 
         print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
@@ -220,10 +304,9 @@ def main(self):
         [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-            WoodMeshGen.RebuildVoronoi(vor,sites,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,boundaryFlag)
-        
-        RebuildvorTime = time.time() 
-        print('Voronoi tessellation rebuilt in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
+            WoodMeshGen.RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
+                                                        boundaries,boundaryFlag)
+        RebuildvorTime = time.time()
 
 
     # ==================================================================

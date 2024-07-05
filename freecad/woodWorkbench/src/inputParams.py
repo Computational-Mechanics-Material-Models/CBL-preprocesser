@@ -17,7 +17,7 @@ def inputParams(form):
     geoName = (form[0].geoName.text() or 'cube_debug')
 
     # Cell Growth Parameters
-    radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
+    radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  #
     r_min = float(form[0].r_min.text() or 0)   # inner radius of generation domain
     r_max = float(form[0].r_max.text() or 10)   # outer radius of generation domain
     nrings = int(form[0].nrings.text() or 1) # number of rings
@@ -70,7 +70,7 @@ def inputParams(form):
     box_shape = form[0].box_shape.currentText()
     box_shape = box_shape.lower().replace(' ','_')
 
-    merge_operation = form[0].merge_operation.currentText() # does what?
+    merge_operation = form[0].merge_operation.currentText() 
     merge_tol = float(form[0].merge_tol.text() or 0.015)
 
     stlFlag = form[0].stlFlag.currentText()
