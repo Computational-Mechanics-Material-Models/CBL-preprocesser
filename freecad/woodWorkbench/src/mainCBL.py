@@ -61,7 +61,7 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth]\
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag]\
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
@@ -197,67 +197,47 @@ def main(self):
         if WoodMeshGen.check_isinside_boundbox2D(np.append(sites[i,:],0),x_min,x_max,y_min,y_max):
             sites_in.append(sites[i,:])
                     
-    delaunay_vetices = np.concatenate((np.array(sites_in), boundary_points_original))
-    
-    A = {'vertices': delaunay_vetices}
-    t = tr.triangulate(A, 'pc')
-
+    delaunay_vertices = np.concatenate((np.array(sites_in), boundary_points_original))
     ## Conforming Delaunay
-    conforming_delaunay = tr.triangulate(t, 'pq0D')
+    conforming_delaunay = tr.triangulate({'vertices': delaunay_vertices}, 'pq0Dec')
   
     ttvertices, ttedges, ttray_origins, ttray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
-    tt = dict(vertices=ttvertices, edges=ttedges,ray_origins=ttray_origins, ray_directions=ttray_directions)
-
+    tt = dict(vertices=ttvertices, edges=ttedges,ray_origins=ttray_origins, ray_directions=ttray_directions) # for visualization purposes
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
 
     # ---------------------------------------------
-    # Visualize the original 2D Voronoi diagram
-    vor = Voronoi(sites[:,0:2])
+    # # Visualize the mesh
 
     plt.figure()
     ax = plt.gca()
     ax.set_aspect('equal', adjustable='box')
     boundarylines = patches.Polygon(boundary_points_original,closed=True,linewidth=2,edgecolor='k',facecolor='none')
     ax.add_patch(boundarylines)
+
+    # Flow
+    vertsD = np.array(conforming_delaunay['vertices'])
+    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=1.,linewidth=0.5)
+
+    #***************************************************************************
     
-    verts = np.array(conforming_delaunay['vertices'])
-    segs = np.array(conforming_delaunay['segments'])
-    for beg, end in segs:
-        x0, y0 = verts[beg, :]
-        x1, y1 = verts[end, :]
-        ax.fill(
-            [x0, x1],
-            [y0, y1],
-            facecolor='none',
-            edgecolor='k',
-            linewidth=3,
-            zorder=0,
-        )
-
-    ax.triplot(verts[:, 0], verts[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=5.)
-        
-    verts = np.array(conforming_delaunay['vertices'])
-    ax.scatter(*verts.T, color='b',s=0.5)
-    if 'labels' in conforming_delaunay:
-        for i in range(verts.shape[0]):
-            ax.text(verts[i, 0], verts[i, 1], str(i))
-    if 'markers' in conforming_delaunay:
-        vm = conforming_delaunay['vertex_markers']
-        for i in range(verts.shape[0]):
-            ax.text(verts[i, 0], verts[i, 1], str(vm[i]))
+    vorsci = Voronoi(conforming_delaunay['vertices'])
+    rpoints = vorsci.ridge_points
+    for r in rpoints:
+        x = (vertsD[r[0], 0],vertsD[r[1], 0])
+        y = (vertsD[r[0], 1],vertsD[r[1], 1])
+        ax.plot(x,y, 'ro-',markersize=2.,linewidth=1)
 
 
-    # tr.plot(ax, **conforming_delaunay)
-    # plt.show()
-
-        
-    verts = tt['vertices']
-    edges = tt['edges']
-    for beg, end in edges:
-        x0, y0 = verts[beg, :]
-        x1, y1 = verts[end, :]
+    #***************************************************************************
+    
+    # Main cells
+    vertsV = tt['vertices']
+    edgesV = tt['edges']
+    for beg, end in edgesV:
+        x0, y0 = vertsV[beg, :]
+        x1, y1 = vertsV[end, :]
         ax.fill(
             [x0, x1],
             [y0, y1],
@@ -266,11 +246,12 @@ def main(self):
             linewidth=1.0,
         )
 
+    # Edge cells
     lim = ax.axis()
     ray_origin = tt['ray_origins']
     ray_direct = tt['ray_directions']
     for (beg, (vx, vy)) in zip(ray_origin.flatten(), ray_direct):
-        x0, y0 = verts[beg, :]
+        x0, y0 = vertsV[beg, :]
         scale = 100.0  # some large number
         x1, y1 = x0 + scale * vx, y0 + scale * vy
         ax.fill(
@@ -280,9 +261,9 @@ def main(self):
             edgecolor='k',
             linewidth=1.0,
         )
+    
     ax.axis(lim)  # make sure figure is not rescaled by ifinite ray
         
-    # tr.plot(ax, **tt)
     plt.show()
 
 
@@ -307,6 +288,41 @@ def main(self):
             WoodMeshGen.RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
                                                         boundaries,boundaryFlag)
         RebuildvorTime = time.time()
+
+    plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
+
+
+    #*******************************************************************
+    # ==================================================================
+    self.form[1].progressBar.setValue(415) 
+    self.form[1].statusWindow.setText("Status: Flow Mesh.") 
+    # ================================================================== 
+    #*******************************************************************
+    
+    
+    #vertsD are delauney vertices from conforming_delaunay[]
+    #veronoi vertices 
+
+    # del_verts = vertsD
+
+    # build elements first
+
+
+    # vor_verts = voronoi_vertices
+    # # print(vor_verts)
+
+    # nverts = len(del_verts)
+    # match = np.zeros((nverts,2))
+
+    # for i in range(0,nverts):
+    #     index = np.argmin(np.sum((np.array(vor_verts) - np.array(del_verts[i]))**2, axis=1))
+    #     print(index)
+    #     # vi = vor_verts[index]
+    #     # match[i,1] = vi
+    #     # print(vi)
+
+    # # print(match)
+
 
 
     # ==================================================================
@@ -418,25 +434,6 @@ def main(self):
 
     # ==================================================================
     self.form[1].progressBar.setValue(80) 
-    self.form[1].statusWindow.setText("Status: Generating Vizualiation Files.") 
-    # ==================================================================
-    # Generate Paraview visulization files
-    WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
-                    segment_length,theta,z_coord,nsegments,nridge,\
-                    voronoi_ridges,generation_center,all_ridges,nvertex,nconnector_t,\
-                    nconnector_l,nctrlpt_per_beam,ConnMeshData,conn_l_tangents,\
-                    all_vertices_2D,max_wings,flattened_all_vertices_2D)
-        
-    plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
-
-    # =================================================
-    # Generate 3D model files
-    if stlFlag in ['on','On','Y','y','Yes','yes']:
-        WoodMeshGen.StlModelFile(geoName)
-
-
-    # ==================================================================
-    self.form[1].progressBar.setValue(90) 
     self.form[1].statusWindow.setText("Status: Generating Model Files.") 
     # ==================================================================
     # Generate input files for numerical simulations
@@ -456,6 +453,17 @@ def main(self):
     boundary_conditions = ['Bottom','Top','Left','Right','Front','Back']
     BC_velo_dof = 1 # 1-x, 2-y, 3-z
     BC_velo_value = box_size*0.03 # mm/s
+    # WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
+    #                     connector_t_bot_connectivity,connector_t_reg_connectivity,\
+    #                     connector_t_top_connectivity,connector_l_connectivity,\
+    #                     segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
+    #                     props_connector_t_reg,iprops_connector_t_reg,props_connector_t_top,\
+    #                     iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
+    #                     timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
+    #                     x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
+    #                     nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
+    #                     precrackFlag,precrack_elem)
+    # chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
     if inpFlag in ['on','On','Y','y','Yes','yes']:
         if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
             WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
@@ -472,15 +480,18 @@ def main(self):
             # chronoInput(self.form)
             chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
         else:
-            np.save(Path(outDir + geoName + '/' + geoName + '_sites.npy'),sites)
-            np.save(Path(outDir + geoName + '/' + geoName + '_radii.npy'),radii)
+            np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+            np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
             print('Input files type: {:s} is not supported for the current version, please check the README for more details.'.format(inpType))
             print('Generated cells and rings info has been saved.')
-            print('Now exitting...')
-            exit()
+    else:
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
+        print('Generated cells and rings info has been saved.')
     
     FileTime = time.time() 
     print('Files generated in {:.3f} seconds'.format(FileTime - BeamTime))
+
 
     # ==============================================
     # Generate log file for the generation
@@ -494,42 +505,54 @@ def main(self):
             stlFlag,inpFlag,inpType,radial_growth_rule,\
             startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime)
     
-    
-    # ==================================================================    
-    self.form[1].progressBar.setValue(95) 
-    self.form[1].statusWindow.setText("Status: Visualizing.") 
     # ==================================================================
+    self.form[1].progressBar.setValue(90) 
+    self.form[1].statusWindow.setText("Status: Generating Vizualiation Files.") 
+    # ==================================================================
+    # Generate Paraview visulization files
+    if visFlag in ['on','On','Y','y','Yes','yes']:
+        WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
+                    segment_length,theta,z_coord,nsegments,nridge,\
+                    voronoi_ridges,generation_center,all_ridges,nvertex,nconnector_t,\
+                    nconnector_l,nctrlpt_per_beam,ConnMeshData,conn_l_tangents,\
+                    all_vertices_2D,max_wings,flattened_all_vertices_2D)  
 
-    App.activeDocument().addObject('App::DocumentObjectGroup',visualFilesName)
-    App.activeDocument().getObject(visualFilesName).Label = 'Visualization Files'
+        App.activeDocument().addObject('App::DocumentObjectGroup',visualFilesName)
+        App.activeDocument().getObject(visualFilesName).Label = 'Visualization Files'
 
-    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'),App.ActiveDocument.Name)
-    CBLbeamsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_beams')
-    CBLbeamsVTU.Label = geoName + '_beams'
-    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLbeamsVTU)
-    CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
-    CBLbeamsVTU.Visibility = True
+        importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'),App.ActiveDocument.Name)
+        CBLbeamsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_beams')
+        CBLbeamsVTU.Label = geoName + '_beams'
+        App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLbeamsVTU)
+        CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
+        CBLbeamsVTU.Visibility = True
 
-    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
-    CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
-    CBLconnsVTU.Label = geoName + '_conns'
-    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
-    CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'))
-    CBLconnsVTU.Visibility = False
-    
-    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),App.ActiveDocument.Name)
-    CBLconnsvVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
-    CBLconnsvVTU.Label = geoName + '_conns_vol'
-    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsvVTU)
-    CBLconnsvVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
-    CBLconnsvVTU.Visibility = False
+        importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
+        CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
+        CBLconnsVTU.Label = geoName + '_conns'
+        App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
+        CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'))
+        CBLconnsVTU.Visibility = False
+        
+        importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),App.ActiveDocument.Name)
+        CBLconnsvVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
+        CBLconnsvVTU.Label = geoName + '_conns_vol'
+        App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsvVTU)
+        CBLconnsvVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
+        CBLconnsvVTU.Visibility = False
 
-    importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
-    CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')
-    CBLvertsVTU.Label = geoName + '_vertices'
-    App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLvertsVTU)
-    CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
-    CBLvertsVTU.Visibility = False
+        importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
+        CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')
+        CBLvertsVTU.Label = geoName + '_vertices'
+        App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLvertsVTU)
+        CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
+        CBLvertsVTU.Visibility = False
+
+    # =================================================
+    # Generate 3D model files
+    if stlFlag in ['on','On','Y','y','Yes','yes']:
+        WoodMeshGen.StlModelFile(geoName)
+
 
     # ==================================================================    
     self.form[1].progressBar.setValue(100) 
@@ -549,7 +572,6 @@ def main(self):
     Gui.runCommand('Std_DrawStyle',6)
     Gui.runCommand('Std_PerspectiveCamera',1)
 
-    plt.show()
 
 if __name__ == '__main__':
     main()
