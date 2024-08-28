@@ -61,7 +61,8 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag]\
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        knotFlag, m1, m2, a1, a2]\
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
@@ -196,16 +197,22 @@ def main(self):
     for i in range(0,sites.shape[0]):
         if WoodMeshGen.check_isinside_boundbox2D(np.append(sites[i,:],0),x_min,x_max,y_min,y_max):
             sites_in.append(sites[i,:])
-                    
+
+    # ---------------------------------------------
+    # # Build flow mesh                    
     delaunay_vertices = np.concatenate((np.array(sites_in), boundary_points_original))
-    ## Conforming Delaunay
+    # Conforming Delaunay
     conforming_delaunay = tr.triangulate({'vertices': delaunay_vertices}, 'pq0Dec')
-  
+    WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay)
+    
+    # ---------------------------------------------
+    # # Build mechanical mesh 
     ttvertices, ttedges, ttray_origins, ttray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
     tt = dict(vertices=ttvertices, edges=ttedges,ray_origins=ttray_origins, ray_directions=ttray_directions) # for visualization purposes
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
+
 
     # ---------------------------------------------
     # # Visualize the mesh
@@ -218,20 +225,8 @@ def main(self):
 
     # Flow
     vertsD = np.array(conforming_delaunay['vertices'])
-    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=1.,linewidth=0.5)
+    ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=2.,linewidth=0.5)
 
-    #***************************************************************************
-    
-    vorsci = Voronoi(conforming_delaunay['vertices'])
-    rpoints = vorsci.ridge_points
-    for r in rpoints:
-        x = (vertsD[r[0], 0],vertsD[r[1], 0])
-        y = (vertsD[r[0], 1],vertsD[r[1], 1])
-        ax.plot(x,y, 'ro-',markersize=2.,linewidth=1)
-
-
-    #***************************************************************************
-    
     # Main cells
     vertsV = tt['vertices']
     edgesV = tt['edges']
@@ -264,7 +259,7 @@ def main(self):
     
     ax.axis(lim)  # make sure figure is not rescaled by ifinite ray
         
-    plt.show()
+    # plt.show()
 
 
     # ==================================================================
@@ -292,37 +287,6 @@ def main(self):
     plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
 
 
-    #*******************************************************************
-    # ==================================================================
-    self.form[1].progressBar.setValue(415) 
-    self.form[1].statusWindow.setText("Status: Flow Mesh.") 
-    # ================================================================== 
-    #*******************************************************************
-    
-    
-    #vertsD are delauney vertices from conforming_delaunay[]
-    #veronoi vertices 
-
-    # del_verts = vertsD
-
-    # build elements first
-
-
-    # vor_verts = voronoi_vertices
-    # # print(vor_verts)
-
-    # nverts = len(del_verts)
-    # match = np.zeros((nverts,2))
-
-    # for i in range(0,nverts):
-    #     index = np.argmin(np.sum((np.array(vor_verts) - np.array(del_verts[i]))**2, axis=1))
-    #     print(index)
-    #     # vi = vor_verts[index]
-    #     # match[i,1] = vi
-    #     # print(vi)
-
-    # # print(match)
-
 
 
     # ==================================================================
@@ -333,7 +297,7 @@ def main(self):
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D] = \
     WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise)
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1, m2, a1, a2)
     
 
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
@@ -453,20 +417,7 @@ def main(self):
     boundary_conditions = ['Bottom','Top','Left','Right','Front','Back']
     BC_velo_dof = 1 # 1-x, 2-y, 3-z
     BC_velo_value = box_size*0.03 # mm/s
-    # WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
-    #                     connector_t_bot_connectivity,connector_t_reg_connectivity,\
-    #                     connector_t_top_connectivity,connector_l_connectivity,\
-    #                     segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
-    #                     props_connector_t_reg,iprops_connector_t_reg,props_connector_t_top,\
-    #                     iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
-    #                     timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
-    #                     x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
-    #                     nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
-    #                     precrackFlag,precrack_elem)
-    # chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
-    if inpFlag in ['on','On','Y','y','Yes','yes']:
-        if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
-            WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
+    WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
                         connector_t_bot_connectivity,connector_t_reg_connectivity,\
                         connector_t_top_connectivity,connector_l_connectivity,\
                         segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
@@ -476,18 +427,31 @@ def main(self):
                         x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
                         nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
                         precrackFlag,precrack_elem)
-        elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
-            # chronoInput(self.form)
-            chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
-        else:
-            np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
-            np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
-            print('Input files type: {:s} is not supported for the current version, please check the README for more details.'.format(inpType))
-            print('Generated cells and rings info has been saved.')
-    else:
-        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
-        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
-        print('Generated cells and rings info has been saved.')
+    chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
+    # if inpFlag in ['on','On','Y','y','Yes','yes']:
+    #     if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
+    #         WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
+    #                     connector_t_bot_connectivity,connector_t_reg_connectivity,\
+    #                     connector_t_top_connectivity,connector_l_connectivity,\
+    #                     segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
+    #                     props_connector_t_reg,iprops_connector_t_reg,props_connector_t_top,\
+    #                     iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
+    #                     timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
+    #                     x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
+    #                     nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
+    #                     precrackFlag,precrack_elem)
+    #     elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
+    #         # chronoInput(self.form)
+    #         chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
+    #     else:
+    #         np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+    #         np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
+    #         print('Input files type: {:s} is not supported for the current version, please check the README for more details.'.format(inpType))
+    #         print('Generated cells and rings info has been saved.')
+    # else:
+    #     np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+    #     np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
+    #     print('Generated cells and rings info has been saved.')
     
     FileTime = time.time() 
     print('Files generated in {:.3f} seconds'.format(FileTime - BeamTime))
@@ -511,6 +475,9 @@ def main(self):
     # ==================================================================
     # Generate Paraview visulization files
     if visFlag in ['on','On','Y','y','Yes','yes']:
+        
+        plt.show()
+        
         WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                     segment_length,theta,z_coord,nsegments,nridge,\
                     voronoi_ridges,generation_center,all_ridges,nvertex,nconnector_t,\

@@ -40,9 +40,9 @@ def inputParams(form):
     print_interval = 500 #int(form[0].print_interval.text() or 500) # interval for printing prgress info
 
     box_center = eval(form[0].box_center.text() or "(0.0,0.0)") # coordinates of clipping box center
-    box_height = float(form[0].box_height.text() or 0.1) # specimen length
-    box_width = float(form[0].box_width.text() or 0.01) # side length
-    box_depth = float(form[0].box_depth.text() or 0.01) # side length
+    box_height = float(form[0].box_height.text() or 1) # specimen length
+    box_width = float(form[0].box_width.text() or 1) # side length
+    box_depth = float(form[0].box_depth.text() or 1) # side length
     box_size = box_width
 
     # longitudinal direction parameters
@@ -55,6 +55,12 @@ def inputParams(form):
 
     NURBS_degree = 2
 
+    # Knot parameters
+    knotFlag = form[0].knotFlag.currentText()
+    a1 = float(form[0].a1.text() or -0.1)
+    a2 = float(form[0].a2.text() or 0.1)
+    m1 = float(form[0].m1.text() or 0.05)
+    m2 = float(form[0].m2.text() or 0.05)
 
     # Precrack Parameters
     # notch and precrack are always centered on leftmost edge
@@ -85,4 +91,5 @@ def inputParams(form):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        knotFlag, m1, m2, a1, a2

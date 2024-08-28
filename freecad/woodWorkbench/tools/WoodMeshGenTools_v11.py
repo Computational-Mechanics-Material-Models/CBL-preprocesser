@@ -23,7 +23,16 @@ import FreeCAD as App # type: ignore
 
 # from hexalattice.hexalattice import create_hex_grid # 
 
+def calc_knotflow(y,z,m1,m2,a1,a2):
+    Uinf = 1
 
+    dy1 = -m1/2/math.pi*y/((z-a1)**2+y**2)
+    dz1 = -m1/2/math.pi*(z-a1)/((z-a1)**2+y**2)    
+    dy2 = m2/2/math.pi*y/((z-a2)**2+y**2)
+    dz2 = m2/2/math.pi*(z-a2)/((z-a2)**2+y**2)
+
+    dydz = (dy1+dy2)/(Uinf + dz1 + dz2)
+    return dydz
 
 def intersect2D(a, b):
   """
@@ -965,6 +974,44 @@ def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
 
+def BuildFlowMesh(outDir, geoName,conforming_delaunay):
+
+
+    #***************************************************************************
+    delaun_verts = np.array(conforming_delaunay['vertices']) # flow point coords
+    nverts = len(delaun_verts)
+
+    vorsci = Voronoi(conforming_delaunay['vertices']) # different package to calculate voronoi region info
+    delaun_indx = vorsci.ridge_points # matching flow index to voronoi ridge
+    vor_indx = vorsci.ridge_vertices # matching voronoi index to voronoi ridge
+    nridges = len(delaun_indx) # number of ridges and thus number of flow elements
+
+    delaun_elems = np.zeros((nridges,5)) # empty arrays for flow info
+    # n1, n2, l1, l2, area
+
+    for r in range(0,nridges):
+        ptsd = delaun_indx[r] # flow index for ridge
+        coordsd = delaun_verts[ptsd] # flow coords from points
+        ptsv = vor_indx[r] # vor index for ridge
+        coordsv = vorsci.vertices[ptsv] # vor coords
+        
+        delaun_elems[r,0:2] = ptsd
+        l = np.linalg.norm(coordsd) # distance bewteen flow coords
+        delaun_elems[r,2] =  l/2
+        delaun_elems[r,3] =  l/2
+        delaun_elems[r,4] = np.linalg.norm(coordsv) # distance between vor coords (for area)
+
+    # Node numbering and output formatting
+    delaun_num = np.empty((nverts,1))
+    delaun_num[:,0] = (np.linspace(1,nverts,nverts,dtype='int64'))
+    delaun_nodes = np.concatenate((delaun_num,delaun_verts),axis=1)
+
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f']\
+        ,header='Flow Mesh Node Coordinates\nn = '+ str(nverts) + '\n[# x y]')
+    
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f']\
+        ,header='Flow Mesh Element Information\nn = '+ str(nridges) + '\n[n1 n2 l1 l2 A]')
+    return 
 
 def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
                                       boundaries,boundaryFlag):
@@ -1074,8 +1121,7 @@ def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_dir
     return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
-            
-            
+                        
             
 def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,merge_tol,boundaryFlag):
     """Clip Voronoi mesh by the boundaries, merge short Voronoi ridges, and rebuild the new Voronoi mesh"""
@@ -1859,7 +1905,7 @@ def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttr
             
 def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise):
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1, m2, a1, a2):
     
     npt_per_layer = nvertex
     npt_per_layer_normal = npt_per_layer - nboundary_pts_featured
@@ -1894,17 +1940,28 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     
     # Rotate and add randomness in each layer in 3D
     vertices_new = np.zeros((nlayers,npt_per_layer,3))
+    # print(vertices_new[1,:,0])
     for i in range(0,nlayers):
         for j in range(0,npt_per_layer):
             vertices_new[i,j,:2] = rotate_around_point_highperf(voronoi_vertices[j,:], theta[i], generation_center)
+            #
+            # Flow around knot
+            if knotFlag == 'On':
+                dy = calc_knotflow(vertices_new[i,j,1],z_coord[i],m1,m2,a1,a2)*segment_length
+            else:
+                dy = 0
+                # dx = calc_knotflow(z_coord[i],vertices_new[i,j,0])*segment_length
+            #
             # added randomness to morphology in the L plane - not calibrated yet -SA
-            vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise/5+1) # sin(z_coord[i]/z_max)
-            vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise/5+1) #(np.random.random()*random_noise/10+1)
+            # vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise+1)# + dx # sin(z_coord[i]/z_max)
+            # vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise+1) + dy #(np.random.random()*random_noise/10+1)
+            vertices_new[i,j,0] = vertices_new[i,j,0]
+            vertices_new[i,j,1] = vertices_new[i,j,1] + dy
             
             # # add artificial waviness
             # vertices_new[i,j,0] = vertices_new[i,j,0] + z_coord[i]**2*random_noise
             # vertices_new[i,j,1] = vertices_new[i,j,1] + 0
-            # 
+            #
             vertices_new[i,j,2] = z_coord[i]
 
     # Vertex Data in 3D
