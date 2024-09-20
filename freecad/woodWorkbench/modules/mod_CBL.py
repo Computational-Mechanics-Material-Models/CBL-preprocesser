@@ -151,7 +151,7 @@ class gen_CBL_Class():
 
     def GetResources(self):
         return {"Pixmap"  : os.path.join(ICONPATH, "ldpmOutput.svg"), # the name of a svg file available in the resources
-                "MenuText": "CBL/CSL Simulation Inputs",
+                "MenuText": "CBL Simulation Inputs",
                 "ToolTip" : "Generation of CBL simulation inputs"}
 
     def Activated(self):
