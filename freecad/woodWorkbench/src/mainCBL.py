@@ -79,13 +79,6 @@ def main(self):
     # height = z_max-z_min
     # nsegments = int(height/grain_length)
     # z_max = 100
-
-    # Prep naming variables
-    meshName = geoName + "_mesh"
-    analysisName = geoName + "_analysis"
-    materialName = geoName + "_material"
-    dataFilesName = geoName + '_dataFiles'
-    visualFilesName = geoName + '_visualFiles'
     
 
     # ==================================================================
@@ -96,13 +89,22 @@ def main(self):
     # Make output directory if does not exist
     outDir = self.form[1].outputDir.text()
 
-    try:
-        shutil.rmtree(outDir + '/' + geoName)
-    except:
-        pass
+    i = 1
+    geoNamenew = geoName
+    while os.path.exists(Path(outDir + '/' + geoNamenew)):
+        i +=1
+        geoNamenew = geoName + str(i)
+    geoName = geoNamenew
+    # if not os.path.exists(Path(outDir + '/' + geoName)):
+    os.makedirs(Path(outDir + '/' + geoName))
 
-    if not os.path.exists(Path(outDir + '/' + geoName)):
-        os.makedirs(Path(outDir + '/' + geoName))
+
+    # Prep naming variables
+    meshName = geoName + "_mesh"
+    analysisName = geoName + "_analysis"
+    materialName = geoName + "_material"
+    dataFilesName = geoName + '_dataFiles'
+    visualFilesName = geoName + '_visualFiles'
 
     # Write input parameters to log file for repeated use
     outputLog(geoName, radial_growth_rule, iter_max, r_min, r_max, nrings, \
