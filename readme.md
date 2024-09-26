@@ -61,7 +61,6 @@ We recommend pulling the GitHub directly into the FreeCAD workbench directory. O
 * Click "**Clone**"
 
 
-
 </details>
 
 <details>
@@ -85,10 +84,69 @@ Verify that everything is installed properly by opening FreeCAD.
 * Select the particle icon (this should be the only workbench-specific button).
 * Run the workbench in debug mode by scrolling to the bottom without changing any parameters and click **Generate Model**. 
 
-If no erros appear during this process, the workbench is installed correctly.
+If no errors appear during this process, the workbench is installed correctly.
 
 </details>
 
+
+## Quest FreeCAD Singularity Setup and Usage
+
+<details>
+<summary>Step 1: Load FreeCAD</summary>
+
+Run FreeCAD using following command:
+
+>singularity exec -B /projects:/projects -B /software:/software -B /home:/home /hpc/software/freecad/0.21.2/freecad_23.10.sif freecad $@.
+
+</details>
+
+
+<details>
+<summary>Step 2: Clone Preprocessor</summary>
+
+After opening FreeCAD, from tools menu find Addon Manager and install Plot Workbench. Then, open the python panel inside FreeCAD and run following command:
+
+>App.getUserAppDataDir()
+
+This command gives you the path where you need to clone CBL preprocessor. The path for new module should be similar to "/home/NETID/.local/share/FreeCAD/Mod/", with NETID replaced with your netID
+
+Copy the repo folder to this location.
+
+</details>
+
+
+<details>
+<summary>Step 3: Run FreeCAD</summary>
+
+You can run the freecad using following command (replace NETID with your netID):
+
+>module load singularity
+>singularity exec --env PATH=/usr/local/bin:/usr/bin:/bin: -B /projects:/projects -B /software:/software -B /home/NETID:/home/NETID /hpc/software/freecad/0.21.2/freecad_23.10.sif  freecad $@
+
+</details>
+
+## Carpenter FreeCAD Setup and Usage
+
+<details>
+<summary>Step 1: Load FreeCAD</summary>
+
+Coming Soon
+
+</details>
+
+<details>
+<summary>Step 2: Clone Preprocessor</summary>
+
+Coming Soon
+
+</details>
+
+<details>
+<summary>Step 3: Run FreeCAD</summary>
+
+Coming Soon
+
+</details>
 
 ## License
 
