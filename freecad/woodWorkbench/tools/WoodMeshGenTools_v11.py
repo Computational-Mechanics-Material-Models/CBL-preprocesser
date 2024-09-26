@@ -546,13 +546,16 @@ def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
             outofbound.append(i)
     sites = np.delete(sites,outofbound,0)
 
+    sites = sites[:,0:2]
+    print(np.shape(sites),np.shape(radii))
+
     return sites, radii
 
 
 def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
                                nrings,width_heart,width_sparse,width_dense,\
                                cellsize_sparse,cellsize_dense,iter_max,\
-                               print_interval,omega=1.0):
+                               print_interval,omega=0.1):
     """
     packing cells by firstly placing new cells and then performing Lloyd's relaxation in the generation rings
     """
@@ -578,16 +581,13 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
     
     sites = np.vstack((PerimeterPointsSites,inside_cells))
     
-    filenames = []
-    frame_iter = 0
-    
-    lloyd_iter = 0
-    while lloyd_iter < iter_max:
-        vor = Voronoi(sites)
-        sites = relax_points(vor,omega)
+    # lloyd_iter = 0
+    # while lloyd_iter < iter_max:
+    #     vor = Voronoi(sites)
+    #     # sites = relax_points(vor,omega)
         
-        sites = np.vstack((PerimeterPointsSites,sites))
-        lloyd_iter += 1
+    #     sites = np.vstack((PerimeterPointsSites,sites))
+    #     lloyd_iter += 1
 
     
     existing_sites = np.copy(sites[npoint:,:])
@@ -636,6 +636,8 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
         existing_sites = np.vstack((sites,existing_sites))
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     sites = existing_sites
+
+    print(np.shape(sites),np.shape(radii))
 
     return sites, radii
 
@@ -974,7 +976,8 @@ def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
 
-def BuildFlowMesh(outDir, geoName,conforming_delaunay):
+
+def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max):
 
 
     #***************************************************************************
@@ -986,32 +989,48 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay):
     vor_indx = vorsci.ridge_vertices # matching voronoi index to voronoi ridge
     nridges = len(delaun_indx) # number of ridges and thus number of flow elements
 
-    delaun_elems = np.zeros((nridges,5)) # empty arrays for flow info
+    delaun_elems = np.zeros((nridges*nsegments,5)) # empty arrays for flow info
     # n1, n2, l1, l2, area
 
-    for r in range(0,nridges):
-        ptsd = delaun_indx[r] # flow index for ridge
-        coordsd = delaun_verts[ptsd] # flow coords from points
-        ptsv = vor_indx[r] # vor index for ridge
-        coordsv = vorsci.vertices[ptsv] # vor coords
+    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
+    connector_l_length = segment_length*long_connector_ratio
+
+    z_coord = z_min    
+    coordsz = np.zeros((nverts*nsegments,1))
+    for l in range(0,nsegments):
+        for p in range(0,nverts):
+            coordsz[p+l*nverts] = z_coord
+        z_coord += (segment_length + connector_l_length)
+
+    for l in range(0,nsegments):
+        for r in range(0,nridges):
+            ptsd = delaun_indx[r] # flow index for ridge
+            coordsd = delaun_verts[ptsd] # flow coords from points
+            ptsv = vor_indx[r] # vor index for ridge
+            coordsv = vorsci.vertices[ptsv] # vor coords
+            
+            delaun_elems[r+l*nridges,0:2] = ptsd
+            length = np.linalg.norm(coordsd) # distance bewteen flow coords
+            delaun_elems[r+l*nridges,2] =  length/2
+            delaun_elems[r+l*nridges,3] =  length/2
+            delaun_elems[r+l*nridges,4] = np.linalg.norm(coordsv) # distance between vor coords (for area)
         
-        delaun_elems[r,0:2] = ptsd
-        l = np.linalg.norm(coordsd) # distance bewteen flow coords
-        delaun_elems[r,2] =  l/2
-        delaun_elems[r,3] =  l/2
-        delaun_elems[r,4] = np.linalg.norm(coordsv) # distance between vor coords (for area)
-
+        
+    
     # Node numbering and output formatting
-    delaun_num = np.empty((nverts,1))
-    delaun_num[:,0] = (np.linspace(1,nverts,nverts,dtype='int64'))
-    delaun_nodes = np.concatenate((delaun_num,delaun_verts),axis=1)
+    delaun_num = np.empty((nverts*nsegments,1))
+    delaun_num[:,0] = np.linspace(1,nverts*nsegments,nverts*nsegments,dtype='int64')
+    delaun_verts_layers = np.tile(delaun_verts,(nsegments,1))
+    delaun_nodes = np.concatenate((delaun_num,delaun_verts_layers,coordsz),axis=1)
 
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f']\
-        ,header='Flow Mesh Node Coordinates\nn = '+ str(nverts) + '\n[# x y]')
+
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
+        ,header='Flow Mesh Node Coordinates\nn = '+ str(nverts) + '\n[# x y z]')
     
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f']\
         ,header='Flow Mesh Element Information\nn = '+ str(nridges) + '\n[n1 n2 l1 l2 A]')
     return 
+
 
 def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
                                       boundaries,boundaryFlag):
@@ -1934,7 +1953,6 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     for i in range(nlayers-(nsegments-1)-(nctrlpt_per_beam-1),1,-(nctrlpt_per_beam-1)): 
         theta = np.insert(theta,i,theta[i-1])
         theta[i:] += connector_l_angle
-    for i in range(nlayers-(nsegments-1)-(nctrlpt_per_beam-1),1,-(nctrlpt_per_beam-1)):
         z_coord = np.insert(z_coord,i,z_coord[i-1])
         z_coord[i:] += connector_l_length
     
@@ -2557,15 +2575,12 @@ def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
 
 
 def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
-                       segment_length,theta,z_coord,nsegments,nridge,\
-                       voronoi_ridges,generation_center,all_ridges,nvertex,\
+                       nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
                        nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
-                       conn_l_tangents,all_vertices_2D,max_wings,\
-                       flattened_all_vertices_2D):
+                       conn_l_tangents,all_vertices_2D):
     
     # Calculate model parameters
     ngrain = nvertex
-    nlayers_conn_l = nsegments - 1
     ninterval_per_beam_vtk = int((nctrlpt_per_beam-1)/2) # 2 layers ----> 1 interval
     nconnector_t_per_beam = int((nctrlpt_per_beam-1)/NURBS_degree+1)
 
@@ -2665,10 +2680,8 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     # Modify Vertex Data by adding quad_conn_vertices
     VTKvertices_quad_conn = np.vstack((VTKvertices,quad_conn_vertices))
     npt_total_vtk_quad_conn = VTKvertices_quad_conn.shape[0]
-    vertex_connectivity_vtk_quad_conn = np.linspace(0,npt_total_vtk_quad_conn-1,npt_total_vtk_quad_conn)
 
     # Hex - Connector Volumes
-    nhex_conn_total = nquad_conn_total*2
     
     hex_conn_vertices = np.zeros((nquad_conn_total*4*3,3))
     hex_conn_vertices[0:nquad_conn_total,:] = Quad_center - Quad_tangent*Quad_height[:, np.newaxis]/2 - Quad_bitangent*Quad_width[:, np.newaxis]/2
@@ -2697,8 +2710,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     # Modify Vertex Data by adding hex_conn_vertices
     VTKvertices_hex_conn = np.vstack((VTKvertices,hex_conn_vertices))
     npt_total_vtk_hex_conn = VTKvertices_hex_conn.shape[0]
-    vertex_connectivity_vtk_hex_conn = np.linspace(0,npt_total_vtk_hex_conn-1,npt_total_vtk_hex_conn)
-    
+  
 # =============================================================================
     # Paraview Visualization File
     collocation_flag_vtk = np.concatenate((np.ones(ngrain),np.zeros(npt_per_layer_vtk*NURBS_degree-ngrain)))

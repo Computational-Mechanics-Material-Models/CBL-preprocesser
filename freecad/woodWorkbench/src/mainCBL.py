@@ -107,13 +107,15 @@ def main(self):
     visualFilesName = geoName + '_visualFiles'
 
     # Write input parameters to log file for repeated use
-    outputLog(geoName, radial_growth_rule, iter_max, r_min, r_max, nrings, \
+    outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
+        r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-        boundaryFlag, box_shape, box_center, box_height, \
-        nsegments, theta_min, long_connector_ratio, \
+        boundaryFlag, box_shape, box_center, box_size, box_height, \
+        nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, box_width, box_depth)
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        knotFlag, m1, m2, a1, a2)
         
 
     # Make new freecad document and set view if does not exisit
@@ -205,12 +207,12 @@ def main(self):
     delaunay_vertices = np.concatenate((np.array(sites_in), boundary_points_original))
     # Conforming Delaunay
     conforming_delaunay = tr.triangulate({'vertices': delaunay_vertices}, 'pq0Dec')
-    WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay)
+    WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max)
     
+
     # ---------------------------------------------
     # # Build mechanical mesh 
     ttvertices, ttedges, ttray_origins, ttray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
-    tt = dict(vertices=ttvertices, edges=ttedges,ray_origins=ttray_origins, ray_directions=ttray_directions) # for visualization purposes
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
@@ -230,11 +232,9 @@ def main(self):
     ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=2.,linewidth=0.5)
 
     # Main cells
-    vertsV = tt['vertices']
-    edgesV = tt['edges']
-    for beg, end in edgesV:
-        x0, y0 = vertsV[beg, :]
-        x1, y1 = vertsV[end, :]
+    for beg, end in ttedges:
+        x0, y0 = ttvertices[beg, :]
+        x1, y1 = ttvertices[end, :]
         ax.fill(
             [x0, x1],
             [y0, y1],
@@ -242,13 +242,16 @@ def main(self):
             edgecolor='k',
             linewidth=1.0,
         )
+        ax.plot(
+            [x0, x1],
+            [y0, y1],'ko',markersize=2.)
 
-    # Edge cells
+    # # Edge cells
     lim = ax.axis()
-    ray_origin = tt['ray_origins']
-    ray_direct = tt['ray_directions']
+    ray_origin = ttray_origins
+    ray_direct = ttray_directions
     for (beg, (vx, vy)) in zip(ray_origin.flatten(), ray_direct):
-        x0, y0 = vertsV[beg, :]
+        x0, y0 = ttvertices[beg, :]
         scale = 100.0  # some large number
         x1, y1 = x0 + scale * vx, y0 + scale * vy
         ax.fill(
@@ -259,7 +262,7 @@ def main(self):
             linewidth=1.0,
         )
     
-    ax.axis(lim)  # make sure figure is not rescaled by ifinite ray
+    ax.axis(lim)  # make sure figure is not rescaled by infinite ray
         
     # plt.show()
 
@@ -481,10 +484,9 @@ def main(self):
         plt.show()
         
         WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
-                    segment_length,theta,z_coord,nsegments,nridge,\
-                    voronoi_ridges,generation_center,all_ridges,nvertex,nconnector_t,\
-                    nconnector_l,nctrlpt_per_beam,ConnMeshData,conn_l_tangents,\
-                    all_vertices_2D,max_wings,flattened_all_vertices_2D)  
+                       nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
+                       nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
+                       conn_l_tangents,all_vertices_2D)  
 
         App.activeDocument().addObject('App::DocumentObjectGroup',visualFilesName)
         App.activeDocument().getObject(visualFilesName).Label = 'Visualization Files'

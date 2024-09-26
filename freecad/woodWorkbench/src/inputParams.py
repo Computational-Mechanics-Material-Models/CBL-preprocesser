@@ -19,7 +19,7 @@ def inputParams(form):
     # Cell Growth Parameters
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  #
     r_min = float(form[0].r_min.text() or 0)   # inner radius of generation domain
-    r_max = float(form[0].r_max.text() or 2)   # outer radius of generation domain
+    r_max = float(form[0].r_max.text() or 1)   # outer radius of generation domain
     nrings = int(form[0].nrings.text() or 2) # number of rings
     width_heart = 0.15*(r_max-r_min)/nrings # ring width for the innermost ring
     width_early = 0.85*(r_max-r_min)/nrings # ring width for rings with early cells
@@ -40,9 +40,9 @@ def inputParams(form):
     print_interval = 500 #int(form[0].print_interval.text() or 500) # interval for printing prgress info
 
     box_center = eval(form[0].box_center.text() or "(0.0,0.0)") # coordinates of clipping box center
-    box_height = float(form[0].box_height.text() or 1) # specimen length
-    box_width = float(form[0].box_width.text() or 1) # side length
-    box_depth = float(form[0].box_depth.text() or 1) # side length
+    box_height = float(form[0].box_height.text() or 0.5) # specimen length
+    box_width = float(form[0].box_width.text() or 0.5) # side length
+    box_depth = float(form[0].box_depth.text() or 0.5) # side length
     box_size = box_width
 
     # longitudinal direction parameters

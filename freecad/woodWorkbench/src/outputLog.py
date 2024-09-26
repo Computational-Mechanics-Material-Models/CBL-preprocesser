@@ -3,13 +3,15 @@ from pathlib import Path
 import FreeCAD as App # type: ignore
 
 
-def outputLog(geoName, radial_growth_rule, iter_max, r_min, r_max, nrings, \
+def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
+        r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-        boundaryFlag, box_shape, box_center, box_height, \
-        nsegments, theta_min, long_connector_ratio, \
+        boundaryFlag, box_shape, box_center, box_size, box_height, \
+        nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, box_width, box_depth):
+        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        knotFlag, m1, m2, a1, a2):
 
     # Generate log file
     logfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-input.cwPar'),'w')        
@@ -56,6 +58,12 @@ def outputLog(geoName, radial_growth_rule, iter_max, r_min, r_max, nrings, \
     logfile.write('nsegments= ' + str(nsegments) + '\n')
     logfile.write('theta_min= ' + str(theta_min) + '\n')
     logfile.write('long_connector_ratio= ' + str(long_connector_ratio) + '\n')
+
+    logfile.write('knotFlag= ' + str(knotFlag) + '\n')
+    logfile.write('a1= ' + str(a1) + '\n')
+    logfile.write('a2= ' + str(a2) + '\n') 
+    logfile.write('m1= ' + str(m1) + '\n')
+    logfile.write('m2= ' + str(m2) + '\n') 
 
     logfile.write('x_notch_size= ' + str(x_notch_size) + '\n')
     logfile.write('y_notch_size= ' + str(y_notch_size) + '\n')   
