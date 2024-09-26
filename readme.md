@@ -91,6 +91,10 @@ If no errors appear during this process, the workbench is installed correctly.
 
 ## Quest FreeCAD Singularity Setup and Usage
 
+COMING SOON
+
+Currently Not Supported with Triangle Package
+
 <details>
 <summary>Step 1: Load FreeCAD</summary>
 
