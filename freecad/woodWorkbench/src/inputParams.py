@@ -57,7 +57,8 @@ def inputParams(form):
 
     # Knot parameters
     knotFlag = form[0].knotFlag.currentText()
-    a1 = float(form[0].a1.text() or -0.1)
+    Uinf = float(form[0].knot_flow.text() or 1)
+    a1 = float(form[0].a1.text() or 0.4)
     a2 = float(form[0].a2.text() or 0.1)
     m1 = float(form[0].m1.text() or 0.05)
     m2 = float(form[0].m2.text() or 0.05)
@@ -92,4 +93,4 @@ def inputParams(form):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, m1, m2, a1, a2
+        knotFlag, m1, m2, a1, a2, Uinf

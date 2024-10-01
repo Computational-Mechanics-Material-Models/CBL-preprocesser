@@ -10,6 +10,7 @@ import math
 import bisect
 import numpy as np
 from scipy.spatial.distance import cdist
+from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from scipy.spatial import cKDTree
@@ -23,13 +24,12 @@ import FreeCAD as App # type: ignore
 
 # from hexalattice.hexalattice import create_hex_grid # 
 
-def calc_knotflow(y,z,m1,m2,a1,a2):
-    Uinf = 1
+def calc_knotflow(y,z,m1,m2,a1,a2,Uinf,yc):
 
-    dy1 = -m1/2/math.pi*y/((z-a1)**2+y**2)
-    dz1 = -m1/2/math.pi*(z-a1)/((z-a1)**2+y**2)    
-    dy2 = m2/2/math.pi*y/((z-a2)**2+y**2)
-    dz2 = m2/2/math.pi*(z-a2)/((z-a2)**2+y**2)
+    dy1 = -m1/2/math.pi*(y-yc)/((z-a1)**2+(y-yc)**2)
+    dz1 = -m1/2/math.pi*(z-a1)/((z-a1)**2+(y-yc)**2)    
+    dy2 = m2/2/math.pi*(y-yc)/((z-a2)**2+(y-yc)**2)
+    dz2 = m2/2/math.pi*(z-a2)/((z-a2)**2+(y-yc)**2)
 
     dydz = (dy1+dy2)/(Uinf + dz1 + dz2)
     return dydz
@@ -637,8 +637,6 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     sites = existing_sites
 
-    print(np.shape(sites),np.shape(radii))
-
     return sites, radii
 
 
@@ -995,6 +993,7 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
     connector_l_length = segment_length*long_connector_ratio
 
+    # define z coordinate for each layer
     z_coord = z_min    
     coordsz = np.zeros((nverts*nsegments,1))
     for l in range(0,nsegments):
@@ -1924,28 +1923,32 @@ def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttr
             
 def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1, m2, a1, a2):
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1,m2,a1,a2,Uinf,box_center,box_depth):
     
+    # Number of points per layer
     npt_per_layer = nvertex
     npt_per_layer_normal = npt_per_layer - nboundary_pts_featured
             
+    # Number of control points per beam
     nctrlpt_per_elem = NURBS_degree + 1
     nctrlpt_per_beam = 2*NURBS_degree + 1
 
+    # Number of layers
     nlayers = nctrlpt_per_beam*nsegments
     
+    # Number of connectors per beam
     nconnector_t_per_beam = int((nctrlpt_per_beam-1)/NURBS_degree+1)
     nconnector_t_per_grain = int(nconnector_t_per_beam*nsegments)
     
+    # Length of layer
     segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
     segment_angle = (theta_max-theta_min) / (nsegments + (nsegments-1)*long_connector_ratio)
 
+    # Size of connectors
     connector_l_angle = segment_angle*long_connector_ratio
     connector_l_length = segment_length*long_connector_ratio
-    
-    # theta = np.linspace(theta_min,theta_max,nlayers-(nsegments-1))
-    # z_coord = np.linspace(z_min,z_max,nlayers-(nsegments-1))
 
+    # Rotation angle and layer z-coordinates
     theta = np.linspace(theta_min,theta_max-connector_l_angle*(nsegments-1),nlayers-(nsegments-1))
     z_coord = np.linspace(z_min,z_max-connector_l_length*(nsegments-1),nlayers-(nsegments-1))
     
@@ -1956,38 +1959,55 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
         z_coord = np.insert(z_coord,i,z_coord[i-1])
         z_coord[i:] += connector_l_length
     
-    # Rotate and add randomness in each layer in 3D
-    vertices_new = np.zeros((nlayers,npt_per_layer,3))
-    # print(vertices_new[1,:,0])
+    # Matricies for adding new coordinates due to layering, rotation, and knot flow
+    vertices_new = np.zeros((nlayers,npt_per_layer,3))   
+    vertices_rep = np.tile(np.transpose(voronoi_vertices[:,1]),(nlayers,1))   
+    vertices_flow = np.tile(np.transpose(voronoi_vertices[:,1]),(nlayers,1)) 
+    knot_dy = np.zeros((nlayers,npt_per_layer))
+    # knot_radii = np.zeros((nlayers,1))
+    # vertices_knot = np.array([])
+
+    # Defining edge to knot influence area for clean mesh boundary
+    knot_bound = 0.95*box_depth/2 + box_center[1]
+    
+    # Calculate bend around knot
+    if knotFlag == 'On':
+        vertices_flow[:,:] = odeint(calc_knotflow,voronoi_vertices[:,1],z_coord[:],args=(m1,m2,a1,a2,Uinf,box_center[1]))
+        knot_dy = vertices_flow - vertices_rep
+        # knot_radii = odeint(calc_knotflow,0.01,z_coord[:],args=(m1,m2,a1,a2,Uinf,box_center[1])) # determine radius of knot by beam closest to center
+    # print(knot_radii)
+
+    # Extrude layers
     for i in range(0,nlayers):
         for j in range(0,npt_per_layer):
+            
+            # Rotate xy plane for trunk rotation
             vertices_new[i,j,:2] = rotate_around_point_highperf(voronoi_vertices[j,:], theta[i], generation_center)
             #
-            # Flow around knot
-            if knotFlag == 'On':
-                dy = calc_knotflow(vertices_new[i,j,1],z_coord[i],m1,m2,a1,a2)*segment_length
-            else:
-                dy = 0
-                # dx = calc_knotflow(z_coord[i],vertices_new[i,j,0])*segment_length
-            #
+            # Straighten out edges of box in case knot flow bulges mesh
+            if abs(vertices_new[i,j,1]) > knot_bound: 
+                knot_dy[i,j] = 0
+            # # Mark down which vertices are within 10% of knot boundary
+            # elif abs(vertices_new[i,j,1]) < knot_radii[i]*1.1: 
+            #     np.append(vertices_knot,vertices_new[i,j,:])
+            
+            
             # added randomness to morphology in the L plane - not calibrated yet -SA
             # vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise+1)# + dx # sin(z_coord[i]/z_max)
             # vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise+1) + dy #(np.random.random()*random_noise/10+1)
-            vertices_new[i,j,0] = vertices_new[i,j,0]
-            vertices_new[i,j,1] = vertices_new[i,j,1] + dy
-            
-            # # add artificial waviness
-            # vertices_new[i,j,0] = vertices_new[i,j,0] + z_coord[i]**2*random_noise
-            # vertices_new[i,j,1] = vertices_new[i,j,1] + 0
-            #
-            vertices_new[i,j,2] = z_coord[i]
 
-    # Vertex Data in 3D
+        # Define z coord based on plane
+        vertices_new[i,:,2] = z_coord[i]
+
+    # print(vertices_knot)
+    # Adjust rotation due to knot flow
+    vertices_new[:,:,1] = vertices_new[:,:,1] + knot_dy[:,:]
+    
+    # Vertex data in 3D
     voronoi_vertices_3D = np.reshape(vertices_new,(-1,3))
     nvertices_3D = voronoi_vertices_3D.shape[0]
     
-    
-    # Voronoi Ridge Data in 3D 
+    # Voronoi ridge data in 3D 
     finite_ridges_3D = np.tile(finite_ridges_new, (nlayers,1)) # temporarily assume each layer has the same number of finite_ridges and same finite ridge connectivities
     # calculate offset 
     x = np.arange(0,nlayers)*npt_per_layer
@@ -1995,8 +2015,6 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     finite_ridges_3D_offset = np.tile(finite_ridges_3D_offset, (2,1))
     finite_ridges_3D = finite_ridges_3D + finite_ridges_3D_offset.T 
 
-    
-    # Voronoi Ridge Data in 3D 
     boundary_ridges_3D = np.tile(boundary_ridges_new, (nlayers,1)) # temporarily assume each layer has the same number of finite_ridges and same finite ridge connectivities
     # calculate offset 
     x = np.arange(0,nlayers)*npt_per_layer

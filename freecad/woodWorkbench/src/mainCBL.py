@@ -62,7 +62,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, m1, m2, a1, a2]\
+        knotFlag, m1, m2, a1, a2, Uinf]\
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
@@ -115,7 +115,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, m1, m2, a1, a2)
+        knotFlag, m1, m2, a1, a2, Uinf)
         
 
     # Make new freecad document and set view if does not exisit
@@ -195,7 +195,7 @@ def main(self):
     # x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
     #     WoodMeshGen.Clipping_Box(box_shape,box_center,box_size, box_width, box_depth,boundaryFlag,x_notch_size,y_notch_size)
     x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
-        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,boundaryFlag)
+        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,boundaryFlag)
 
     sites_in = []
     for i in range(0,sites.shape[0]):
@@ -302,7 +302,7 @@ def main(self):
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D] = \
     WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1, m2, a1, a2)
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1, m2, a1, a2, Uinf, box_center,box_depth)
     
 
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
@@ -481,7 +481,7 @@ def main(self):
     # Generate Paraview visulization files
     if visFlag in ['on','On','Y','y','Yes','yes']:
         
-        plt.show()
+        # plt.show()
         
         WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                        nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
@@ -519,29 +519,39 @@ def main(self):
         CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
         CBLvertsVTU.Visibility = False
 
-    # =================================================
-    # Generate 3D model files
-    if stlFlag in ['on','On','Y','y','Yes','yes']:
-        WoodMeshGen.StlModelFile(geoName)
+        # =================================================
+        # Generate 3D model files
+        if stlFlag in ['on','On','Y','y','Yes','yes']:
+            WoodMeshGen.StlModelFile(geoName)
 
+        # ==================================================================    
+        self.form[1].progressBar.setValue(100) 
+        self.form[1].statusWindow.setText("Status: Complete.") 
+        # ==================================================================
 
-    # ==================================================================    
-    self.form[1].progressBar.setValue(100) 
-    self.form[1].statusWindow.setText("Status: Complete.") 
-    # ==================================================================
+        # Switch to FEM GUI
+        App.ActiveDocument.recompute()
 
-    # Switch to FEM GUI
-    App.ActiveDocument.recompute()
+        Gui.Control.closeDialog()
+        # Gui.activateWorkbench("FemWorkbench")
+        FemGui.setActiveAnalysis(App.activeDocument().getObject(analysisName))
 
-    Gui.Control.closeDialog()
-    # Gui.activateWorkbench("FemWorkbench")
-    FemGui.setActiveAnalysis(App.activeDocument().getObject(analysisName))
+        # Set view
+        docGui.activeView().viewAxonometric()
+        Gui.SendMsgToActiveView("ViewFit")
+        Gui.runCommand('Std_DrawStyle',6)
+        Gui.runCommand('Std_PerspectiveCamera',1)
+    
+    else:
 
-    # Set view
-    docGui.activeView().viewAxonometric()
-    Gui.SendMsgToActiveView("ViewFit")
-    Gui.runCommand('Std_DrawStyle',6)
-    Gui.runCommand('Std_PerspectiveCamera',1)
+        # ==================================================================    
+        self.form[1].progressBar.setValue(100) 
+        self.form[1].statusWindow.setText("Status: Complete.") 
+        # ==================================================================
+        
+        # Switch to FEM GUI
+        App.ActiveDocument.recompute()
+        Gui.Control.closeDialog()
 
 
 if __name__ == '__main__':

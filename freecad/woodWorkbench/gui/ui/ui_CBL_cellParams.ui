@@ -619,7 +619,7 @@
          <item>
           <widget class="QLabel" name="label_32">
            <property name="text">
-            <string>Width of Cut [mm]</string>
+            <string>Width X of Cut [mm]</string>
            </property>
           </widget>
          </item>
@@ -655,7 +655,7 @@
          <item>
           <widget class="QLabel" name="label_33">
            <property name="text">
-            <string>Depth of Cut [mm]</string>
+            <string>Depth Y of Cut [mm]</string>
            </property>
           </widget>
          </item>
@@ -881,7 +881,7 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_30">
          <item>
-          <widget class="QLineEdit" name="knot_center">
+          <widget class="QLineEdit" name="knot_flow">
            <property name="enabled">
             <bool>true</bool>
            </property>
@@ -901,14 +901,14 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>0,0</string>
+            <string>1</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QLabel" name="label_35">
            <property name="text">
-            <string>Center of Knot</string>
+            <string>Infinite Flow</string>
            </property>
           </widget>
          </item>
@@ -937,14 +937,14 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>-0.1</string>
+            <string>0.4</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QLabel" name="label_26">
            <property name="text">
-            <string>size1</string>
+            <string>Sink Y-Coord</string>
            </property>
           </widget>
          </item>
@@ -980,7 +980,7 @@
          <item>
           <widget class="QLabel" name="label_36">
            <property name="text">
-            <string>size2</string>
+            <string>Source Y-Coord</string>
            </property>
           </widget>
          </item>
@@ -1016,7 +1016,7 @@
          <item>
           <widget class="QLabel" name="label_37">
            <property name="text">
-            <string>strength1</string>
+            <string>Sink Magnitude</string>
            </property>
           </widget>
          </item>
@@ -1052,7 +1052,7 @@
          <item>
           <widget class="QLabel" name="label_38">
            <property name="text">
-            <string>strength2</string>
+            <string>Source Magnitude</string>
            </property>
           </widget>
          </item>

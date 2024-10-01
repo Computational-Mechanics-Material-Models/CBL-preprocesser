@@ -11,7 +11,7 @@ def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, m1, m2, a1, a2):
+        knotFlag, m1, m2, a1, a2, Uinf):
 
     # Generate log file
     logfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-input.cwPar'),'w')        
@@ -60,6 +60,7 @@ def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
     logfile.write('long_connector_ratio= ' + str(long_connector_ratio) + '\n')
 
     logfile.write('knotFlag= ' + str(knotFlag) + '\n')
+    logfile.write('Uinf= ' + str(Uinf) + '\n')
     logfile.write('a1= ' + str(a1) + '\n')
     logfile.write('a2= ' + str(a2) + '\n') 
     logfile.write('m1= ' + str(m1) + '\n')

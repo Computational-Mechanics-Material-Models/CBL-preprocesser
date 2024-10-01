@@ -52,6 +52,17 @@ def readInput(self):
             elif "long_connector_ratio" in line:
                 long_connector_ratio = line.split("=")[1].strip()
 
+            elif "Uinf" in line:
+                Uinf = line.split("=")[1].strip()
+            elif "a1" in line:
+                a1 = line.split("=")[1].strip()
+            elif "a2" in line:
+                a2 = line.split("=")[1].strip()
+            elif "m1" in line:
+                m1 = line.split("=")[1].strip()
+            elif "m2" in line:
+                m2 = line.split("=")[1].strip()
+
             elif "x_notch_size" in line:
                 x_notch_size = line.split("=")[1].strip()
             elif "y_notch_size" in line:
