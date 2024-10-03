@@ -1054,15 +1054,12 @@ def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_dir
     """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh"""
     # Store indices of Voronoi vertices for each finite ridge
     finite_ridges = ttedges
-    finite_ridges_pointid = []
     infinite_ridges = np.zeros((ttray_origins.shape[0],2))
     infinite_ridges[:,0] = ttray_origins
-    infinite_ridges_pointid = []
     boundary_points = []
     
     # Form two new Voronoi vertices lists with and without out-of-bound vertices
     voronoi_vertices_in = ttvertices
-    # plt.plot(voronoi_vertices_in[:, 0], voronoi_vertices_in[:, 1], 'ro')
             
     # Find the intersect point of infinite ridges (rays) with the boundary lines
     # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
@@ -1082,7 +1079,6 @@ def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_dir
                             
         intersect_point = p + normal * t_final
         boundary_points.append(intersect_point)
-        # plt.plot([ttvertices[ttray_origins[i],0], intersect_point[0]], [ttvertices[ttray_origins[i],1], intersect_point[1]], 'b-',linewidth=1)
             
     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
         boundary_points = np.asarray(boundary_points)
@@ -1090,22 +1086,17 @@ def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_dir
         boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
         nboundary_pts_featured = boundary_points_featured.shape[0]
         boundary_points = np.vstack((boundary_points,boundary_points_featured))
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
-
-        ninfinite_ridge = infinite_ridges.shape[0]
            
     else:
         boundary_points = np.asarray(boundary_points)
         nboundary_pts_featured = 0
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
 
-        ninfinite_ridge = infinite_ridges.shape[0]
+    nvertices_in = voronoi_vertices_in.shape[0]
+    nboundary_pts = boundary_points.shape[0]
+    finite_ridges = np.asarray(finite_ridges)
+    nfinite_ridge = finite_ridges.shape[0]
+
+    ninfinite_ridge = infinite_ridges.shape[0]
            
     # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
     finite_ridges_new = np.copy(finite_ridges)
@@ -1143,22 +1134,104 @@ def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_dir
         voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
         nvertex = voronoi_vertices.shape[0]
         boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
+        
     else:
         voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
         nvertex = voronoi_vertices.shape[0]
         boundary_ridges_new = np.copy(infinite_ridges_new)
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
+
+    nboundary_ridge = boundary_ridges_new.shape[0]
+    voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+    nridge = voronoi_ridges.shape[0]
     
     return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
                         
+
+def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
+                                      boundaries,boundaryFlag):
+    """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh
+        Modified to fix incorrect addition of boundary corner points - SA
+    """
+
+    # Store indices of Voronoi vertices for each finite ridge
+    finite_ridges = ttedges
+    infinite_ridges = np.zeros((ttray_origins.shape[0],2))
+    infinite_ridges[:,0] = ttray_origins
+    boundary_points = []
+    
+    # Form two new Voronoi vertices lists with and without out-of-bound vertices
+    voronoi_vertices_in = ttvertices
             
+    # Find the intersect point of infinite ridges (rays) with the boundary lines
+    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+    for i in range(0,len(ttray_origins)):
+        p = ttvertices[ttray_origins[i]]
+        normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal
+
+        for boundary in boundaries: # loop over boundary lines
+            q = np.asarray(boundary[1][0])
+            s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+            t = np.cross((q-p),s)/np.cross(normal,s)
+            u = np.cross((q-p),normal)/np.cross(normal,s)
+            
+            if (u >= 0) and (u <= 1):
+                if (t >= 0) and math.isfinite(t):
+                    t_final = t
+                            
+        intersect_point = p + normal * t_final
+        boundary_points.append(intersect_point)
+
+    boundary_points = np.asarray(boundary_points)
+    nboundary_pts_featured = 0
+
+    nvertices_in = voronoi_vertices_in.shape[0]
+    nboundary_pts = boundary_points.shape[0]
+    finite_ridges = np.asarray(finite_ridges)
+    nfinite_ridge = finite_ridges.shape[0]
+
+    ninfinite_ridge = infinite_ridges.shape[0]
+           
+    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
+    finite_ridges_new = np.copy(finite_ridges)
+    infinite_ridges_new = np.copy(infinite_ridges)
+    for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
+        infinite_ridges_new[i,1] = nvertices_in + i
+    
+    if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+        # construct the connectivity for a line path consisting of the boundary points
+        boundary_ridges_new = np.zeros(boundary_points.shape)
+        boundary_points_new = np.copy(boundary_points) 
+        next_point = np.copy(boundary_points_new[0])  # get first point
+        boundary_points_new[0] = [np.inf,np.inf]
+        
+        for i in range(0,boundary_points_new.shape[0]-1):
+            next_point_id = cdist([next_point], boundary_points_new).argmin()
+            boundary_ridges_new[i,1] = next_point_id
+            boundary_ridges_new[i+1,0] = next_point_id
+            next_point = np.copy(boundary_points_new[next_point_id])
+            boundary_points_new[next_point_id] = [np.inf,np.inf]
+                
+        boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
+        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+        nvertex = voronoi_vertices.shape[0]
+        boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
+        
+    else:
+        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+        nvertex = voronoi_vertices.shape[0]
+        boundary_ridges_new = np.copy(infinite_ridges_new)
+
+    nboundary_ridge = boundary_ridges_new.shape[0]
+    voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+    nridge = voronoi_ridges.shape[0]
+    
+    return voronoi_vertices,boundary_points,finite_ridges_new,\
+        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+        nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
+  
+
 def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,merge_tol,boundaryFlag):
     """Clip Voronoi mesh by the boundaries, merge short Voronoi ridges, and rebuild the new Voronoi mesh"""
     # Store indices of Voronoi vertices for each finite ridge
@@ -1940,12 +2013,12 @@ def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttr
             
             
 def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
-                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
+                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,\
                    voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1,m2,a1,a2,Uinf,box_center,box_depth):
     
     # Number of points per layer
     npt_per_layer = nvertex
-    npt_per_layer_normal = npt_per_layer - nboundary_pts_featured
+    npt_per_layer_normal = npt_per_layer
             
     # Number of control points per beam
     nctrlpt_per_elem = NURBS_degree + 1
@@ -2047,7 +2120,7 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
         
 def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
                        finite_ridges_new,boundary_ridges_new,finite_ridges_3D,boundary_ridges_3D,nfinite_ridge,\
-                       nboundary_ridge,nboundary_pts,nboundary_pts_featured,nlayers,voronoi_vertices):
+                       nboundary_ridge,nboundary_pts,nlayers,voronoi_vertices):
     
     count = 0 # count for vertex (point) index
     
@@ -2229,7 +2302,6 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
     
     
     npt_per_layer = nvertices_in + nboundary_pts
-    npt_per_layer_normal = npt_per_layer - nboundary_pts_featured
     npt_per_layer_vtk = nfinitept_per_layer + nboundary_pt_per_layer
     
     all_midpt_indices = np.vstack((np.reshape(finite_midpt_indices,(2,-1)).T,np.reshape(boundary_midpt_indices,(2,-1)).T))
@@ -2238,10 +2310,9 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
     all_pts_2D = np.vstack((voronoi_vertices,finite_ridge_mid,finite_ridge_quarter,boundary_ridge_mid,boundary_ridge_quarter))
     all_ridges = np.hstack((voronoi_ridges,all_midpt_indices,all_quarterpt_indices)).astype(int)
     
-    
 
 
-    return all_pts_3D,all_ridges_3D,npt_per_layer_vtk,all_pts_2D,all_ridges
+    return all_pts_3D,npt_per_layer_vtk,all_pts_2D,all_ridges
 
 
 
@@ -2433,12 +2504,11 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
     
     nconnector_total = nconnector_t + nconnector_l
     
-    return IGAvertices,vertex_connectivity,beam_connectivity_original,nbeam_total,\
-        beam_connectivity,nbeamElem,connector_t_connectivity,\
-        connector_t_bot_connectivity,connector_t_top_connectivity,\
-        connector_t_reg_connectivity,connector_l_connectivity,\
-        nconnector_t,nconnector_l,nconnector_total,connector_l_vertex_dict
-
+    return IGAvertices,beam_connectivity_original,nbeam_total,\
+    beam_connectivity,nbeamElem,\
+    connector_t_bot_connectivity,connector_t_top_connectivity,\
+    connector_t_reg_connectivity,connector_l_connectivity,\
+    nconnector_t,nconnector_l,connector_l_vertex_dict
 
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\

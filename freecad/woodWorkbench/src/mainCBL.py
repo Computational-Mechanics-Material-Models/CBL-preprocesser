@@ -208,15 +208,56 @@ def main(self):
     # Conforming Delaunay
     conforming_delaunay = tr.triangulate({'vertices': delaunay_vertices}, 'pq0Dec')
     WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max)
-    
+
+    # num_interiorflowpts = np.shape(delaunay_vertices)[0]
+    # flowpts_bound = np.concatenate(conforming_delaunay['vertices'][num_interiorflowpts:,:], boundary_points_original)
 
     # ---------------------------------------------
     # # Build mechanical mesh 
+    vorsci = Voronoi(conforming_delaunay['vertices']) # different package to calculate voronoi region info
+
     ttvertices, ttedges, ttray_origins, ttray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
 
+
+    # ==================================================================
+    self.form[1].progressBar.setValue(40) 
+    self.form[1].statusWindow.setText("Status: Clipping Mesh.") 
+    # ==================================================================
+    # Rebuild the Voronoi mesh
+    # if merge_operation in ['on','On','Y','y','Yes','yes']:
+    #     [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
+    #     boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+    #     nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
+    #         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttray_directions,\
+    #                                                             boundaries,merge_tol,boundaryFlag)
+        
+    #     RebuildvorTime = time.time() 
+    #     print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
+    # else:
+    #     [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
+    #     boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+    #     nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
+    #         WoodMeshGen.RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
+    #                                                     boundaries,boundaryFlag)
+    #     RebuildvorTime = time.time()
+
+    # print(np.shape(ttvertices),np.shape(ttedges),np.shape(ttray_origins),np.shape(ttray_directions),np.shape(boundaries))
+
+    [voronoi_vertices,boundary_points,finite_ridges_new,\
+        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+        nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
+        WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
+                                                        boundaries,boundaryFlag)
+    
+    # print(np.shape(voronoi_vertices),np.shape(boundary_points),np.shape(finite_ridges_new),np.shape(boundary_ridges_new),np.shape(voronoi_ridges))
+    # print((nvertex),(nvertices_in),(nfinite_ridge),(nboundary_ridge),(nboundary_pts),(nboundary_pts_featured),(nridge))
+
+    
+
+    RebuildvorTime = time.time()
 
     # ---------------------------------------------
     # # Visualize the mesh
@@ -224,17 +265,15 @@ def main(self):
     plt.figure()
     ax = plt.gca()
     ax.set_aspect('equal', adjustable='box')
-    boundarylines = patches.Polygon(boundary_points_original,closed=True,linewidth=2,edgecolor='k',facecolor='none')
-    ax.add_patch(boundarylines)
 
     # Flow
     vertsD = np.array(conforming_delaunay['vertices'])
-    ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=2.,linewidth=0.5)
+    ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
 
     # Main cells
-    for beg, end in ttedges:
-        x0, y0 = ttvertices[beg, :]
-        x1, y1 = ttvertices[end, :]
+    for beg, end in voronoi_ridges.astype(int):
+        x0, y0 = voronoi_vertices[beg, :]
+        x1, y1 = voronoi_vertices[end, :]
         ax.fill(
             [x0, x1],
             [y0, y1],
@@ -244,54 +283,11 @@ def main(self):
         )
         ax.plot(
             [x0, x1],
-            [y0, y1],'ko',markersize=2.)
-
-    # # Edge cells
-    lim = ax.axis()
-    ray_origin = ttray_origins
-    ray_direct = ttray_directions
-    for (beg, (vx, vy)) in zip(ray_origin.flatten(), ray_direct):
-        x0, y0 = ttvertices[beg, :]
-        scale = 100.0  # some large number
-        x1, y1 = x0 + scale * vx, y0 + scale * vy
-        ax.fill(
-            [x0, x1],
-            [y0, y1],
-            facecolor='none',
-            edgecolor='k',
-            linewidth=1.0,
-        )
-    
-    ax.axis(lim)  # make sure figure is not rescaled by infinite ray
+            [y0, y1],'ko',markersize=1.)
         
     # plt.show()
-
-
-    # ==================================================================
-    self.form[1].progressBar.setValue(40) 
-    self.form[1].statusWindow.setText("Status: Clipping Mesh.") 
-    # ==================================================================
-    # Rebuild the Voronoi mesh
-    if merge_operation in ['on','On','Y','y','Yes','yes']:
-        [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-            WoodMeshGen.RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttray_directions,\
-                                                                boundaries,merge_tol,boundaryFlag)
-        
-        RebuildvorTime = time.time() 
-        print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
-    else:
-        [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-            WoodMeshGen.RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
-                                                        boundaries,boundaryFlag)
-        RebuildvorTime = time.time()
-
+    
     plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
-
-
 
 
     # ==================================================================
@@ -301,15 +297,15 @@ def main(self):
     [voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D] = \
     WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
-                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,nboundary_pts_featured,\
+                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,\
                    voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1, m2, a1, a2, Uinf, box_center,box_depth)
     
 
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
-    [all_pts_3D,all_ridges_3D,npt_per_layer_vtk,all_pts_2D,all_ridges] = \
+    [all_pts_3D,npt_per_layer_vtk,all_pts_2D,all_ridges] = \
     WoodMeshGen.RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
                     finite_ridges_new,boundary_ridges_new,finite_ridges_3D,boundary_ridges_3D,nfinite_ridge,\
-                    nboundary_ridge,nboundary_pts,nboundary_pts_featured,nlayers,voronoi_vertices)
+                    nboundary_ridge,nboundary_pts,nlayers,voronoi_vertices)
 
 
     # ===============================================
@@ -327,11 +323,11 @@ def main(self):
     # ==================================================================
     # Extrude in the parallel-to-grain (longitudinal) direction
     
-    [IGAvertices,vertex_connectivity,beam_connectivity_original,nbeam_total,\
-    beam_connectivity,nbeamElem,connector_t_connectivity,\
+    [IGAvertices,beam_connectivity_original,nbeam_total,\
+    beam_connectivity,nbeamElem,\
     connector_t_bot_connectivity,connector_t_top_connectivity,\
     connector_t_reg_connectivity,connector_l_connectivity,\
-    nconnector_t,nconnector_l,nconnector_total,connector_l_vertex_dict] = \
+    nconnector_t,nconnector_l,connector_l_vertex_dict] = \
     WoodMeshGen.GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,theta_min,theta_max,\
                         z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
                         nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
