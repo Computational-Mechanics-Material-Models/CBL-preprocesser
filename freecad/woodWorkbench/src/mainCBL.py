@@ -61,18 +61,11 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, m1, m2, a1, a2, Uinf]\
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
-    # random field parameters - SA to implement as input eventually
-    random_field = 'off'
-    RF_dimension = 1
-    RF_dist_types= ["TruncatedGaussian"]
-    RF_dist_params = [[1.,0.5,0]]
-    RF_corr_l = 0.05
-    RF_sampling_type="MC"
 
     # for future implementation - SA
     # grain_length = 5 # mm
@@ -114,7 +107,7 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, m1, m2, a1, a2, Uinf)
         
 
@@ -177,6 +170,10 @@ def main(self):
         print('Loading saved sites')
         sites_path = Path(os.path.dirname(os.path.abspath(__file__)))
         sites,radii = WoodMeshGen.ReadSavedSites(sites_path,radial_growth_rule)
+    elif radial_growth_rule == 'debug':
+        # ---------------------------------------------
+        # debug run
+        sites,radii = WoodMeshGen.CellPlacement_Debug(nrings,width_heart,width_early,width_late)     
     else:
         print('Growth rule: {:s} is not supported for the current version, please check the README for more details.'.format(radial_growth_rule))
         # print('Now exiting...')
@@ -191,9 +188,6 @@ def main(self):
     self.form[1].statusWindow.setText("Status: Defining Boundaries.") 
     # ==================================================================
     # Clipping box (boundaries) of the model
-    
-    # x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
-    #     WoodMeshGen.Clipping_Box(box_shape,box_center,box_size, box_width, box_depth,boundaryFlag,x_notch_size,y_notch_size)
     x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
         WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,boundaryFlag)
 
@@ -207,20 +201,14 @@ def main(self):
     delaunay_vertices = np.concatenate((np.array(sites_in), boundary_points_original))
     # Conforming Delaunay
     conforming_delaunay = tr.triangulate({'vertices': delaunay_vertices}, 'pq0Dec')
-    WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max)
-
-    # num_interiorflowpts = np.shape(delaunay_vertices)[0]
-    # flowpts_bound = np.concatenate(conforming_delaunay['vertices'][num_interiorflowpts:,:], boundary_points_original)
+    WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries)
 
     # ---------------------------------------------
     # # Build mechanical mesh 
-    vorsci = Voronoi(conforming_delaunay['vertices']) # different package to calculate voronoi region info
-
     ttvertices, ttedges, ttray_origins, ttray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
-
 
     # ==================================================================
     self.form[1].progressBar.setValue(40) 
@@ -252,11 +240,7 @@ def main(self):
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
                                                         boundaries,boundaryFlag)
     
-    # print(np.shape(voronoi_vertices),np.shape(boundary_points),np.shape(finite_ridges_new),np.shape(boundary_ridges_new),np.shape(voronoi_ridges))
-    # print((nvertex),(nvertices_in),(nfinite_ridge),(nboundary_ridge),(nboundary_pts),(nboundary_pts_featured),(nridge))
-
     
-
     RebuildvorTime = time.time()
 
     # ---------------------------------------------
@@ -298,7 +282,7 @@ def main(self):
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D] = \
     WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1, m2, a1, a2, Uinf, box_center,box_depth)
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,knotFlag, m1, m2, a1, a2, Uinf, box_center,box_depth)
     
 
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
@@ -331,7 +315,7 @@ def main(self):
     WoodMeshGen.GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,theta_min,theta_max,\
                         z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
                         nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
-                        flattened_all_vertices_2D,all_ridges,random_noise,nconnector_t_per_beam,nconnector_t_per_grain)
+                        flattened_all_vertices_2D,all_ridges,nconnector_t_per_beam,nconnector_t_per_grain)
 
     BeamTime = time.time() 
     print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
@@ -339,15 +323,21 @@ def main(self):
 
     # ==================================================================
     # Calculate random field
-    if random_field in ['on','On','Y','y','Yes','yes']:
+    # simplify/modify to input -SA
+    RF_dist_types= ["TruncatedGaussian"]
+    RF_dist_params = [[1.,0.5,0]]
+    RF_corr_l = 0.1
+    RF_sampling_type="MC"
+
+    if randomFlag in ['on','On','Y','y','Yes','yes']:
         # RF = RandomField(RF_dimension,RF_dist_types,RF_dist_params,geoName,RF_corr_l,"text",[z_min,z_max],RF_sampling_type)
         # RF = RandomField(dimension=RF_dimension,"none",RF_dist_types,np.array([[1]]),RF_dist_params,geoName,RF_corr_l,"text",x_range=[x_min,x_max],RF_sampling_type,"binary")
-        RF = RandomField(dimension = 1, readFromFolder = "none", dist_types=RF_dist_types, CC = np.array([[1]]), \
-                         dist_params=RF_dist_params, name=geoName,corr_l =RF_corr_l, corr_f='exponential_square',\
-                         x_range=[x_min,x_max], sampling_type = RF_sampling_type, filesavetype="binary")
+        random_field = RandomField(dimension = 1, readFromFolder = "none", dist_types=RF_dist_types, CC = np.array([[1]]), \
+                         dist_params=RF_dist_params, name=geoName,out=outDir,corr_l =RF_corr_l, corr_f='exponential_square',\
+                         x_range=[x_min,x_max],y_range=[y_min,y_max],z_range=[z_min,z_max], sampling_type = RF_sampling_type, filesavetype="binary")
         # RF = RandomField(dist_types=["TruncatedGaussian"], dist_params=[[1.,0.5,0]], name = "FIELD_1D_TruncNormal", corr_l = 0.05,filesavetype="text", x_range=[x_min,x_max],y_range=[y_min,y_max],z_range=[z_min,z_max], sampling_type="MC")
     else:
-        RF = []
+        random_field = []
 
     # ===============================================
     # Insert precracks
@@ -382,7 +372,7 @@ def main(self):
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                    random_field,RF)
+                    randomFlag,random_field)
 
     # ===============================================
     # Calculate model properties

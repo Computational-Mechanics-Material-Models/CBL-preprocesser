@@ -35,7 +35,8 @@ def readInput(self):
 
             # elif "iter_max" in line:
             #     iter_max = line.split("=")[1].strip()
-
+            elif "box_shape" in line:
+                box_shape = line.split("=")[1].strip()
             elif "box_center" in line:
                 box_center = line.split("=")[1].strip()
             elif "box_height" in line:
@@ -75,8 +76,8 @@ def readInput(self):
 
             elif "boundaryFlag" in line:
                 boundaryFlag = line.split("=")[1].strip()
-            elif "box_shape" in line:
-                box_shape = line.split("=")[1].strip()
+            elif "randomFlag" in line:
+                randomFlag = line.split("=")[1].strip()
                 
             elif "merge_operation" in line:
                 merge_operation = line.split("=")[1].strip()
@@ -102,10 +103,10 @@ def readInput(self):
         self.form[0].cellwallthickness_late.setText(cellwallthickness_late)
 
         self.form[0].skeleton_density.setText(skeleton_density)
-        self.form[0].random_noise.setText(random_noise)
 
         # self.form[0].iter_max.setText(iter_max)
 
+        self.form[0].box_shape.setCurrentText(box_shape)
         self.form[0].box_center.setText(box_center)
         self.form[0].box_height.setText(box_height)
         self.form[0].box_width.setText(box_width)
@@ -123,7 +124,7 @@ def readInput(self):
             self.form[0].precrack_size.setText(precrack_size)
 
         self.form[0].boundaryFlag.setCurrentText(boundaryFlag)
-        self.form[0].box_shape.setCurrentText(box_shape)
+        self.form[0].randomFlag.setText(randomFlag)
         
         self.form[0].merge_operation.setCurrentText(merge_operation)
         # if merge_operation in ['on','On','Y','y','Yes','yes']:

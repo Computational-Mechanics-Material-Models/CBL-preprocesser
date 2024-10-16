@@ -6,6 +6,7 @@
 # Brno University of Technology,
 # 2020
 
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -79,7 +80,8 @@ def crateDistributionObject(disttype,distparams):
 ############################################################################################################    
 
 class RandomField():    
-    def __init__(self, dimension = 3, readFromFolder = "none", dist_types=["Gaussian"], CC = np.array([[1]]), dist_params=[[0,1]], name="FIELD",corr_l = 0.5, corr_f='exponential_square',x_range=[0.,1],y_range=[0.,2],z_range=[0.,0.5], sampling_type = "Sobol", filesavetype="binary"):
+    def __init__(self, dimension = 3, readFromFolder = "none", dist_types=["Gaussian"], CC = np.array([[1]]), dist_params=[[0,1]], \
+                 name="FIELD",out="OUTDIR",corr_l = 0.5, corr_f='exponential_square',x_range=[0.,1],y_range=[0.,2],z_range=[0.,0.5], sampling_type = "Sobol", filesavetype="binary"):
 
         if readFromFolder == "none":
             self.dim = dimension            
@@ -107,7 +109,7 @@ class RandomField():
             if self.dim<3: self.z_range=np.array([0,0])
 
             self.sampling_type = sampling_type# MC, LHS, Freet or Sobol
-            self.folder = self.name
+            self.folder = Path(out + '/' + name + '/' + 'randomfield')
             self.saveReport()
         else: 
             self.folder = readFromFolder
@@ -255,7 +257,7 @@ class RandomField():
     #############################################################################
 
     def GenerateCovarianceMatrixExpanded(self,X,lab):
-        print("Generating covariance matrix %s"%lab)
+        # print("Generating covariance matrix %s"%lab)
         nx = len(X);
         CX = np.zeros([nx,nx]);
         for i in range(nx):
@@ -263,7 +265,7 @@ class RandomField():
             corr = self.GetCorrelation(dist2)
             corr[np.where(corr<self.covmat_cutoff)[0]] = 0.
             CX[i,:] = corr
-        print("[DONE]")
+        # print("[DONE]")
         return CX
 
     #############################################################################
@@ -307,7 +309,7 @@ class RandomField():
     #############################################################################
 
     def GenerateCovarianceMatrixCompact(self, nodes):
-        print("Generating covariance matrix between grid and nodes")
+        # print("Generating covariance matrix between grid and nodes")
 
         n = nodes.shape[0]
         m = self.grid.shape[0]
@@ -320,7 +322,7 @@ class RandomField():
             corr = self.GetCorrelation(d2)
             ind = np.where(corr<self.covmat_cutoff)[0]
             D0[i,:] = corr
-            if i%100==0: print("progress {:2.1%}".format(float(i)/n),)
+            # if i%100==0: print("progress {:2.1%}".format(float(i)/n),)
                 
         D0 = sparse.coo_matrix(D0)
         row = D0.row
@@ -339,7 +341,7 @@ class RandomField():
 
 
         D = sparse.coo_matrix((datafull, (rowfull, columnfull)), shape=(m*self.Nvar,n*self.Nvar))
-        print("[DONE]")
+        # print("[DONE]")
         return D
 
     #############################################################################
@@ -401,11 +403,11 @@ class RandomField():
         if self.dist_types[var]=='Gaussian': 
             return interp1d([-1,1], [-1,1])
         elif os.path.isfile(os.path.join(self.folder, "NatafTransform_%d"%var + self.giveNumpyExt() )):
-            print("Loading Nataf transformation of variable %d"%var)
+            # print("Loading Nataf transformation of variable %d"%var)
             x,NR = self.loadNumpyFile(os.path.join(self.folder, "NatafTransform_%d"%var))
             return interp1d(x, NR)
 
-        print("Nataf transformation of variable %d"%var)
+        # print("Nataf transformation of variable %d"%var)
         # Nataf transformation - approximate
         ni = 0
         N = 50
@@ -433,14 +435,14 @@ class RandomField():
             #plt.show()
             plt.close(fig)
             
-        print("[DONE]")
+        # print("[DONE]")
         return interp1d(x, NR)
 
     #############################################################################
 
     def NatafTransformationCrossCorMatrix(self):
 
-        print("Nataf transformation of cross correlation matrix")
+        # print("Nataf transformation of cross correlation matrix")
         self.cross_correlation_matrix_transformed = np.ones((self.Nvar,self.Nvar))
         for i in range(self.Nvar):
             for j in range(i+1,self.Nvar):
@@ -448,7 +450,7 @@ class RandomField():
                     self.cross_correlation_matrix_transformed[i,j] = self.cross_correlation_matrix_transformed[j,i] = self.cross_correlation_matrix[i,j]
                 else:
                     self.cross_correlation_matrix_transformed[i,j] = self.cross_correlation_matrix_transformed[j,i] = self.NatafTransformation(i,j, self.cross_correlation_matrix[i,j], 6, 0.005)
-        print("[DONE]")
+        # print("[DONE]")
 
     #############################################################################
 
@@ -508,7 +510,7 @@ class RandomField():
 
     def Separate2FullEigenvaluesSpatial(self, lambdaX,lambdaY,lambdaZ):
 
-        print("Combination of eigenmodes")
+        # print("Combination of eigenmodes")
         nx = len(lambdaX); ny = len(lambdaY); nz = len(lambdaZ)
         n = nx*ny*nz
 
@@ -536,7 +538,7 @@ class RandomField():
         p = sum(lam[:t])/sum(lam)
         ijk = ijk[:t,:]
 
-        print("[DONE] used %d eigenvalues, %.3f%% of trace"%(t,p*100))
+        # print("[DONE] used %d eigenvalues, %.3f%% of trace"%(t,p*100))
         return ijk
 
     #############################################################################
@@ -557,8 +559,8 @@ class RandomField():
         lambdaY = lambdaY/self.Nvar
         lambdaZ = lambdaZ/self.Nvar
       
-
-        print("Combination of eigenmodes")
+# 
+        # print("Combination of eigenmodes")
         nx = len(lambdaX); ny = len(lambdaY); nz = len(lambdaZ); nc = len(self.eigenValsC)
         n = nx*ny*nz*nc
 
@@ -588,7 +590,7 @@ class RandomField():
         lam = lam[:t]
         ijkc = ijkc[:t,:]
 
-        print("[DONE] used %d eigenvalues, %.3f%% of trace"%(t,p*100))
+        # print("[DONE] used %d eigenvalues, %.3f%% of trace"%(t,p*100))
         return ijkc
 
     #############################################################################
@@ -621,13 +623,13 @@ class RandomField():
 
         #generate grid nodes
         if os.path.isfile(os.path.join(self.folder,"gridnodesX"+self.giveNumpyExt())) and os.path.isfile(os.path.join(self.folder,"gridnodesY"+self.giveNumpyExt())) and os.path.isfile(os.path.join(self.folder,"gridnodesZ"+self.giveNumpyExt())):
-            print("Loading grid")
+            # print("Loading grid")
             GX = self.loadNumpyFile(os.path.join(self.folder,"gridnodesX"))
             GY = self.loadNumpyFile(os.path.join(self.folder,"gridnodesY"))
             GZ = self.loadNumpyFile(os.path.join(self.folder,"gridnodesZ"))
         else:                        
             #CREATE GRID 
-            print("Generating grid")
+            # print("Generating grid")
             xw = (self.x_range_gap[1]-self.x_range_gap[0]); xn = int(np.ceil(xw/self.grid_spacing)+0.5); x0 = self.x_range_gap[0]+(xw-xn*self.grid_spacing)/2.
             yw = (self.y_range_gap[1]-self.y_range_gap[0]); yn = int(np.ceil(yw/self.grid_spacing)+0.5); y0 = self.y_range_gap[0]+(yw-yn*self.grid_spacing)/2.
             zw = (self.z_range_gap[1]-self.z_range_gap[0]); zn = int(np.ceil(zw/self.grid_spacing)+0.5); z0 = self.z_range_gap[0]+(zw-zn*self.grid_spacing)/2.
@@ -657,7 +659,7 @@ class RandomField():
                  allFilesFound = False
 
             if allFilesFound:
-                print("Loading factorization")                
+                # print("Loading factorization")                
 
                 self.eigenValsXYZ = []
                 self.eigenVecsXYZ = []
@@ -752,12 +754,12 @@ class RandomField():
 
         self.Nrealz = Nrealz
         if os.path.isfile(os.path.join(self.folder,"random_variables"+self.giveNumpyExt())):
-            print("Loading random variables")
+            # print("Loading random variables")
             self.X = self.loadNumpyFile(os.path.join(self.folder,"random_variables"))
             if( not self.X.shape[1] == self.Nrealz):
                 raise ValueError("Error: required %d realizations, file %s contains %d realizations"%(self.Nrealz,"random_variables"+self.giveNumpyExt(), self.X.shape[1]))
         else:
-            print("Generating random variables")
+            # print("Generating random variables")
             if self.sampling_type=="MC": 
                 self.X = np.random.rand(self.Neig,self.Nrealz)
                 self.X = norm.ppf(self.X, loc=0., scale=1.)
@@ -802,7 +804,7 @@ class RandomField():
                 ind = [i for i,c in enumerate(content) if "[Values]" in content[i]]
                 self.X = np.zeros([self.Neig,self.Nrealz])
                 for i in  range(self.Neig): 
-                    print(i, self.Neig)
+                    # print(i, self.Neig)
                     self.X[i,:] = [float(val) for val in content[ind[i]+1:ind[i]+1+self.Nrealz]]   
             elif self.sampling_type=='Sobol':
 
@@ -836,7 +838,7 @@ class RandomField():
                 raise ValueError("Sampling type ", self.sampling_type, " not implemented - terminating")
                 exit(1)
             self.saveRandomVariables()
-            print("[DONE]")
+            # print("[DONE]")
 
 
 
@@ -860,7 +862,7 @@ class RandomField():
                     break
 
         if allFilesFound:
-            print('Loading preparation for EOLE')
+            # print('Loading preparation for EOLE')
             self.PREP = []
             for var in range(self.Nvar):            
                 self.PREP.append( np.zeros([self.grid.shape[0],self.Nrealz]) )
@@ -868,7 +870,7 @@ class RandomField():
                     self.PREP[var][:,i] = self.loadNumpyFile(os.path.join(self.folder,"prepData_%d_%03d"%(var,i))) 
         else: 
         
-            print('Generating preparation for EOLE:')
+            # print('Generating preparation for EOLE:')
 
             nvx = self.eigenVecsXYZ[0][0].shape[0]; nvy = self.eigenVecsXYZ[0][1].shape[0]; nvz = self.eigenVecsXYZ[0][2].shape[0];
 
@@ -876,7 +878,7 @@ class RandomField():
             for var in range(self.Nvar): self.PREP.append(np.zeros([nvx*nvy*nvz,self.Nrealz]))
 
             for var in range(self.Nvar):
-                print("Variable %d out of %d"%(var+1, self.Nvar))
+                # print("Variable %d out of %d"%(var+1, self.Nvar))
 
                 ntot = self.Neig
                 nspatial = len(self.ijk)
@@ -907,7 +909,7 @@ class RandomField():
            
             self.savePreparation()   
     
-            print("[DONE]")
+            # print("[DONE]")
 
 
     #############################################################################
@@ -919,7 +921,7 @@ class RandomField():
         #= ReadReport(fieldname);
 
         if nodefilename == "none":
-            print("Generating random nodes",)
+            # print("Generating random nodes",)
             #RANDOM STRUCTURE
             maxiter = 1000; d2min = dmin**2
             iteration = 0
@@ -940,15 +942,15 @@ class RandomField():
                     nodes = np.vstack([nodes, node])
                     npoints += 1
 
-            print("[DONE] generated %d nodes"%nodes.shape[0])
+            # print("[DONE] generated %d nodes"%nodes.shape[0])
 
         elif os.path.isfile(nodefilename):
-            print("Loading random nodes from file '%s'"%nodefilename,)
+            # print("Loading random nodes from file '%s'"%nodefilename,)
             if (nodefilename.endswith(".npy")):
                 nodes = np.load(nodefilename)
             else:
                 nodes = np.loadtxt(nodefilename, usecols=range(3))
-            print("[DONE]")
+            # print("[DONE]")
         else: raise ValueError("Error: File with nodes '%s' not found."%snodefilename)
         self.saveNumpyFile(os.path.join(self.folder,'fieldNodes'),nodes);
         return nodes
@@ -956,7 +958,7 @@ class RandomField():
     #############################################################################
 
     def GetNodalGaussFieldExpanded(self):
-        print("Generating random field on the GRID")
+        # print("Generating random field on the GRID")
         nvx = self.eigenVecsXYZ[0][0].shape[0]; 
         nvy = self.eigenVecsXYZ[0][1].shape[0]; 
         nvz = self.eigenVecsXYZ[0][2].shape[0];
@@ -964,7 +966,7 @@ class RandomField():
         GF = np.zeros([self.Nvar,nvx*nvy*nvz,self.Nrealz])
 
         for var in range(self.Nvar):
-                print("Variable %d out of %d"%(var+1, self.Nvar))
+                # print("Variable %d out of %d"%(var+1, self.Nvar))
                 ntot = self.Neig
                 nspatial = len(self.ijk)
                 lam = self.eigenValsXYZ[var][0][self.ijk[:,0]]*self.eigenValsXYZ[var][1][self.ijk[:,1]]*self.eigenValsXYZ[var][2][self.ijk[:,2]]
@@ -980,13 +982,13 @@ class RandomField():
                     for varx in range(self.Nvar):
                         X = np.einsum("i,ij->ij",np.sqrt(lam),self.X[nspatial*var:nspatial*(var+1),:])*self.eigenVecsC[varx,var]*np.sqrt(self.eigenValsC[var])
                         GF[varx] += np.einsum("ij,ik->jk",EV,X) 
-        print("[DONE]")
+        # print("[DONE]")
         return GF       
 
     #############################################################################
 
     def GetGaussFieldEOLEExpanded(self,nodes):
-        print("generating field on nodes")
+        # print("generating field on nodes")
         n = nodes.shape[0]
         ng = self.grid.shape[0]
         GF = np.zeros([self.Nvar,n,self.Nrealz])
@@ -1000,9 +1002,9 @@ class RandomField():
 
             for var in range(self.Nvar):
                 GF[var,i,:] = np.dot(self.nataf_interp[var](d2),self.PREP[var])
-            if i%1000==0: print("progress {:2.1%}\r".format(float(i)/n),)
+            # if i%1000==0: print("progress {:2.1%}\r".format(float(i)/n),)
 
-        print("[DONE]")
+        # print("[DONE]")
         return GF
 
     #############################################################################
@@ -1015,7 +1017,7 @@ class RandomField():
 
     def SaveFieldNodesVTKVoronoi(self, realizations = "all"):
 
-        print('Generating Voronoi tessellation')
+        # print('Generating Voronoi tessellation')
         if realizations == "all": realizations = range(self.Nrealz)
 
         nodes = self.loadNumpyFile(os.path.join(self.folder,"fieldNodes"))
@@ -1067,7 +1069,7 @@ class RandomField():
         vnodes, retindices = np.unique(vnodes, return_inverse=True)
         tetras = retindices[tetras]
 
-        print('Saving VTK Voronoi files')
+        # print('Saving VTK Voronoi files')
         for var in range(self.Nvar):
             GF = self.loadNumpyFile(os.path.join(self.folder,"fieldValues_%d"%var))     
 
@@ -1101,7 +1103,7 @@ class RandomField():
 
     def SaveFieldNodesVTKDots(self, realizations = "all"):
 
-        print('Saving VTK dots files')
+        # print('Saving VTK dots files')
         if realizations == "all": realizations = range(self.Nrealz)
 
         for var in range(self.Nvar):
@@ -1138,7 +1140,7 @@ class RandomField():
     def SaveGridVTKDots(self, realizations = "all"):
         GF = self.GetNodalGaussFieldExpanded();
         GF = self.BackNatafTransformation(GF); 
-        print('Saving VTK dots files of GRID')
+        # print('Saving VTK dots files of GRID')
         if realizations == "all": realizations = range(self.Nrealz)
 
         n = self.grid.shape[0]
@@ -1172,7 +1174,7 @@ class RandomField():
         GF = self.GetNodalGaussFieldExpanded();
         GF = self.BackNatafTransformation(GF); 
 
-        print('Saving VTK Voronoi files of GRID')
+        # print('Saving VTK Voronoi files of GRID')
         if realizations == "all": realizations = range(self.Nrealz)
         
         GX = self.loadNumpyFile(os.path.join(self.folder,"gridnodesX"))
@@ -1231,16 +1233,16 @@ class RandomField():
         limits_min = np.max(nodes,axis =0)
         nodes_in_box = True
         if (limits_min[0]<self.x_range[0] or limits_max[0]>self.x_range[1]):
-            print("RF x limits: ", self.x_range, "min and max x coordintes of points:", [limits_min[0], limits_max[0]])
+            # print("RF x limits: ", self.x_range, "min and max x coordintes of points:", [limits_min[0], limits_max[0]])
             nodes_in_box = False
         if (limits_min[1]<self.y_range[0] or limits_max[1]>self.y_range[1]):
-            print("RF y limits: ", self.y_range, "min and max y coordintes of points:", [limits_min[1], limits_max[1]])
+            # print("RF y limits: ", self.y_range, "min and max y coordintes of points:", [limits_min[1], limits_max[1]])
             nodes_in_box = False
         if (limits_min[2]<self.z_range[0] or limits_max[2]>self.z_range[1]):
-            print("RF z limits: ", self.z_range, "min and max z coordintes of points:", [limits_min[2], limits_max[2]])
+            # print("RF z limits: ", self.z_range, "min and max z coordintes of points:", [limits_min[2], limits_max[2]])
             nodes_in_box = False
         if not nodes_in_box:
-            print("ERROR: rubmitted points exceed the box in which random field was generated. Termination is strongly suggested as the results will be most likely biased.")
+            print("Error in random field: rubmitted points exceed the box in which random field was generated. Termination is strongly suggested as the results will be most likely biased.")
         
  
         GF = self.GetGaussFieldEOLEExpanded(nodes)
@@ -1269,7 +1271,7 @@ class RandomField():
         nodesX = nodes[randint,:]
 
         for var in range(self.Nvar):
-            print("Variable %d out of %d"%(var+1, self.Nvar))            
+            # print("Variable %d out of %d"%(var+1, self.Nvar))            
            
         
             GF.append (self.loadNumpyFile(os.path.join(self.folder,"fieldValues_%d"%var)) )
@@ -1307,7 +1309,7 @@ class RandomField():
 
             ################# DISTIBUTION
         
-            print(GFX.shape)
+            # print(GFX.shape)
             GFXX = np.reshape(GFX,[-1,1])
 
             hist, bins = np.histogram(GFXX, density=True, bins = int(np.sqrt(len(GFXX)/10.)))    
@@ -1337,7 +1339,7 @@ class RandomField():
                     
             np.savetxt(os.path.join(self.folder,"cross_correlation_error.dat"),crosscorr)
         
-        print("[DONE]")
+        # print("[DONE]")
 
 # if __name__ == '__main__':
 

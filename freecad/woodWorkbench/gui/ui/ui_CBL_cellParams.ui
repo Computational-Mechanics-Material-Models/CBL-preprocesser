@@ -26,7 +26,7 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QVBoxLayout" name="verticalLayout_6">
+   <layout class="QVBoxLayout" name="verticalLayout_4">
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_44">
       <item>
@@ -115,6 +115,11 @@
              </item>
              <item>
               <widget class="QComboBox" name="radial_growth_rule">
+               <item>
+                <property name="text">
+                 <string>debug</string>
+                </property>
+               </item>
                <item>
                 <property name="text">
                  <string>binary_lloyd</string>
@@ -437,39 +442,6 @@
            </item>
           </layout>
          </item>
-         <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_20">
-           <item>
-            <widget class="QLineEdit" name="random_noise">
-             <property name="minimumSize">
-              <size>
-               <width>75</width>
-               <height>20</height>
-              </size>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>75</width>
-               <height>20</height>
-              </size>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="placeholderText">
-              <string>0</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="label_19">
-             <property name="text">
-              <string>Cell L Randomness</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </item>
         </layout>
        </widget>
       </item>
@@ -483,7 +455,7 @@
       <property name="title">
        <string>Model Parameters</string>
       </property>
-      <layout class="QVBoxLayout" name="verticalLayout_4">
+      <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_16">
          <item>
@@ -548,6 +520,50 @@
           <widget class="QLabel" name="label_31">
            <property name="text">
             <string>Center of Cut</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_4">
+         <item>
+          <widget class="QComboBox" name="box_shape">
+           <property name="maximumSize">
+            <size>
+             <width>100</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <property name="currentIndex">
+            <number>0</number>
+           </property>
+           <item>
+            <property name="text">
+             <string>Rectangle</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Square</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Notched Square</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Circle</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_4">
+           <property name="text">
+            <string>Boundary Shape</string>
            </property>
           </widget>
          </item>
@@ -1069,7 +1085,7 @@
       <property name="title">
        <string>Flags</string>
       </property>
-      <layout class="QVBoxLayout" name="verticalLayout">
+      <layout class="QVBoxLayout" name="verticalLayout_6">
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
@@ -1102,9 +1118,9 @@
         </layout>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_4">
+        <layout class="QHBoxLayout" name="horizontalLayout_20">
          <item>
-          <widget class="QComboBox" name="box_shape">
+          <widget class="QComboBox" name="randomFlag">
            <property name="maximumSize">
             <size>
              <width>100</width>
@@ -1116,30 +1132,20 @@
            </property>
            <item>
             <property name="text">
-             <string>Rectangle</string>
+             <string>On</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Square</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Notched Square</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Circle</string>
+             <string>Off</string>
             </property>
            </item>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="label_4">
+          <widget class="QLabel" name="label_19">
            <property name="text">
-            <string>Boundary Shape</string>
+            <string>Random Field</string>
            </property>
           </widget>
          </item>
@@ -1549,7 +1555,7 @@
      <x>0</x>
      <y>0</y>
      <width>845</width>
-     <height>21</height>
+     <height>26</height>
     </rect>
    </property>
   </widget>

@@ -32,13 +32,14 @@ def inputParams(form):
     cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
 
     skeleton_density = float(form[0].skeleton_density.text() or 1.5e-9) # unit: tonne/mm3
-    random_noise = float(form[0].random_noise.text() or 0.0) # unit: ?
 
 
     # Model Parameters     
     iter_max = int(form[0].iter_max.text() or 10) # increase this number to achieve a more regular geometry
     print_interval = 500 #int(form[0].print_interval.text() or 500) # interval for printing prgress info
-
+    
+    box_shape = form[0].box_shape.currentText()
+    box_shape = box_shape.lower().replace(' ','_')
     box_center = eval(form[0].box_center.text() or "(0.0,0.0)") # coordinates of clipping box center
     box_height = float(form[0].box_height.text() or 0.5) # specimen length
     box_width = float(form[0].box_width.text() or 0.5) # side length
@@ -74,8 +75,7 @@ def inputParams(form):
     precrack_size = float(form[0].x_precrack_size.text() or 0) # depth of precrack box_size*0.1
 
     boundaryFlag = form[0].boundaryFlag.currentText()
-    box_shape = form[0].box_shape.currentText()
-    box_shape = box_shape.lower().replace(' ','_')
+    randomFlag = form[0].randomFlag.currentText()
 
     merge_operation = form[0].merge_operation.currentText() 
     merge_tol = float(form[0].merge_tol.text() or 0.015)
@@ -85,6 +85,14 @@ def inputParams(form):
     inpType = form[0].inpType.currentText()
     visFlag = form[0].visFlag.currentText()
 
+    if radial_growth_rule == 'debug':
+        nsegments = int(1) 
+        box_center = eval( "(0.0,0.0)") # coordinates of clipping box center
+        box_height = float(0.05) # specimen length
+        box_width = float(0.05) # side length
+        box_depth = float(0.05) # side length
+        box_size = box_width
+
     return geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
@@ -92,5 +100,5 @@ def inputParams(form):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, m1, m2, a1, a2, Uinf
