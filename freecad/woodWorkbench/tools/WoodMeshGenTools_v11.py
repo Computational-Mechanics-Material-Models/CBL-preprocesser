@@ -15,7 +15,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from scipy.spatial import cKDTree
 from scipy.spatial import ConvexHull
-from scipy.spatial import Voronoi
+from scipy.spatial import Voronoi, voronoi_plot_2d
+import triangle as tr
 from pathlib import Path
 import datetime
 import pkg_resources
@@ -168,12 +169,12 @@ def check_iscollinear(p1,p2,boundaries):
         else:
             k2 = (bp2[1]-bp1[1])/(bp2[0]-bp1[0]) # slope of the boundary line segment
             
-        if math.isclose(k1,k2): # check if slopes are equal (with a tolerance)
+        if math.isclose(k1,k2,rel_tol=1e-05, abs_tol=1e-10): # check if slopes are equal (with a tolerance)
             p3 = (p1+p2)/2 # mid point of the new line
             if k2 == 99999999: # inf slope
                 p3_on = (p3[0] == bp1[0])
             else:
-                p3_on = math.isclose((p3[1] - bp1[1]),k2*(p3[0] - bp1[0]))
+                p3_on = math.isclose((p3[1] - bp1[1]),k2*(p3[0] - bp1[0]),rel_tol=1e-05, abs_tol=1e-10)
             p3_between = (min(bp1[0], bp2[0]) <= p3[0] <= max(bp1[0], bp2[0])) and (min(bp1[1], bp2[1]) <= p3[1] <= max(bp1[1], bp2[1]))
             if (p3_on and p3_between): # check if mid point of the new line is on the boundary line segment
                 collinear += 1
@@ -511,6 +512,23 @@ def find_centroid(vertices,omega):
     centroid_y = (1.0/(6.0*area)) * centroid_y
     return np.array([[centroid_x, centroid_y]])
 
+def find_intersect(p,normal,boundaries):
+    # Find the intersect point of infinite ridges (rays) with the boundary lines
+    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+
+        for boundary in boundaries: # loop over boundary lines
+            q = np.asarray(boundary[1][0])
+            s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+            t = np.cross((q-p),s)/np.cross(normal,s)
+            u = np.cross((q-p),normal)/np.cross(normal,s)
+            
+            if (u >= 0) and (u <= 1):
+                if (t >= 0) and math.isfinite(t):
+                    t_final = t
+                            
+        intersect_point = p + normal * t_final
+
+        return intersect_point
 
 def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
                          width_sparse,width_dense,cellsize_sparse,cellsize_dense,\
@@ -595,7 +613,8 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
     
     #generate internal points for heart region
     n_nonoverlapped_cells = int(2*np.floor((radii[1]/cellsize_dense)**2))
-    inside_cells = 1e-3*(np.random.rand(n_nonoverlapped_cells,2) - [0.5,0.5]) # add cell points in a very small area
+    inside_cells = 1e-1*(np.random.rand(n_nonoverlapped_cells,2) - [0.5,0.5]) # add cell points in a very small area
+    # not too small or else flow mesh is too extreme at center, changed 1e-3 to 1e-1 -SA
     
     sites = np.vstack((PerimeterPointsSites,inside_cells))
     
@@ -694,6 +713,23 @@ def CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,box_center,box_
     sites = np.delete(sites,outofbound,0)
 
     return sites, radii
+
+
+def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
+    """
+    place single cell for debug
+    """
+    # generate radii for rings
+    radii = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
+    noise = np.random.normal(1,0.25,len(radii))
+    radii = np.multiply(radii,noise)
+    radii = np.concatenate(([0],np.cumsum(radii)))
+
+    # generate point at center    
+    sites = np.array([[-0.01,0.01],[0.01,-0.01]])
+
+    return sites, radii
+
 
 
 def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,boundaryFlag):
@@ -993,59 +1029,196 @@ def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_
             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
 
 
-def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max):
+def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries):
 
 
+    ''' 
+    NOTE: There are nsegment-1 number of transverse layers, shifted to occur at 
+    the long connection location, and there are nsegment+1 longitudinal layers.
+    There are nesegments+2 number of 'node layers'.
+    '''
     #***************************************************************************
-    delaun_verts = np.array(conforming_delaunay['vertices']) # flow point coords
-    nverts = len(delaun_verts)
+    delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
+    npts = len(delaunay_pts)
 
-    vorsci = Voronoi(conforming_delaunay['vertices']) # different package to calculate voronoi region info
-    delaun_indx = vorsci.ridge_points # matching flow index to voronoi ridge
-    vor_indx = vorsci.ridge_vertices # matching voronoi index to voronoi ridge
-    nridges = len(delaun_indx) # number of ridges and thus number of flow elements
+    # different package to calculate voronoi region info because it produces output in different form
+    # checked and within tolerance of triangle package -SA
+    vorsci = Voronoi(conforming_delaunay['vertices']) # location of flow points
+    vortri = tr.voronoi(conforming_delaunay.get('vertices'))
+    vortri_rayinds = vortri[2]
+    vortri_vertices = vortri[0]
+    vortri_raycoords = vortri_vertices[vortri_rayinds]
+    vortri_raydirs = vortri[3]
 
-    delaun_elems = np.zeros((nridges*nsegments,5)) # empty arrays for flow info
-    # n1, n2, l1, l2, area
+    nrdgs = len(vorsci.ridge_points) # number of ridges and thus number of flow elements
+    nlayers = nsegments + 2 # number of node layers 
+    nnodes = npts*nlayers 
+    nels_long = npts*(nsegments+1)
+    if nsegments==1: # make sure transverse layer exists even for one segment
+        nels_trans = nrdgs
+    else:
+        nels_trans = nrdgs*(nsegments-1)
+    nels = nels_long + nels_trans
+    delaun_elems_long = np.zeros((nels_long,15)) 
+    delaun_elems_trans = np.zeros((nels_trans,15)) # empty arrays for flow info
+    # n1, n2, length, area, volume, element type, v1, v2 ... vn
 
     segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
     connector_l_length = segment_length*long_connector_ratio
 
-    # define z coordinate for each layer
+    # define z coordinate for each node layer
     z_coord = z_min    
-    coordsz = np.zeros((nverts*nsegments,1))
-    for l in range(0,nsegments):
-        for p in range(0,nverts):
-            coordsz[p+l*nverts] = z_coord
-        z_coord += (segment_length + connector_l_length)
+    coordsz = np.zeros((nnodes,1))
+    for l in range(0,nlayers):
+        for p in range(0,npts):
+            coordsz[p+l*npts] = z_coord
+        if (l == 0) or (l == nlayers-2): # the first or last layer
+            z_coord += segment_length/2
+        else: # for middle elements include connector distance
+            z_coord += segment_length + connector_l_length
 
-    for l in range(0,nsegments):
-        for r in range(0,nridges):
-            ptsd = delaun_indx[r] # flow index for ridge
-            coordsd = delaun_verts[ptsd] # flow coords from points
-            ptsv = vor_indx[r] # vor index for ridge
-            coordsv = vorsci.vertices[ptsv] # vor coords
-            
-            delaun_elems[r+l*nridges,0:2] = ptsd
-            length = np.linalg.norm(coordsd) # distance bewteen flow coords
-            delaun_elems[r+l*nridges,2] =  length/2
-            delaun_elems[r+l*nridges,3] =  length/2
-            delaun_elems[r+l*nridges,4] = np.linalg.norm(coordsv) # distance between vor coords (for area)
-        
-        
-    
-    # Node numbering and output formatting
-    delaun_num = np.empty((nverts*nsegments,1))
-    delaun_num[:,0] = np.linspace(1,nverts*nsegments,nverts*nsegments,dtype='int64')
-    delaun_verts_layers = np.tile(delaun_verts,(nsegments,1))
+
+    # nodes
+    delaun_num = np.zeros((nnodes, 1)) # delaun_num is hacky because of np dimension nonsense -SA
+    delaun_num[:,0] = np.linspace(1,nnodes,nnodes,dtype='int64')
+    delaun_verts_layers = np.tile(delaunay_pts,(nlayers,1)) # tile node xy coords for each layer
     delaun_nodes = np.concatenate((delaun_num,delaun_verts_layers,coordsz),axis=1)
 
 
+    # longitudinal elements
+    for l in range(0,nlayers-1):
+        # get layer properties
+        if (l == 0) or (l == nlayers-2): # the first or last layer
+            typeFlag = 1
+            el_len = segment_length/2
+        else:
+            typeFlag = 0
+            el_len = segment_length + connector_l_length
+        # for each element in layer
+        for p in range(0,npts):
+            nel_l = p + l*npts # element index
+            nd = [p + l*npts, p + (l+1)*npts] # manual calculation of 3D node number
+            delaun_elems_long[nel_l,0:2] = nd # element connectivity
+            delaun_elems_long[nel_l,2] =  el_len
+
+            pr = vorsci.point_region[p] # index of voronoi region
+            pv = vorsci.regions[pr] # vertices of voronoi region
+
+            if (-1) in pv: # check if boundary cell, as noted by -1 for vertice index
+                # this part gets the intersection of the infinite ray and a perpindicular line 
+                # through the delaunay point (flow node), since for boundary cells the flow node is on the boundary,
+                # then all intersection points are added to the region vertices to calculate the region area 
+                # it could probably be done more efficiently -SA
+
+                gen = (v for v in pv if v != -1)
+                coords_int = np.empty((0,2)) # coordinates of voronoi vertices
+                coords_out = np.empty((0,2))
+                if len(pv)==2: # corner element, only one real node with two rays
+
+                    for v in gen: 
+                        coord = vorsci.vertices[v]
+                        coords_int = np.vstack([coords_int,coord])
+                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
+                        ray_dir = vortri_raydirs[inds]     
+                        int_pts = np.empty((np.size(inds),2))  
+                        for i in range(0, np.size(inds)):           
+                            # Find the intersect point of infinite ridges (rays) with the boundary lines
+                            # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+                            p = coord
+                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
+                            int_pts[i,:] = find_intersect(coord,normal,boundaries)
+                        coords_out = np.vstack([coords_out,int_pts])
+                else: # side element, may or may not be touching a corner
+
+                    for v in gen: 
+                        coord = vorsci.vertices[v]
+                        coords_int = np.vstack([coords_int,coord])
+                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
+                        ray_dir = vortri_raydirs[inds] 
+                        int_pts = np.empty((np.size(inds),2))   
+                        #
+                        for i in range(0, np.size(inds)):    
+                            # Find the intersect point of infinite ridges (rays) with the boundary lines
+                            p = coord
+                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
+                            int_pts[i,:] = find_intersect(coord,normal,boundaries)
+                        if np.size(inds) > 1:
+                            refpt = (delaun_nodes[nd[0],1:3] + delaun_nodes[nd[1],1:3])/2 # average xy of top/bot of long element to get average xy location
+                            index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
+                            int_pts = int_pts[index,:]
+                        coords_out = np.vstack([coords_out,int_pts])
+
+                coords = np.vstack([coords_int,coords_out])    # combine interior with exterior nodes     
+                flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
+                el_vol = el_len*flow_area/3 # element volume
+
+            else:
+                coords = vorsci.vertices[pv] # coordinates of voronoi vertices
+                # calculate the flux area of voronoi region of arbitrary shape by the shoelace formula
+                flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
+                el_vol = el_len*flow_area/3 # element volume
+            
+            delaun_elems_long[nel_l,3] = flow_area
+            delaun_elems_long[nel_l,4] =  el_vol
+            delaun_elems_long[nel_l,5] = typeFlag
+            delaun_elems_long[nel_l,6:len(pv)+6] =  pv
+
+    # transverse elements
+    typeFlag = 2
+    h = segment_length + connector_l_length # element height
+    if nsegments==1: # if only one layer, add transverse elements anyway
+        h = segment_length
+        for r in range(0,nrdgs):
+                nel_t = r # element index
+
+                pd = vorsci.ridge_points[r] # 2D flow index for ridge
+                coordsd = delaunay_pts[pd] # 2D flow coords
+                nd = pd
+                delaun_elems_trans[nel_t,0:2] = nd # element connectivity
+                el_len = np.linalg.norm(coordsd) # distance bewteen flow nodes (element length)
+                delaun_elems_trans[nel_t,2] =  el_len
+
+                pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
+                coordsv = vorsci.vertices[pv] # 2D vor coords
+                vor_len = np.linalg.norm(coordsv) # distance between vor coords (for area)
+                flow_area = vor_len*h # flux area
+                delaun_elems_trans[nel_t,3] = flow_area 
+                el_vol = el_len*flow_area/3 # element volume
+                delaun_elems_trans[nel_t,4] = el_vol 
+                delaun_elems_trans[nel_t,5] = typeFlag # element type
+
+                delaun_elems_trans[nel_t,6:8] = pv
+    else:
+        for l in range(0,nsegments-1):
+            for r in range(0,nrdgs):
+                nel_t = r + l*nrdgs # element index
+
+                pd = vorsci.ridge_points[r] # 2D flow index for ridge
+                coordsd = delaunay_pts[pd] # 2D flow coords
+                nd = pd + (l+1)*npts # translate 2D flow index to 3D flow node number
+                delaun_elems_trans[nel_t,0:2] = nd # element connectivity
+                el_len = np.linalg.norm(coordsd) # distance bewteen flow nodes (element length)
+                delaun_elems_trans[nel_t,2] =  el_len
+
+                pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
+                coordsv = vorsci.vertices[pv] # 2D vor coords
+                vor_len = np.linalg.norm(coordsv) # distance between vor coords (for area)
+                flow_area = vor_len*h # flux area
+                delaun_elems_trans[nel_t,3] = flow_area 
+                el_vol = el_len*flow_area/3 # element volume
+                delaun_elems_trans[nel_t,4] = el_vol 
+                delaun_elems_trans[nel_t,5] = typeFlag # element type
+
+                delaun_elems_trans[nel_t,6:8] = pv
+        
+    # print(nels_long,nel_l,nels_trans,nel_t,nels)
+    delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
+
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
-        ,header='Flow Mesh Node Coordinates\nn = '+ str(nverts) + '\n[# x y z]')
+        ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
     
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f']\
-        ,header='Flow Mesh Element Information\nn = '+ str(nridges) + '\n[n1 n2 l1 l2 A]')
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%d','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f']\
+        ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l A V type v1 v2 ... vn]')
     return 
 
 
@@ -1165,22 +1338,10 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     voronoi_vertices_in = ttvertices
             
     # Find the intersect point of infinite ridges (rays) with the boundary lines
-    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
     for i in range(0,len(ttray_origins)):
         p = ttvertices[ttray_origins[i]]
-        normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal
-
-        for boundary in boundaries: # loop over boundary lines
-            q = np.asarray(boundary[1][0])
-            s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-            t = np.cross((q-p),s)/np.cross(normal,s)
-            u = np.cross((q-p),normal)/np.cross(normal,s)
-            
-            if (u >= 0) and (u <= 1):
-                if (t >= 0) and math.isfinite(t):
-                    t_final = t
-                            
-        intersect_point = p + normal * t_final
+        normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal                 
+        intersect_point = find_intersect(p,normal,boundaries)
         boundary_points.append(intersect_point)
 
     boundary_points = np.asarray(boundary_points)
@@ -2014,7 +2175,7 @@ def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttr
             
 def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,random_noise,knotFlag, m1,m2,a1,a2,Uinf,box_center,box_depth):
+                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,knotFlag, m1,m2,a1,a2,Uinf,box_center,box_depth):
     
     # Number of points per layer
     npt_per_layer = nvertex
@@ -2315,7 +2476,6 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
     return all_pts_3D,npt_per_layer_vtk,all_pts_2D,all_ridges
 
 
-
 def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,npt_per_layer_normal,\
                        npt_per_layer_vtk,nridge,geoName,radii,generation_center,\
                        cellwallthickness_sparse,cellwallthickness_dense,inpType):
@@ -2432,7 +2592,7 @@ Number of ridges\n'+ str(nridge) +
 def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,theta_min,theta_max,\
                         z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
                         nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
-                        flattened_all_vertices_2D,all_ridges,random_noise,nconnector_t_per_beam,nconnector_t_per_grain):
+                        flattened_all_vertices_2D,all_ridges,nconnector_t_per_beam,nconnector_t_per_grain):
     
     IGAvertices = np.copy(voronoi_vertices_3D)
     # Connectivity for IGA Control Points (Vertices)
@@ -2510,12 +2670,13 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
     connector_t_reg_connectivity,connector_l_connectivity,\
     nconnector_t,nconnector_l,connector_l_vertex_dict
 
+
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                       nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                      random_field,RF):
+                      randomFlag,random_field):
 ######### txt File stores the connector data for Abaqus analyses ##############
     nelem_connector_t_bot = connector_t_bot_connectivity.shape[0]
     nelem_connector_t_reg = connector_t_reg_connectivity.shape[0]
@@ -2548,42 +2709,45 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
 # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag]    
     Meshdata = np.zeros((nelem_total,28))
     
-    for i in range(0,nelem_connector_t_bot):
+    # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for l)
+    for i in range(0,nelem_connector_t_bot): # transverse bottom of beam
         Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:]
         Meshdata[i,3:6] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,1]-1,:]
         Meshdata[i,22] = height_connector_t
         Meshdata[i,24] = 1
-    for i in range(0,nelem_connector_t_reg):
+    for i in range(0,nelem_connector_t_reg): # transverse mid beam
         Meshdata[i+nelem_connector_t_bot,0:3] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,0]-1,:]
         Meshdata[i+nelem_connector_t_bot,3:6] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,1]-1,:]
         Meshdata[i+nelem_connector_t_bot,22] = height_connector_t*2
         Meshdata[i+nelem_connector_t_bot,24] = 2
-    for i in range(0,nelem_connector_t_top):
+    for i in range(0,nelem_connector_t_top): # transverse top of beam
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,0:3] = np.copy(IGAvertices)[connector_t_top_connectivity[i,0]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,3:6] = np.copy(IGAvertices)[connector_t_top_connectivity[i,1]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,22] = height_connector_t
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,24] = 3
-        
-    for i in range(0,nelem_connector_l):
+    for i in range(0,nelem_connector_l): # longitudinal
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,0:3] = np.copy(IGAvertices)[connector_l_connectivity[i,0]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,22] = conn_l_lengths[i]
         Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,24] = 4
+
     
     # Calculate connector center    
     Meshdata[:,6:9] = (Meshdata[:,0:3] + Meshdata[:,3:6])/2
-    # print(Meshdata[:,6:9])
-    # Meshdata[:,25:28] = Meshdata[:,6:9]
-    # Meshdata[0:nelem_connector_t_bot,8] = Meshdata[0:nelem_connector_t_bot,8]
-    # Meshdata[nelem_total-nelem_connector_t_top:nelem_total,8] = Meshdata[nelem_total-nelem_connector_t_top:nelem_total,8]
-    
     # Calculate distance from center to vertex 1
     Meshdata[:,9:12] = Meshdata[:,6:9] - Meshdata[:,0:3]
-    # print(Meshdata[nelem_total-5:nelem_total,0:3])
-    
     # Calculate distance from center to vertex 2
     Meshdata[:,12:15] = Meshdata[:,6:9] - Meshdata[:,3:6]
-    # print(Meshdata[nelem_total-5:nelem_total,3:6])
+
+    # Add random field h(x) 
+    if randomFlag in ['on','On','Y','y','Yes','yes']:
+        random_field.GenerateRandVariables(5, seed = 8) # generation of random numbers, critical step
+        random_field.precomputeEOLE()                  # calculation of preparation files, can be used for any LDPM geometry
+        GF = random_field.GenerateField(Meshdata[:,6:9])           # EOLE projection
+        Meshdata[:,23] = GF[0,:,0]
+    else:
+        GF = np.ones(nelem_total)
+        Meshdata[:,23] = GF
 
     # Calculate unit t vector
     tvects = np.zeros((nelem_total,3))
@@ -2599,15 +2763,6 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     Meshdata[:,15:18] = zvects
     Meshdata[:,18:21] = nvects
 
-    # Add random field h(x) 
-    if random_field in ['on','On','Y','y','Yes','yes']:
-        RF.GenerateRandVariables(5, seed = 8) # generation of random numbers, critical step
-        RF.precomputeEOLE()                  # calculation of preparation files, can be used for any LDPM geometry
-        GF = RF.GenerateField(Meshdata[:,6:9])           # EOLE projection
-        Meshdata[:,23] = GF[0,:,0]
-    else:
-        GF = np.ones(nelem_total)
-        Meshdata[:,23] = GF
     
     # Add z-variation/random field for cellwall thicknesses/connector widths
     for i in range(0,nridge):
