@@ -92,6 +92,8 @@ def inputParams(form):
         box_width = float(0.05) # side length
         box_depth = float(0.05) # side length
         box_size = box_width
+        z_min = 0
+        z_max = box_height #box_size # segment_length = (z_max - z_min) / nsegments
 
     return geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
