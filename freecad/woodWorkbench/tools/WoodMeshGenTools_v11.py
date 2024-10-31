@@ -35,6 +35,16 @@ def calc_knotflow(y,z,m1,m2,a1,a2,Uinf,yc):
     dydz = (dy1+dy2)/(Uinf + dz1 + dz2)
     return dydz
 
+def calc_knotstream(y,z,m1,m2,a1,a2,Uinf):
+
+    psi_frstr = Uinf*y
+    psi_snk = -m1/(2*math.pi)*np.arctan2((y),(z-a1))
+    psi_src = m2/(2*math.pi)*np.arctan2((y),(z-a2))
+
+    psi = psi_frstr + psi_src + psi_snk
+
+    return psi
+
 def intersect2D(a, b):
   """
   Find row intersection between 2D numpy arrays, a and b.
@@ -727,6 +737,8 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
 
     # generate point at center    
     sites = np.array([[-0.01,0.01],[0.01,-0.01]])
+    # sites = np.array([[-0.01,0.01],[0.01,-0.01],[0.01,0.01],[-0.01,-0.01]])
+    # sites = np.array([[0.0,0.0]])
 
     return sites, radii
 
@@ -1033,9 +1045,9 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
 
 
     ''' 
-    NOTE: There are nsegment-1 number of transverse layers, shifted to occur at 
-    the long connection location, and there are nsegment+1 longitudinal layers.
-    There are nesegments+2 number of 'node layers'.
+    NOTE: There are nsegment number of transverse layers, shifted to occur at 
+    the mid-segment location, and there are nsegment+1 longitudinal layers.
+    There are 2*nsegments+1 number of node layers.
     '''
     #***************************************************************************
     delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
@@ -1051,16 +1063,13 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     vortri_raydirs = vortri[3]
 
     nrdgs = len(vorsci.ridge_points) # number of ridges and thus number of flow elements
-    nlayers = nsegments + 2 # number of node layers 
+    nlayers = 2*nsegments + 1 # number of node layers 
     nnodes = npts*nlayers 
     nels_long = npts*(nsegments+1)
-    if nsegments==1: # make sure transverse layer exists even for one segment
-        nels_trans = nrdgs
-    else:
-        nels_trans = nrdgs*(nsegments-1)
+    nels_trans = nrdgs*nsegments
     nels = nels_long + nels_trans
-    delaun_elems_long = np.zeros((nels_long,15)) 
-    delaun_elems_trans = np.zeros((nels_trans,15)) # empty arrays for flow info
+    delaun_elems_long = np.zeros((nels_long,6)) 
+    delaun_elems_trans = np.zeros((nels_trans,6)) # empty arrays for flow info
     # n1, n2, length, area, volume, element type, v1, v2 ... vn
 
     segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
@@ -1075,29 +1084,30 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
         if (l == 0) or (l == nlayers-2): # the first or last layer
             z_coord += segment_length/2
         else: # for middle elements include connector distance
-            z_coord += segment_length + connector_l_length
-
+            z_coord += segment_length/2 + connector_l_length/2
 
     # nodes
-    delaun_num = np.zeros((nnodes, 1)) # delaun_num is hacky because of np dimension nonsense -SA
-    delaun_num[:,0] = np.linspace(1,nnodes,nnodes,dtype='int64')
+    delaun_num = np.zeros(((nnodes),1)) # delaun_num is hacky because of np dimension nonsense -SA
+    delaun_num[:,0] = np.linspace(0,nnodes-1,nnodes,dtype='int64')
     delaun_verts_layers = np.tile(delaunay_pts,(nlayers,1)) # tile node xy coords for each layer
     delaun_nodes = np.concatenate((delaun_num,delaun_verts_layers,coordsz),axis=1)
 
 
     # longitudinal elements
-    for l in range(0,nlayers-1):
+    for l in range(0,nsegments+1):
         # get layer properties
-        if (l == 0) or (l == nlayers-2): # the first or last layer
+        if (l == 0) or (l == nsegments): # the first or last layer
             typeFlag = 1
             el_len = segment_length/2
+            ni = 1
         else:
             typeFlag = 0
             el_len = segment_length + connector_l_length
+            ni = 3
         # for each element in layer
         for p in range(0,npts):
             nel_l = p + l*npts # element index
-            nd = [p + l*npts, p + (l+1)*npts] # manual calculation of 3D node number
+            nd = [p + l*npts, p + (l+ni)*npts] # manual calculation of 3D node numbers
             delaun_elems_long[nel_l,0:2] = nd # element connectivity
             delaun_elems_long[nel_l,2] =  el_len
 
@@ -1160,56 +1170,35 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
             
             delaun_elems_long[nel_l,3] = flow_area
             delaun_elems_long[nel_l,4] =  el_vol
+            # if el_vol == 0:
+            #     print('vol',nel_l,pv,coords)
             delaun_elems_long[nel_l,5] = typeFlag
-            delaun_elems_long[nel_l,6:len(pv)+6] =  pv
+            # delaun_elems_long[nel_l,6:len(pv)+6] =  pv
 
     # transverse elements
-    typeFlag = 2
-    h = segment_length + connector_l_length # element height
-    if nsegments==1: # if only one layer, add transverse elements anyway
-        h = segment_length
+    for l in range(0,nsegments): # each segment
+        el_h = segment_length + connector_l_length # element height if at top or bottom (one less connector)
+        typeFlag = 2
         for r in range(0,nrdgs):
-                nel_t = r # element index
+            nel_t = r + l*nrdgs # element index
 
-                pd = vorsci.ridge_points[r] # 2D flow index for ridge
-                coordsd = delaunay_pts[pd] # 2D flow coords
-                nd = pd
-                delaun_elems_trans[nel_t,0:2] = nd # element connectivity
-                el_len = np.linalg.norm(coordsd) # distance bewteen flow nodes (element length)
-                delaun_elems_trans[nel_t,2] =  el_len
+            pd = vorsci.ridge_points[r] # 2D flow index for ridge
+            coordsd = delaunay_pts[pd] # 2D flow coords
+            nd = pd + (2*l+1)*npts # translate 2D flow index to 3D flow index
+            delaun_elems_trans[nel_t,0:2] = nd # element connectivity
+            el_len = np.linalg.norm((coordsd[0,:]-coordsd[1,:])) # distance bewteen flow nodes (element length)
+            delaun_elems_trans[nel_t,2] =  el_len
 
-                pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
-                coordsv = vorsci.vertices[pv] # 2D vor coords
-                vor_len = np.linalg.norm(coordsv) # distance between vor coords (for area)
-                flow_area = vor_len*h # flux area
-                delaun_elems_trans[nel_t,3] = flow_area 
-                el_vol = el_len*flow_area/3 # element volume
-                delaun_elems_trans[nel_t,4] = el_vol 
-                delaun_elems_trans[nel_t,5] = typeFlag # element type
+            pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
+            coordsv = vorsci.vertices[pv] # 2D vor coords
+            vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+            flow_area = vor_len*el_h # flux area
+            delaun_elems_trans[nel_t,3] = flow_area 
+            el_vol = el_len*flow_area/3 # element volume
+            delaun_elems_trans[nel_t,4] = el_vol 
+            delaun_elems_trans[nel_t,5] = typeFlag # element type
 
-                delaun_elems_trans[nel_t,6:8] = pv
-    else:
-        for l in range(0,nsegments-1):
-            for r in range(0,nrdgs):
-                nel_t = r + l*nrdgs # element index
-
-                pd = vorsci.ridge_points[r] # 2D flow index for ridge
-                coordsd = delaunay_pts[pd] # 2D flow coords
-                nd = pd + (l+1)*npts # translate 2D flow index to 3D flow node number
-                delaun_elems_trans[nel_t,0:2] = nd # element connectivity
-                el_len = np.linalg.norm(coordsd) # distance bewteen flow nodes (element length)
-                delaun_elems_trans[nel_t,2] =  el_len
-
-                pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
-                coordsv = vorsci.vertices[pv] # 2D vor coords
-                vor_len = np.linalg.norm(coordsv) # distance between vor coords (for area)
-                flow_area = vor_len*h # flux area
-                delaun_elems_trans[nel_t,3] = flow_area 
-                el_vol = el_len*flow_area/3 # element volume
-                delaun_elems_trans[nel_t,4] = el_vol 
-                delaun_elems_trans[nel_t,5] = typeFlag # element type
-
-                delaun_elems_trans[nel_t,6:8] = pv
+            # delaun_elems_trans[nel_t,6:8] = pv # mark relevant 2D voronoi ridge for possible reference
         
     # print(nels_long,nel_l,nels_trans,nel_t,nels)
     delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
@@ -1217,9 +1206,10 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
         ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
     
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%d','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f','%0.8f']\
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%d']\
         ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l A V type v1 v2 ... vn]')
-    return 
+    
+    return delaun_nodes, delaun_elems
 
 
 def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
@@ -2174,9 +2164,13 @@ def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttr
             
             
 def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
-                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,knotFlag, m1,m2,a1,a2,Uinf,box_center,box_depth):
+                   z_min,z_max,long_connector_ratio,voronoi_vertices,nvertex,generation_center,knotFlag, knotParams,box_center,box_depth):
     
+    m1 = knotParams.get('m1')
+    m2 = knotParams.get('m2')
+    a1 = knotParams.get('a1')
+    a2 = knotParams.get('a2')
+    Uinf = knotParams.get('Uinf')
     # Number of points per layer
     npt_per_layer = nvertex
     npt_per_layer_normal = npt_per_layer
@@ -2226,11 +2220,14 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     if knotFlag == 'On':
         vertices_flow[:,:] = odeint(calc_knotflow,voronoi_vertices[:,1],z_coord[:],args=(m1,m2,a1,a2,Uinf,box_center[1]))
         knot_dy = vertices_flow - vertices_rep
-        # knot_radii = odeint(calc_knotflow,0.01,z_coord[:],args=(m1,m2,a1,a2,Uinf,box_center[1])) # determine radius of knot by beam closest to center
-    # print(knot_radii)
-
+    # knot_indices = [] # empty list of indices which are in knot
+        
+        
     # Extrude layers
     for i in range(0,nlayers):
+        # Define z coord based on plane
+        vertices_new[i,:,2] = z_coord[i]
+
         for j in range(0,npt_per_layer):
             
             # Rotate xy plane for trunk rotation
@@ -2239,19 +2236,15 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
             # Straighten out edges of box in case knot flow bulges mesh
             if abs(vertices_new[i,j,1]) > knot_bound: 
                 knot_dy[i,j] = 0
-            # # Mark down which vertices are within 10% of knot boundary
-            # elif abs(vertices_new[i,j,1]) < knot_radii[i]*1.1: 
-            #     np.append(vertices_knot,vertices_new[i,j,:])
-            
-            
+            # if knotFlag == 'On':
+            #     psi = calc_knotstream(voronoi_vertices[j,1],z_coord[i],m1,m2,a1,a2,Uinf)
+            #     if -0.01 <  psi < 0.01:
+            #         knot_indices.append(np.array([j,i]))
+                
             # added randomness to morphology in the L plane - not calibrated yet -SA
             # vertices_new[i,j,0] = vertices_new[i,j,0]*(np.random.random()*random_noise+1)# + dx # sin(z_coord[i]/z_max)
             # vertices_new[i,j,1] = vertices_new[i,j,1]*(np.random.random()*random_noise+1) + dy #(np.random.random()*random_noise/10+1)
 
-        # Define z coord based on plane
-        vertices_new[i,:,2] = z_coord[i]
-
-    # print(vertices_knot)
     # Adjust rotation due to knot flow
     vertices_new[:,:,1] = vertices_new[:,:,1] + knot_dy[:,:]
     
@@ -2476,8 +2469,8 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
     return all_pts_3D,npt_per_layer_vtk,all_pts_2D,all_ridges
 
 
-def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,npt_per_layer_normal,\
-                       npt_per_layer_vtk,nridge,geoName,radii,generation_center,\
+def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
+                       nridge,geoName,radii,generation_center,\
                        cellwallthickness_sparse,cellwallthickness_dense,inpType):
     
     """Generate the vertex and ridge info 
@@ -2580,24 +2573,23 @@ Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one verte
 Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
 [xcoord ycoord nwings ridge1 farvertex1 length1 width1 angle1 ... ridgen farvertexn lengthn widthn anglen]', comments='')
         
-    np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-ridge.mesh'), all_ridges, fmt='%d', delimiter=' '\
-        ,header='Ridge Data Generated with RingsPy Mesh Generation Tool\n\
-Number of ridges\n'+ str(nridge) +
-    '\n\
-[vertex1 vertex2 midpt1 midpt2 qrtrpt1 qrtrpt2]', comments='')
+        # not used - SA
+#     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-ridge.mesh'), all_ridges, fmt='%d', delimiter=' '\
+#         ,header='Ridge Data Generated with RingsPy Mesh Generation Tool\n\
+# Number of ridges\n'+ str(nridge) +
+#     '\n\
+# [vertex1 vertex2 midpt1 midpt2 qrtrpt1 qrtrpt2]', comments='')
     
     return all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges
 
 
-def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,theta_min,theta_max,\
-                        z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
-                        nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
-                        flattened_all_vertices_2D,all_ridges,nconnector_t_per_beam,nconnector_t_per_grain):
+def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,\
+                        npt_per_layer,nvertex,voronoi_ridges,nridge,all_vertices_2D,\
+                        nconnector_t_per_beam,nconnector_t_per_grain):
     
     IGAvertices = np.copy(voronoi_vertices_3D)
     # Connectivity for IGA Control Points (Vertices)
     npt_total = nvertices_3D
-    vertex_connectivity = np.linspace(0,npt_total-1,npt_total)
     
     # Beams
     ngrain = nvertex
@@ -2662,8 +2654,6 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
     connector_l_vertex_dict = connector_l_vertex_dict.astype(int)
     connector_l_connectivity = connector_l_connectivity.astype(int)
     
-    nconnector_total = nconnector_t + nconnector_l
-    
     return IGAvertices,beam_connectivity_original,nbeam_total,\
     beam_connectivity,nbeamElem,\
     connector_t_bot_connectivity,connector_t_top_connectivity,\
@@ -2676,13 +2666,19 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                       nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                      randomFlag,random_field):
+                      randomFlag,random_field,knotParams,knotFlag,box_center):
+    
+    m1 = knotParams.get('m1')
+    m2 = knotParams.get('m2')
+    a1 = knotParams.get('a1')
+    a2 = knotParams.get('a2')
+    Uinf = knotParams.get('Uinf')
 ######### txt File stores the connector data for Abaqus analyses ##############
-    nelem_connector_t_bot = connector_t_bot_connectivity.shape[0]
-    nelem_connector_t_reg = connector_t_reg_connectivity.shape[0]
-    nelem_connector_t_top = connector_t_top_connectivity.shape[0]
-    nelem_connector_l = connector_l_connectivity.shape[0]
-    nelem_total = nelem_connector_t_bot + nelem_connector_t_reg + nelem_connector_t_top + nelem_connector_l
+    nel_con_tbot = connector_t_bot_connectivity.shape[0]
+    nel_con_treg = connector_t_reg_connectivity.shape[0]
+    nel_con_ttop = connector_t_top_connectivity.shape[0]
+    nel_con_l = connector_l_connectivity.shape[0]
+    nel_con = nel_con_tbot + nel_con_treg + nel_con_ttop + nel_con_l
     
     # calculate heights of transverse connectors
     height_connector_t = segment_length/4
@@ -2706,30 +2702,46 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     conn_l_tangents = rot
     
 # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
-# dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag]    
-    Meshdata = np.zeros((nelem_total,28))
+# dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag]    
+    Meshdata = np.zeros((nel_con,28))
     
+    if knotFlag == 'On':
+        ktol = 0.01
+    else:
+        ktol = 0.0
     # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for l)
-    for i in range(0,nelem_connector_t_bot): # transverse bottom of beam
+    for i in range(0,nel_con_tbot): # transverse bottom of beam
         Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:]
         Meshdata[i,3:6] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,1]-1,:]
         Meshdata[i,22] = height_connector_t
         Meshdata[i,24] = 1
-    for i in range(0,nelem_connector_t_reg): # transverse mid beam
-        Meshdata[i+nelem_connector_t_bot,0:3] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,0]-1,:]
-        Meshdata[i+nelem_connector_t_bot,3:6] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,1]-1,:]
-        Meshdata[i+nelem_connector_t_bot,22] = height_connector_t*2
-        Meshdata[i+nelem_connector_t_bot,24] = 2
-    for i in range(0,nelem_connector_t_top): # transverse top of beam
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,0:3] = np.copy(IGAvertices)[connector_t_top_connectivity[i,0]-1,:]
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,3:6] = np.copy(IGAvertices)[connector_t_top_connectivity[i,1]-1,:]
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,22] = height_connector_t
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg,24] = 3
-    for i in range(0,nelem_connector_l): # longitudinal
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,0:3] = np.copy(IGAvertices)[connector_l_connectivity[i,0]-1,:]
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,22] = conn_l_lengths[i]
-        Meshdata[i+nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,24] = 4
+        psi = calc_knotstream(Meshdata[i,1]-box_center[1],Meshdata[i,2],m1,m2,a1,a2,Uinf)
+        if abs(psi) < ktol:
+            Meshdata[i,25] = 1
+    for i in range(0,nel_con_treg): # transverse mid beam
+        Meshdata[i+nel_con_tbot,0:3] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,0]-1,:]
+        Meshdata[i+nel_con_tbot,3:6] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,1]-1,:]
+        Meshdata[i+nel_con_tbot,22] = height_connector_t*2
+        Meshdata[i+nel_con_tbot,24] = 2
+        psi = calc_knotstream(Meshdata[i+nel_con_tbot,1]-box_center[1],Meshdata[i+nel_con_tbot,2],m1,m2,a1,a2,Uinf)
+        if abs(psi) < ktol:
+            Meshdata[i+nel_con_tbot,25] = 1
+    for i in range(0,nel_con_ttop): # transverse top of beam
+        Meshdata[i+nel_con_tbot+nel_con_treg,0:3] = np.copy(IGAvertices)[connector_t_top_connectivity[i,0]-1,:]
+        Meshdata[i+nel_con_tbot+nel_con_treg,3:6] = np.copy(IGAvertices)[connector_t_top_connectivity[i,1]-1,:]
+        Meshdata[i+nel_con_tbot+nel_con_treg,22] = height_connector_t
+        Meshdata[i+nel_con_tbot+nel_con_treg,24] = 3
+        psi = calc_knotstream(Meshdata[i+nel_con_tbot+nel_con_treg,1]-box_center[1],Meshdata[i+nel_con_tbot+nel_con_treg,2],m1,m2,a1,a2,Uinf)
+        if abs(psi) < ktol:
+            Meshdata[i+nel_con_tbot+nel_con_treg,25] = 1
+    for i in range(0,nel_con_l): # longitudinal
+        Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,0:3] = np.copy(IGAvertices)[connector_l_connectivity[i,0]-1,:]
+        Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
+        Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,22] = conn_l_lengths[i]
+        Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,24] = 4
+        psi = calc_knotstream(Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,1]-box_center[1],Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,2],m1,m2,a1,a2,Uinf)
+        if abs(psi) < ktol:
+            Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,25] = 1
 
     
     # Calculate connector center    
@@ -2746,20 +2758,20 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         GF = random_field.GenerateField(Meshdata[:,6:9])           # EOLE projection
         Meshdata[:,23] = GF[0,:,0]
     else:
-        GF = np.ones(nelem_total)
+        GF = np.ones(nel_con)
         Meshdata[:,23] = GF
 
     # Calculate unit t vector
-    tvects = np.zeros((nelem_total,3))
+    tvects = np.zeros((nel_con,3))
     tvects[:,0:3] = (Meshdata[:,0:3] - Meshdata[:,3:6])/np.linalg.norm((Meshdata[:,0:3] - Meshdata[:,3:6])) #n1 - n2 = t
     # Calculate cross product with z axis (*** temporary until full connector rotation is added - SA)
-    zvects = np.zeros((nelem_total,3))
-    zvects[:nelem_total-nelem_connector_l,2] = 1
-    zvects[nelem_total-nelem_connector_l:nelem_total,0] = 1
+    zvects = np.zeros((nel_con,3))
+    zvects[:nel_con-nel_con_l,2] = 1
+    zvects[nel_con-nel_con_l:nel_con,0] = 1
     # n vectors of beam (n1 for bot, reg, top, and n2 for long)
-    nvects = np.zeros((nelem_total,3))
-    nvects[:nelem_total-nelem_connector_l,:] = np.cross(tvects[:nelem_total-nelem_connector_l,:],zvects[:nelem_total-nelem_connector_l,:])
-    nvects[nelem_total-nelem_connector_l:nelem_total,:] = np.cross(tvects[nelem_total-nelem_connector_l:nelem_total,:],zvects[nelem_total-nelem_connector_l:nelem_total,:])
+    nvects = np.zeros((nel_con,3))
+    nvects[:nel_con-nel_con_l,:] = np.cross(tvects[:nel_con-nel_con_l,:],zvects[:nel_con-nel_con_l,:])
+    nvects[nel_con-nel_con_l:nel_con,:] = np.cross(tvects[nel_con-nel_con_l:nel_con,:],zvects[nel_con-nel_con_l:nel_con,:])
     Meshdata[:,15:18] = zvects
     Meshdata[:,18:21] = nvects
 
@@ -2767,13 +2779,13 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # Add z-variation/random field for cellwall thicknesses/connector widths
     for i in range(0,nridge):
         Meshdata[i,21] = all_vertices_2D[connector_t_bot_connectivity[i,1]-1,3+max_wings*3] # assign widths to all bot transverse connectors
-    Meshdata[:nelem_total-nelem_connector_l,21] = np.tile(Meshdata[0:nridge,21],3*nsegments) # use the same widths for reg and top transverse connectors
+    Meshdata[:nel_con-nel_con_l,21] = np.tile(Meshdata[0:nridge,21],3*nsegments) # use the same widths for reg and top transverse connectors
     
     conn_l_widths = Meshdata[conn_l_ridge_index,21]
-    Meshdata[nelem_total-nelem_connector_l:nelem_total,21] = conn_l_widths
+    Meshdata[nel_con-nel_con_l:nel_con,21] = conn_l_widths
 
     # Add the eccentricity to the centers for longitudinal connectors (new center is correct)
-    Meshdata[nelem_total-nelem_connector_l:nelem_total,6:9] += conn_l_tangents*Meshdata[nelem_total-nelem_connector_l:nelem_total,22][:, np.newaxis]/2
+    Meshdata[nel_con-nel_con_l:nel_con,6:9] += conn_l_tangents*Meshdata[nel_con-nel_con_l:nel_con,22][:, np.newaxis]/2
     # print(conn_l_tangents)
 
     # Replace nodal coordinates with nodal indices
@@ -2783,15 +2795,15 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     
     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName+'-mesh.txt'), Meshdata, fmt='%.16g', delimiter=' '\
     ,header='# Connector Data Generated with RingsPy Mesh Generation Tool\n\
-Number of bot connectors\n'+ str(nelem_connector_t_bot) +
+Number of bot connectors\n'+ str(nel_con_tbot) +
 '\n\
-Number of reg connectors\n'+ str(nelem_connector_t_reg) +
+Number of reg connectors\n'+ str(nel_con_treg) +
 '\n\
-Number of top connectors\n'+ str(nelem_connector_t_top) +
+Number of top connectors\n'+ str(nel_con_ttop) +
 '\n\
-Number of long connectors\n'+ str(nelem_connector_l) +
+Number of long connectors\n'+ str(nel_con_l) +
 '\n\
-[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag]', comments='')  
+[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag]', comments='')  
 
     return Meshdata,conn_l_tangents,height_connector_t
 
@@ -2838,7 +2850,7 @@ def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
 def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                        nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
                        nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
-                       conn_l_tangents,all_vertices_2D):
+                       conn_l_tangents,all_vertices_2D, delaun_nodes, delaun_elems):
     
     # Calculate model parameters
     ngrain = nvertex
@@ -2977,6 +2989,76 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     collocation_flag_vtk = np.concatenate((np.ones(ngrain),np.zeros(npt_per_layer_vtk*NURBS_degree-ngrain)))
     collocation_flag_vtk = np.concatenate((np.tile(collocation_flag_vtk, nconnector_t_per_beam-1),np.concatenate((np.ones(ngrain),np.zeros(npt_per_layer_vtk-ngrain)))))
     collocation_flag_vtk = np.tile(collocation_flag_vtk, nsegments)
+
+# =============================================================================
+    # Paraview Flow File
+    
+    delaun_nodes_sorted = delaun_nodes[np.argsort(delaun_nodes[:,2]),:]
+    delaun_nodes_sorted = delaun_nodes_sorted[np.argsort(delaun_nodes_sorted[:, 1], kind='stable'),:]
+
+    npts_flow_vtk = np.size(delaun_nodes,axis=0)
+    ncell_flow = np.size(delaun_elems,axis=0)
+
+    vtkfile_flow = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '_flow'+'.vtu'),'w')
+    
+    vtkfile_flow.write('<VTKFile type="UnstructuredGrid" version="2.0" byte_order="LittleEndian">'+'\n')
+    vtkfile_flow.write('<UnstructuredGrid>'+'\n')
+    vtkfile_flow.write('<Piece NumberOfPoints="'+str(npts_flow_vtk)+'"'+' '+'NumberOfCells="'+str(ncell_flow)+'">'+'\n')
+    
+    # <Points>
+    vtkfile_flow.write('<Points>'+'\n')
+    vtkfile_flow.write('<DataArray type="Float64" NumberOfComponents="3" format="ascii">'+'\n')
+    for i in range(0,npts_flow_vtk):
+        X,Y,Z = delaun_nodes_sorted[i,1:5]
+        vtkfile_flow.write(' '+'%11.8e'%X+'  '+'%11.8e'%Y+'  '+'%11.8e'%Z+'\n')
+    vtkfile_flow.write('</DataArray>'+'\n')
+    vtkfile_flow.write('</Points>'+'\n')
+    # </Points>
+    
+    # <PointData> 
+    # </PointData> 
+      
+    # <Cells>
+    vtkfile_flow.write('<Cells>'+'\n')
+    
+    # Cell connectivity
+    vtkfile_flow.write('<DataArray type="Int32" Name="connectivity" format="ascii">'+'\n')
+    for i in range(0,ncell_flow):
+        n1,n2 = delaun_elems[i,0:2]
+        s1 = np.where(delaun_nodes_sorted[:,0] == n1)[0]
+        s2 = np.where(delaun_nodes_sorted[:,0] == n2)[0]
+        vtkfile_flow.write(' '+'%i'%s1+'  '+'%i'%s2+'\n')
+    vtkfile_flow.write('</DataArray>'+'\n')
+    
+    # Cell offsets
+    vtkfile_flow.write('<DataArray type="Int32" Name="offsets" format="ascii">'+'\n')
+    offset = 2
+    for n in range(0,ncell_flow):
+        vtkfile_flow.write(' '+'%i'%offset+'\n')
+        offset += 2
+    vtkfile_flow.write('</DataArray>'+'\n')
+    
+    # Cell type
+    vtkfile_flow.write('<DataArray type="UInt8" Name="types" format="ascii">'+'\n')
+    for i in range(0,ncell_flow):
+        vtkfile_flow.write(str(3)+'\n')
+
+    vtkfile_flow.write('</DataArray>'+'\n')
+    
+    vtkfile_flow.write('</Cells>'+'\n')
+    # </Cells>
+    
+    vtkfile_flow.write('</Piece>'+'\n')
+    #</Piece>
+    
+    vtkfile_flow.write('</UnstructuredGrid>'+'\n')
+    #</UnstructuredGrid>
+    
+    vtkfile_flow.write('</VTKFile>'+'\n')
+    #</VTKFile>
+    
+    vtkfile_flow.close()
+    
 
 # =============================================================================
     # Paraview Vertices File
@@ -3385,14 +3467,14 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
     numnode = woodIGAvertices.shape[0]
     nelem = beam_connectivity.shape[0]
     nnode = beam_connectivity.shape[1]
-    nelem_connector_t_bot = connector_t_bot_connectivity.shape[0]
-    nelem_connector_t_reg = connector_t_reg_connectivity.shape[0]
-    nelem_connector_t_top = connector_t_top_connectivity.shape[0]
-    nelem_connector_l = connector_l_connectivity.shape[0]
+    nel_con_tbot = connector_t_bot_connectivity.shape[0]
+    nel_con_treg = connector_t_reg_connectivity.shape[0]
+    nel_con_ttop = connector_t_top_connectivity.shape[0]
+    nel_con_l = connector_l_connectivity.shape[0]
     nconnector_t_precrack = iprops_connector_l[4]
     nconnector_l_precrack = iprops_connector_l[6]
-    nelem_total = nelem + nelem_connector_t_bot + nelem_connector_t_reg + nelem_connector_t_top\
-                + nelem_connector_l + nconnector_t_precrack + nconnector_l_precrack
+    nel_con = nelem + nel_con_tbot + nel_con_treg + nel_con_ttop\
+                + nel_con_l + nconnector_t_precrack + nconnector_l_precrack
     
     xaxis = 1
     yaxis = 2
@@ -3440,7 +3522,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
         connector_l_precracked_connectivity = []
         # bottom transverse connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllBotConns\n') 
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             if i in precrack_elem:
                 connector_t_precracked_index.append(count)
                 count += 1
@@ -3453,7 +3535,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                 meshinpfile.write('\n')
         # regular transverse connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllRegConns\n') 
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             if i in precrack_elem:
                 connector_t_precracked_index.append(count)
                 count += 1
@@ -3466,7 +3548,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                 meshinpfile.write('\n')
         # top transverse connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllTopConns\n') 
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             if i in precrack_elem:
                 connector_t_precracked_index.append(count)
                 count += 1
@@ -3486,7 +3568,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             meshinpfile.write('\n')
         # longitudinal connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllLongConns\n') 
-        for i in range(0,nelem_connector_l):
+        for i in range(0,nel_con_l):
             if i in precrack_elem:
                 connector_l_precracked_index.append(count)
                 count += 1
@@ -3507,7 +3589,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
     else:
         # bottom transverse connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllBotConns\n') 
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             # meshinpfile.write('{:d}'.format(i+1))
             meshinpfile.write('{:d}'.format(count))
             count += 1
@@ -3516,7 +3598,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             meshinpfile.write('\n')
         # regular transverse connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllRegConns\n') 
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             # meshinpfile.write('{:d}'.format(i+1))
             meshinpfile.write('{:d}'.format(count))
             count += 1
@@ -3525,7 +3607,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             meshinpfile.write('\n')
         # top transverse connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllTopConns\n') 
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             # meshinpfile.write('{:d}'.format(i+1))
             meshinpfile.write('{:d}'.format(count))
             count += 1
@@ -3534,7 +3616,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             meshinpfile.write('\n')
         # longitudinal connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=AllLongConns\n') 
-        for i in range(0,nelem_connector_l):
+        for i in range(0,nel_con_l):
             # meshinpfile.write('{:d}'.format(i+1))
             meshinpfile.write('{:d}'.format(count))
             count += 1
@@ -3560,7 +3642,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
         visual_connector_precracked_index = []
         meshinpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualBotConns\n')
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             if i in precrack_elem:
                 visual_connector_precracked_index.append(count)
                 count += 1
@@ -3571,7 +3653,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                     meshinpfile.write(', {:d}'.format(connector_t_bot_connectivity[i,j])) 
                 meshinpfile.write('\n')
         meshinpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualRegConns\n')
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             if i in precrack_elem:
                 visual_connector_precracked_index.append(count)
                 count += 1
@@ -3582,7 +3664,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                     meshinpfile.write(', {:d}'.format(connector_t_reg_connectivity[i,j])) 
                 meshinpfile.write('\n')
         meshinpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualTopConns\n')
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             if i in precrack_elem:
                 visual_connector_precracked_index.append(count)
                 count += 1
@@ -3601,7 +3683,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             meshinpfile.write('\n')
         # longitudinal connector element connectivity 
         meshinpfile.write('*Element, type=T3D2,elset=VisualLConns\n') 
-        for i in range(0,nelem_connector_l):
+        for i in range(0,nel_con_l):
             if i in precrack_elem:
                 connector_l_precracked_index.append(count)
                 count += 1
@@ -3622,28 +3704,28 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
         #     meshinpfile.write('\n')      
     else:
         meshinpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualBotConns\n')
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             meshinpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
                 meshinpfile.write(', {:d}'.format(connector_t_bot_connectivity[i,j])) 
             meshinpfile.write('\n')
         meshinpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualRegConns\n')
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             meshinpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
                 meshinpfile.write(', {:d}'.format(connector_t_reg_connectivity[i,j])) 
             meshinpfile.write('\n')
         meshinpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualTopConns\n')
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             meshinpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
                 meshinpfile.write(', {:d}'.format(connector_t_top_connectivity[i,j])) 
             meshinpfile.write('\n')
         meshinpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualLongConns\n')
-        for i in range(0,nelem_connector_l):
+        for i in range(0,nel_con_l):
             meshinpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
@@ -4081,7 +4163,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                         meshinpfile.write(''.join(','.join(map(str, FrontNodes[0][15*i:15*(i+1)])))+',\n')      
     # ELEMENT SETS
     meshinpfile.write('*Elset, elset=AllElles, instance=Part-1-1, generate\n') 
-    meshinpfile.write('{:d}, {:d}, {:d} \n'.format(1,nelem_total,1))
+    meshinpfile.write('{:d}, {:d}, {:d} \n'.format(1,nel_con,1))
     meshinpfile.write('*Elset, elset=AllVisualElle, instance=Part-1-1, generate\n') 
     meshinpfile.write('{:d}, {:d}, {:d} \n'.format(count_offset+1,count-1,1))
     meshinpfile.write('*End Assembly\n')
@@ -4205,7 +4287,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
     inpfile.write('NumberOfBeamElem = {:d}\n'.format(nelem))
     inpfile.write('NumberOfConnectorT = {:d}\n'.format(iprops_beam[2]))
     inpfile.write('NumberOfConnectorTPrecrack = {:d}\n'.format(iprops_beam[3]))
-    inpfile.write('NumberOfConnectorL = {:d}\n'.format(nelem_connector_l))
+    inpfile.write('NumberOfConnectorL = {:d}\n'.format(nel_con_l))
     inpfile.write('NumberOfConnectorLPrecrack = {:d}\n'.format(iprops_beam[5]))
     inpfile.write('NumberOfSvarsBeam = {:d}\n'.format(nsvars_beam))
     inpfile.write('NumberOfSvarsTConn = {:d}\n'.format(nsvars_conn_t))
@@ -4275,7 +4357,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
         connector_t_precracked_connectivity = []
         # bottom transverse connector element connectivity 
         inpfile.write('*Element, type=VU{:d},elset=AllBotConns\n'.format(eltype_connector_t)) 
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             if i in precrack_elem:
                 connector_t_precracked_index.append(count)
                 count += 1
@@ -4288,7 +4370,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                 inpfile.write('\n')
         # regular transverse connector element connectivity 
         inpfile.write('*Element, type=VU{:d},elset=AllRegConns\n'.format(eltype_connector_t)) 
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             if i in precrack_elem:
                 connector_t_precracked_index.append(count)
                 count += 1
@@ -4301,7 +4383,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                 inpfile.write('\n')
         # top transverse connector element connectivity 
         inpfile.write('*Element, type=VU{:d},elset=AllTopConns\n'.format(eltype_connector_t)) 
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             if i in precrack_elem:
                 connector_t_precracked_index.append(count)
                 count += 1
@@ -4322,7 +4404,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
     else:
         # bottom transverse connector element connectivity 
         inpfile.write('*Element, type=VU{:d},elset=AllBotConns\n'.format(eltype_connector_t)) 
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             # inpfile.write('{:d}'.format(i+1))
             inpfile.write('{:d}'.format(count))
             count += 1
@@ -4331,7 +4413,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             inpfile.write('\n')
         # regular transverse connector element connectivity 
         inpfile.write('*Element, type=VU{:d},elset=AllRegConns\n'.format(eltype_connector_t)) 
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             # inpfile.write('{:d}'.format(i+1))
             inpfile.write('{:d}'.format(count))
             count += 1
@@ -4340,7 +4422,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             inpfile.write('\n')
         # top transverse connector element connectivity 
         inpfile.write('*Element, type=VU{:d},elset=AllTopConns\n'.format(eltype_connector_t)) 
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             # inpfile.write('{:d}'.format(i+1))
             inpfile.write('{:d}'.format(count))
             count += 1
@@ -4350,7 +4432,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             
     # longitudinal connector element connectivity 
     inpfile.write('*Element, type=VU{:d},elset=AllLongConns\n'.format(eltype_connector_l)) 
-    for i in range(0,nelem_connector_l):
+    for i in range(0,nel_con_l):
         # inpfile.write('{:d}'.format(i+1))
         inpfile.write('{:d}'.format(count))
         count += 1
@@ -4421,7 +4503,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
         visual_connector_precracked_index = []
         inpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualBotConns\n')
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             if i in precrack_elem:
                 visual_connector_precracked_index.append(count)
                 count += 1
@@ -4432,7 +4514,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                     inpfile.write(', {:d}'.format(connector_t_bot_connectivity[i,j])) 
                 inpfile.write('\n')
         inpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualRegConns\n')
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             if i in precrack_elem:
                 visual_connector_precracked_index.append(count)
                 count += 1
@@ -4443,7 +4525,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                     inpfile.write(', {:d}'.format(connector_t_reg_connectivity[i,j])) 
                 inpfile.write('\n')
         inpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualTopConns\n')
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             if i in precrack_elem:
                 visual_connector_precracked_index.append(count)
                 count += 1
@@ -4462,7 +4544,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
             inpfile.write('\n')
         # longitudinal connector element connectivity 
         inpfile.write('*Element, type=T3D2,elset=VisualLongConns\n') 
-        for i in range(0,nelem_connector_l):
+        for i in range(0,nel_con_l):
             if i in precrack_elem:
                 connector_l_precracked_index.append(count)
                 count += 1
@@ -4483,28 +4565,28 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
         #     inpfile.write('\n')      
     else:
         inpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualBotConns\n')
-        for i in range(0,nelem_connector_t_bot):
+        for i in range(0,nel_con_tbot):
             inpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
                 inpfile.write(', {:d}'.format(connector_t_bot_connectivity[i,j])) 
             inpfile.write('\n')
         inpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualRegConns\n')
-        for i in range(0,nelem_connector_t_reg):
+        for i in range(0,nel_con_treg):
             inpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
                 inpfile.write(', {:d}'.format(connector_t_reg_connectivity[i,j])) 
             inpfile.write('\n')
         inpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualTopConns\n')
-        for i in range(0,nelem_connector_t_top):
+        for i in range(0,nel_con_ttop):
             inpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
                 inpfile.write(', {:d}'.format(connector_t_top_connectivity[i,j])) 
             inpfile.write('\n')
         inpfile.write('*ELEMENT, TYPE=T3D2, ELSET=VisualLongConns\n')
-        for i in range(0,nelem_connector_l):
+        for i in range(0,nel_con_l):
             inpfile.write('{:d}'.format(count))
             count += 1
             for j in range(0,nelnode_connector):
@@ -4913,7 +4995,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                         inpfile.write(''.join(','.join(map(str, FrontNodes[0][15*i:15*(i+1)])))+',\n')      
     # ELEMENT SETS
     inpfile.write('*Elset, elset=AllElles, instance=Part-1-1, generate\n') 
-    inpfile.write('{:d}, {:d}, {:d} \n'.format(1,nelem_total,1))
+    inpfile.write('{:d}, {:d}, {:d} \n'.format(1,nel_con,1))
     inpfile.write('*Elset, elset=AllVisualElle, instance=Part-1-1, generate\n') 
     inpfile.write('{:d}, {:d}, {:d} \n'.format(count_offset+1,count-1,1))
     inpfile.write('*End Assembly\n')
@@ -5265,10 +5347,10 @@ def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
     
     beam_length = fiberlength/nbeam_per_grain
     nelem_beam = beam_connectivity.shape[0]
-    nelem_connector_t_bot = connector_t_bot_connectivity.shape[0]
-    nelem_connector_t_reg = connector_t_reg_connectivity.shape[0]
-    nelem_connector_t_top = connector_t_top_connectivity.shape[0]
-    nelem_connector_l = connector_l_connectivity.shape[0]
+    nel_con_tbot = connector_t_bot_connectivity.shape[0]
+    nel_con_treg = connector_t_reg_connectivity.shape[0]
+    nel_con_ttop = connector_t_top_connectivity.shape[0]
+    nel_con_l = connector_l_connectivity.shape[0]
     
     density_beam = props_beam[0]
     density_connector_t_bot = props_connector_t_bot[0]
@@ -5281,16 +5363,16 @@ def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
     # for i in range(0,nelem_beam):
     mass += nelem_beam*density_beam*props_beam[3]*props_beam[4]*beam_length
     # mass of bot transverse connector
-    for i in range(0,nelem_connector_t_bot):
+    for i in range(0,nel_con_tbot):
         mass += density_connector_t_bot*props_connector_t_bot[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     # mass of reg transverse connector
-    for i in range(nelem_connector_t_bot,nelem_connector_t_bot+nelem_connector_t_reg):
+    for i in range(nel_con_tbot,nel_con_tbot+nel_con_treg):
         mass += density_connector_t_reg*props_connector_t_reg[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     # mass of top transverse connector
-    for i in range(nelem_connector_t_bot+nelem_connector_t_reg,nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top):
+    for i in range(nel_con_tbot+nel_con_treg,nel_con_tbot+nel_con_treg+nel_con_ttop):
         mass += density_connector_t_top*props_connector_t_top[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     # mass of longitudinal connector
-    for i in range(nelem_connector_t_bot+nelem_connector_t_reg+nelem_connector_t_top,MeshData.shape[0]):
+    for i in range(nel_con_tbot+nel_con_treg+nel_con_ttop,MeshData.shape[0]):
         mass += density_connector_l*props_connector_l[3]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     
     hull = ConvexHull(boundary_points) 

@@ -62,7 +62,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, m1, m2, a1, a2, Uinf]\
+        knotFlag, knotParams]\
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
@@ -108,7 +108,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, m1, m2, a1, a2, Uinf)
+        knotFlag, knotParams)
         
 
     # Make new freecad document and set view if does not exisit
@@ -174,6 +174,7 @@ def main(self):
         # ---------------------------------------------
         # debug run
         sites,radii = WoodMeshGen.CellPlacement_Debug(nrings,width_heart,width_early,width_late)     
+        
     else:
         print('Growth rule: {:s} is not supported for the current version, please check the README for more details.'.format(radial_growth_rule))
         # print('Now exiting...')
@@ -201,7 +202,7 @@ def main(self):
     delaunay_vertices = np.concatenate((np.array(sites_in), boundary_points_original))
     # Conforming Delaunay
     conforming_delaunay = tr.triangulate({'vertices': delaunay_vertices}, 'pq0Dec')
-    WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries)
+    flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries)
 
     # ---------------------------------------------
     # # Build mechanical mesh 
@@ -281,8 +282,7 @@ def main(self):
     [voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D] = \
     WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
-                   z_min,z_max,long_connector_ratio,nvertices_in,nboundary_pts,\
-                   voronoi_vertices,nvertex,voronoi_ridges,nridge,generation_center,knotFlag, m1, m2, a1, a2, Uinf, box_center,box_depth)
+                   z_min,z_max,long_connector_ratio,voronoi_vertices,nvertex,generation_center,knotFlag, knotParams, box_center,box_depth)
     
 
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
@@ -295,9 +295,8 @@ def main(self):
     # ===============================================
     # Generate a file for vertices and ridges info
     [all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges] = \
-        WoodMeshGen.VertexandRidgeinfo(all_pts_2D,all_ridges,\
-                        npt_per_layer,npt_per_layer_normal,\
-                        npt_per_layer_vtk,nridge,geoName,radii,generation_center,\
+        WoodMeshGen.VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
+                        nridge,geoName,radii,generation_center,\
                         cellwallthickness_early,cellwallthickness_late,inpType)
     
 
@@ -312,10 +311,10 @@ def main(self):
     connector_t_bot_connectivity,connector_t_top_connectivity,\
     connector_t_reg_connectivity,connector_l_connectivity,\
     nconnector_t,nconnector_l,connector_l_vertex_dict] = \
-    WoodMeshGen.GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,theta_min,theta_max,\
-                        z_min,z_max,long_connector_ratio,npt_per_layer,voronoi_vertices,\
-                        nvertex,voronoi_ridges,nridge,generation_center,all_vertices_2D,max_wings,\
-                        flattened_all_vertices_2D,all_ridges,nconnector_t_per_beam,nconnector_t_per_grain)
+    WoodMeshGen.GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,\
+                        npt_per_layer,\
+                        nvertex,voronoi_ridges,nridge,all_vertices_2D,\
+                        nconnector_t_per_beam,nconnector_t_per_grain)
 
     BeamTime = time.time() 
     print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
@@ -372,7 +371,7 @@ def main(self):
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                    randomFlag,random_field)
+                    randomFlag,random_field,knotParams,knotFlag,box_center)
 
     # ===============================================
     # Calculate model properties
@@ -472,7 +471,7 @@ def main(self):
         WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                        nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
                        nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
-                       conn_l_tangents,all_vertices_2D)  
+                       conn_l_tangents,all_vertices_2D, flow_nodes, flow_elems)  
 
         App.activeDocument().addObject('App::DocumentObjectGroup',visualFilesName)
         App.activeDocument().getObject(visualFilesName).Label = 'Visualization Files'

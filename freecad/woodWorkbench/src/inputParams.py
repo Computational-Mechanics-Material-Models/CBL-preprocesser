@@ -58,11 +58,13 @@ def inputParams(form):
 
     # Knot parameters
     knotFlag = form[0].knotFlag.currentText()
-    Uinf = float(form[0].knot_flow.text() or 1)
-    a1 = float(form[0].a1.text() or 0.4)
-    a2 = float(form[0].a2.text() or 0.1)
-    m1 = float(form[0].m1.text() or 0.05)
-    m2 = float(form[0].m2.text() or 0.05)
+    knotParams = {}
+    knotParams['Uinf'] = float(form[0].knot_flow.text() or 1)
+    knotParams['a1'] = float(form[0].a1.text() or 0.4)
+    knotParams['a2'] = float(form[0].a2.text() or 0.1)
+    knotParams['m1'] = float(form[0].m1.text() or 0.05)
+    knotParams['m2'] = float(form[0].m2.text() or 0.05)
+
 
     # Precrack Parameters
     # notch and precrack are always centered on leftmost edge
@@ -86,7 +88,7 @@ def inputParams(form):
     visFlag = form[0].visFlag.currentText()
 
     if radial_growth_rule == 'debug':
-        nsegments = int(1) 
+        nsegments = int(2) 
         box_center = eval( "(0.0,0.0)") # coordinates of clipping box center
         box_height = float(0.05) # specimen length
         box_width = float(0.05) # side length
@@ -103,4 +105,4 @@ def inputParams(form):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, m1, m2, a1, a2, Uinf
+        knotFlag, knotParams
