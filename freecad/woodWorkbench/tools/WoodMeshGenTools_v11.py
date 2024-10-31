@@ -1195,7 +1195,7 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
             flow_area = vor_len*el_h # flux area
             delaun_elems_trans[nel_t,3] = flow_area 
             el_vol = el_len*flow_area/3 # element volume
-            delaun_elems_trans[nel_t,4] = el_vol 
+            delaun_elems_trans[nel_t,4] = el_vol
             delaun_elems_trans[nel_t,5] = typeFlag # element type
 
             # delaun_elems_trans[nel_t,6:8] = pv # mark relevant 2D voronoi ridge for possible reference
@@ -2702,11 +2702,11 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     conn_l_tangents = rot
     
 # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
-# dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag]    
+# dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag] (22 elements)   
     Meshdata = np.zeros((nel_con,28))
     
     if knotFlag == 'On':
-        ktol = 0.01
+        ktol = 0.02
     else:
         ktol = 0.0
     # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for l)
@@ -3309,6 +3309,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     ncell_conns_vol = VTKcell_types_conns_vol.shape[0]
     
     Quad_width_vtk = np.tile(Quad_width,(2))
+    knot_vtk = np.tile(np.copy(ConnMeshData[:,21]),(2))
 
     vtkfile_conns_vol = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '_conns_vol'+'.vtu'),'w')
     
@@ -3368,6 +3369,12 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     for i in range(0,ncell_conns_vol):
         X = Quad_width_vtk[i]
         vtkfile_conns_vol.write('%11.8e'%X+'\n')
+    vtkfile_conns_vol.write('</DataArray>'+'\n')
+
+    vtkfile_conns_vol.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"knotFlag"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
+    for i in range(0,ncell_conns_vol):
+        K = knot_vtk[i]
+        vtkfile_conns_vol.write('%11.8e'%K+'\n')
     vtkfile_conns_vol.write('</DataArray>'+'\n')
 
     vtkfile_conns_vol.write('</CellData>'+'\n')
