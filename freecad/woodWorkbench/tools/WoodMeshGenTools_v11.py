@@ -3310,6 +3310,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     
     Quad_width_vtk = np.tile(Quad_width,(2))
     knot_vtk = np.tile(np.copy(ConnMeshData[:,21]),(2))
+    RF_vtk = np.tile(np.copy(ConnMeshData[:,19]),(2))
 
     vtkfile_conns_vol = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '_conns_vol'+'.vtu'),'w')
     
@@ -3375,6 +3376,12 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     for i in range(0,ncell_conns_vol):
         K = knot_vtk[i]
         vtkfile_conns_vol.write('%11.8e'%K+'\n')
+    vtkfile_conns_vol.write('</DataArray>'+'\n')
+
+    vtkfile_conns_vol.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"randomFlag"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
+    for i in range(0,ncell_conns_vol):
+        RF = RF_vtk[i]
+        vtkfile_conns_vol.write('%11.8e'%RF+'\n')
     vtkfile_conns_vol.write('</DataArray>'+'\n')
 
     vtkfile_conns_vol.write('</CellData>'+'\n')

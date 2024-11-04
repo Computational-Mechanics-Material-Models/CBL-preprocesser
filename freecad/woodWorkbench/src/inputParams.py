@@ -35,11 +35,11 @@ def inputParams(form):
 
 
     # Model Parameters     
+    box_shape = form[0].box_shape.currentText()
+    box_shape = box_shape.lower().replace(' ','_')
     iter_max = int(form[0].iter_max.text() or 10) # increase this number to achieve a more regular geometry
     print_interval = 500 #int(form[0].print_interval.text() or 500) # interval for printing prgress info
     
-    box_shape = form[0].box_shape.currentText()
-    box_shape = box_shape.lower().replace(' ','_')
     box_center = eval(form[0].box_center.text() or "(0.0,0.0)") # coordinates of clipping box center
     box_height = float(form[0].box_height.text() or 0.5) # specimen length
     box_width = float(form[0].box_width.text() or 0.5) # side length
@@ -65,6 +65,13 @@ def inputParams(form):
     knotParams['m1'] = float(form[0].m1.text() or 0.05)
     knotParams['m2'] = float(form[0].m2.text() or 0.05)
 
+    # Random field parameters
+    randomFlag = form[0].randomFlag.currentText()
+    randomParams = {}
+    randomParams['RF_dist_types'] = ([form[0].dist_types.currentText()] or ["TruncatedGaussian"])
+    randomParams['RF_dist_params'] = ([[float(i) for i in form[0].dist_params.text().split(',')]]) # or [[1.,0.5,0]]) # or doesn't work for empty after converting to float - convert later?
+    randomParams['RF_corr_l'] = float(form[0].corr_l.text() or 0.1)
+    randomParams['RF_sampling_type'] = (form[0].sampling_type.currentText() or "MC")
 
     # Precrack Parameters
     # notch and precrack are always centered on leftmost edge
@@ -77,7 +84,6 @@ def inputParams(form):
     precrack_size = float(form[0].x_precrack_size.text() or 0) # depth of precrack box_size*0.1
 
     boundaryFlag = form[0].boundaryFlag.currentText()
-    randomFlag = form[0].randomFlag.currentText()
 
     merge_operation = form[0].merge_operation.currentText() 
     merge_tol = float(form[0].merge_tol.text() or 0.015)
@@ -96,6 +102,7 @@ def inputParams(form):
         box_size = box_width
         z_min = 0
         z_max = box_height #box_size # segment_length = (z_max - z_min) / nsegments
+        randomFlag = 'Off'
 
     return geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
@@ -104,5 +111,5 @@ def inputParams(form):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
+        stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams

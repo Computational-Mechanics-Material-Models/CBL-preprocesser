@@ -61,7 +61,7 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
+        stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams]\
             = inputParams(self.form)
     
@@ -108,7 +108,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams)
+        knotFlag, knotParams, randomFlag, randomParams)
         
 
     # Make new freecad document and set view if does not exisit
@@ -322,11 +322,10 @@ def main(self):
 
     # ==================================================================
     # Calculate random field
-    # simplify/modify to input -SA
-    RF_dist_types= ["TruncatedGaussian"]
-    RF_dist_params = [[1.,0.5,0]]
-    RF_corr_l = 0.1
-    RF_sampling_type="MC"
+    RF_dist_types = randomParams.get('RF_dist_types')
+    RF_dist_params = randomParams.get('RF_dist_params')
+    RF_corr_l = randomParams.get('RF_corr_l')
+    RF_sampling_type = randomParams.get('RF_sampling_type')
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
         # RF = RandomField(RF_dimension,RF_dist_types,RF_dist_params,geoName,RF_corr_l,"text",[z_min,z_max],RF_sampling_type)

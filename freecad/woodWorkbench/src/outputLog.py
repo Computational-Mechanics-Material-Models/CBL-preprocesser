@@ -11,7 +11,7 @@ def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams):
+        knotFlag, knotParams, randomFlag, randomParams):
 
     # Generate log file
     logfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-input.cwPar'),'w')        
@@ -65,6 +65,12 @@ def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
     logfile.write('a2= ' + str(knotParams.get('a2')) + '\n') 
     logfile.write('m1= ' + str(knotParams.get('m1')) + '\n')
     logfile.write('m2= ' + str(knotParams.get('m2')) + '\n') 
+
+    logfile.write('randomFlag= ' + str(randomFlag) + '\n')
+    logfile.write('dist_type= ' + str(randomParams.get('RF_dist_types')) + '\n')
+    logfile.write('dist_params= ' + str(randomParams.get('RF_dist_params')) + '\n')
+    logfile.write('corr_l= ' + str(randomParams.get('RF_corr_l')) + '\n') 
+    logfile.write('sampling_type= ' + str(randomParams.get('RF_sampling_type')) + '\n')
 
     logfile.write('x_notch_size= ' + str(x_notch_size) + '\n')
     logfile.write('y_notch_size= ' + str(y_notch_size) + '\n')   
