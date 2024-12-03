@@ -13,6 +13,7 @@ from scipy.spatial.distance import cdist
 from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.path as mpltPath
 from scipy.spatial import cKDTree
 from scipy.spatial import ConvexHull
 from scipy.spatial import Voronoi, voronoi_plot_2d
@@ -44,6 +45,16 @@ def calc_knotstream(y,z,m1,m2,a1,a2,Uinf):
     psi = psi_frstr + psi_src + psi_snk
 
     return psi
+
+def sort_coordinates(coords):
+    # from https://pavcreations.com/clockwise-and-counterclockwise-sorting-of-coordinates/
+    x = coords[0,:]
+    y = coords[1,:]
+    cx = np.mean(x)
+    cy = np.mean(y)
+    angles = np.arctan2(x-cx, y-cy)
+    indices = np.argsort(angles)
+    return coords[:,indices]
 
 def intersect2D(a, b):
   """
@@ -191,6 +202,11 @@ def check_iscollinear(p1,p2,boundaries):
                 
     return collinear
 
+def check_collinear(p0, p1, p2):
+    x1, y1 = p1[0] - p0[0], p1[1] - p0[1]
+    x2, y2 = p2[0] - p0[0], p2[1] - p0[1]
+    return abs(x1 * y2 - x2 * y1) < 1e-12
+
 def rotate_around_point_highperf(xy, radians, origin=(0, 0)):
     """Rotate a point around a given point.
     
@@ -208,268 +224,6 @@ def rotate_around_point_highperf(xy, radians, origin=(0, 0)):
     qy = offset_y + -sin_rad * adjusted_x + cos_rad * adjusted_y
 
     return qx, qy
-
-
-# def Clipping_Box(box_shape,box_center,box_size, box_width, box_depth,boundaryFlag,x_notch_size,y_notch_size):
-#     """
-#     clipping box for the 2D Voronoi diagram
-#     """
-    
-#     if box_shape in ['square','Square','SQUARE','cube','Cube','CUBE','s']: # square box
-#         x_min = box_center[0] - box_size/2
-#         x_max = box_center[0] + box_size/2 
-#         y_min = box_center[1] - box_size/2
-#         y_max = box_center[1] + box_size/2
-        
-#         boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-#         l0 = [(x_min, y_min), (x_max, y_min)]
-#         l1 = [(x_max, y_min), (x_max, y_max)]
-#         l2 = [(x_max, y_max), (x_min, y_max)]
-#         l3 = [(x_min, y_max), (x_min, y_min)]
-#         boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-
-#         if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-#             boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-#         else:
-#             boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-    
-#     elif box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangle box
-#         x_min = box_center[0] - box_width/2
-#         x_max = box_center[0] + box_width/2 
-#         y_min = box_center[1] - box_depth/2
-#         y_max = box_center[1] + box_depth/2
-        
-#         boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-#         l0 = [(x_min, y_min), (x_max, y_min)]
-#         l1 = [(x_max, y_min), (x_max, y_max)]
-#         l2 = [(x_max, y_max), (x_min, y_max)]
-#         l3 = [(x_min, y_max), (x_min, y_min)]
-#         boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-
-#         if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-#             boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-#         else:
-#             boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-
-#     elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE','rectangle','Rectangle','RECTANGLE','cube','Cube','CUBE','s']: # notched sqaure box
-#         x_min = box_center[0] - box_size/2
-#         x_max = box_center[0] + box_size/2
-#         y_min = box_center[1] - box_size/2
-#         y_max = box_center[1] + box_size/2
-#         x_notch = x_min + x_notch_size
-#         y_notch_min = box_center[1] - y_notch_size/2
-#         y_notch_max = box_center[1] + y_notch_size/2
-        
-#         boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
-#                             [x_notch,y_notch_min],[x_min,y_notch_min]])
-            
-#         l0 = [(x_min, y_min), (x_max, y_min)]
-#         l1 = [(x_max, y_min), (x_max, y_max)]
-#         l2 = [(x_max, y_max), (x_min, y_max)]
-#         l3 = [(x_min, y_max), (x_min, y_notch_max)]
-#         l4 = [(x_min, y_notch_max), (x_notch, y_notch_max)]
-#         l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
-#         l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
-#         l7 = [(x_min,y_notch_min), (x_min, y_min)]
-        
-#         boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
-        
-#         if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-#             boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-#         else:
-#             boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-            
-#     elif box_shape in ['triangle','Triangle','TRIANGLE','triangular','Triangular','TRIANGULAR','tri','Tri','TRI','^']: # Triangle box
-#         x_0 = box_center[0] - box_size
-#         x_1 = box_center[0]
-#         x_2 = box_center[0] + box_size
-#         y_0 = box_center[1]
-#         y_1 = box_center[1] + box_size*np.sqrt(3)
-#         boundary_points = np.array([[x_0, y_0], [x_2, y_0], [x_1, y_1]])
-        
-#         l0 = [(x_0, y_0), (x_2, y_0)]
-#         l1 = [(x_2, y_0), (x_1, y_1)]
-#         l2 = [(x_1, y_1), (x_0, y_0)]
-        
-#         boundaries = [('bottom', l0), ('top-right', l1), ('top-left', l2)]
-        
-#         if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-#             boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,edgecolor='k',facecolor='none')
-#         else:
-#             boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
-        
-#         x_min = x_0
-#         x_max = x_2
-#         y_min = y_0
-#         y_max = y_1
-        
-#     elif box_shape in ['hexagon','Hexagon','HEXAGON','hexagonal','Hexagonal','HEXAGONAL','hex','Hex','HEX','h']: # hexagonal box
-#         x_0 = box_center[1] - box_size
-#         x_1 = box_center[1] - box_size/2.0
-#         x_2 = box_center[1] + box_size/2.0
-#         x_3 = box_center[1] + box_size
-#         y_0 = box_center[0] - box_size/2*np.sqrt(3)
-#         y_1 = box_center[0]
-#         y_2 = box_center[0] + box_size/2*np.sqrt(3)
-        
-#         boundary_points = np.array([[x_1, y_0], [x_2, y_0], [x_3, y_1], [x_2, y_2], [x_1, y_2], [x_0, y_1]])
-        
-#         l0 = [(x_1, y_0), (x_2, y_0)]
-#         l1 = [(x_2, y_0), (x_3, y_1)]
-#         l2 = [(x_3, y_1), (x_2, y_2)]
-#         l3 = [(x_2, y_2), (x_1, y_2)]
-#         l4 = [(x_1, y_2), (x_0, y_1)]
-#         l5 = [(x_0, y_1), (x_1, y_0)]
-        
-#         boundaries = [('bottom', l0), ('bottom-right', l1), ('top-right', l2), ('top', l3), ('top-left', l4), ('bottom-left', l5)]
-        
-#         if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-#             boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,edgecolor='k',facecolor='none')
-#         else:
-#             boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
-        
-#         x_min = x_0
-#         x_max = x_3
-#         y_min = y_0
-#         y_max = y_2
-        
-#     else:
-#         print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
-#         print('Now exitting...')
-#         exit()
-        
-#     return x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines
-
-def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size=0,y_notch_size=0):
-    """
-    clipping box for the 2D Voronoi diagram
-    """
-    
-    if box_shape in ['square','Square','SQUARE']: # square box
-        x_min = box_center[0] - box_size/2
-        x_max = box_center[0] + box_size/2 
-        y_min = box_center[1] - box_size/2
-        y_max = box_center[1] + box_size/2
-        
-        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-        l0 = [(x_min, y_min), (x_max, y_min)]
-        l1 = [(x_max, y_min), (x_max, y_max)]
-        l2 = [(x_max, y_max), (x_min, y_max)]
-        l3 = [(x_min, y_max), (x_min, y_min)]
-        boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-        
-    if box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangular box
-        x_min = box_center[0] - box_width/2
-        x_max = box_center[0] + box_width/2 
-        y_min = box_center[1] - box_depth/2
-        y_max = box_center[1] + box_depth/2
-        
-        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-        l0 = [(x_min, y_min), (x_max, y_min)]
-        l1 = [(x_max, y_min), (x_max, y_max)]
-        l2 = [(x_max, y_max), (x_min, y_max)]
-        l3 = [(x_min, y_max), (x_min, y_min)]
-        boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-
-    elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE','rectangle','Rectangle','RECTANGLE','cube','Cube','CUBE','s']: # notched sqaure box
-        x_min = box_center[0] - box_size/2
-        x_max = box_center[0] + box_size/2
-        y_min = box_center[1] - box_size/2
-        y_max = box_center[1] + box_size/2
-        x_notch = x_min + x_notch_size
-        y_notch_min = box_center[1] - y_notch_size/2
-        y_notch_max = box_center[1] + y_notch_size/2
-        
-        boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
-                            [x_notch,y_notch_min],[x_min,y_notch_min]])
-            
-        l0 = [(x_min, y_min), (x_max, y_min)]
-        l1 = [(x_max, y_min), (x_max, y_max)]
-        l2 = [(x_max, y_max), (x_min, y_max)]
-        l3 = [(x_min, y_max), (x_min, y_notch_max)]
-        l4 = [(x_min, y_notch_max), (x_notch, y_notch_max)]
-        l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
-        l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
-        l7 = [(x_min,y_notch_min), (x_min, y_min)]
-        
-        boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
-        
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-            
-    elif box_shape in ['triangle','Triangle','TRIANGLE','triangular','Triangular','TRIANGULAR','tri','Tri','TRI','^']: # Triangle box
-        x_0 = box_center[0] - box_size
-        x_1 = box_center[0]
-        x_2 = box_center[0] + box_size
-        y_0 = box_center[1]
-        y_1 = box_center[1] + box_size*np.sqrt(3)
-        boundary_points = np.array([[x_0, y_0], [x_2, y_0], [x_1, y_1]])
-        
-        l0 = [(x_0, y_0), (x_2, y_0)]
-        l1 = [(x_2, y_0), (x_1, y_1)]
-        l2 = [(x_1, y_1), (x_0, y_0)]
-        
-        boundaries = [('bottom', l0), ('top-right', l1), ('top-left', l2)]
-        
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
-        
-        x_min = x_0
-        x_max = x_2
-        y_min = y_0
-        y_max = y_1
-        
-    elif box_shape in ['hexagon','Hexagon','HEXAGON','hexagonal','Hexagonal','HEXAGONAL','hex','Hex','HEX','h']: # hexagonal box
-        x_0 = box_center[1] - box_size
-        x_1 = box_center[1] - box_size/2.0
-        x_2 = box_center[1] + box_size/2.0
-        x_3 = box_center[1] + box_size
-        y_0 = box_center[0] - box_size/2*np.sqrt(3)
-        y_1 = box_center[0]
-        y_2 = box_center[0] + box_size/2*np.sqrt(3)
-        
-        boundary_points = np.array([[x_1, y_0], [x_2, y_0], [x_3, y_1], [x_2, y_2], [x_1, y_2], [x_0, y_1]])
-        
-        l0 = [(x_1, y_0), (x_2, y_0)]
-        l1 = [(x_2, y_0), (x_3, y_1)]
-        l2 = [(x_3, y_1), (x_2, y_2)]
-        l3 = [(x_2, y_2), (x_1, y_2)]
-        l4 = [(x_1, y_2), (x_0, y_1)]
-        l5 = [(x_0, y_1), (x_1, y_0)]
-        
-        boundaries = [('bottom', l0), ('bottom-right', l1), ('top-right', l2), ('top', l3), ('top-left', l4), ('bottom-left', l5)]
-        
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
-        
-        x_min = x_0
-        x_max = x_3
-        y_min = y_0
-        y_max = y_2
-        
-    else:
-        print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
-        print('Now exitting...')
-        exit()
-        
-    return x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines
-
 
 def relax_points(vor,omega):
     """
@@ -494,7 +248,6 @@ def relax_points(vor,omega):
         centroids[i,:] = centroid
         
     return centroids # store the centroids as the new point positions
-
 
 def find_centroid(vertices,omega):
     """
@@ -523,22 +276,163 @@ def find_centroid(vertices,omega):
     return np.array([[centroid_x, centroid_y]])
 
 def find_intersect(p,normal,boundaries):
+
     # Find the intersect point of infinite ridges (rays) with the boundary lines
     # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
 
-        for boundary in boundaries: # loop over boundary lines
-            q = np.asarray(boundary[1][0])
-            s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-            t = np.cross((q-p),s)/np.cross(normal,s)
-            u = np.cross((q-p),normal)/np.cross(normal,s)
-            
-            if (u >= 0) and (u <= 1):
-                if (t >= 0) and math.isfinite(t):
-                    t_final = t
-                            
-        intersect_point = p + normal * t_final
+    for boundary in boundaries: # loop over boundary lines
+        q = np.asarray(boundary[1][0])
+        s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+        t = np.cross((q-p),s)/np.cross(normal,s)
+        u = np.cross((q-p),normal)/np.cross(normal,s)
+        
+        if (u >= 0) and (u <= 1):
+            if (t >= 0) and math.isfinite(t):
+                t_final = t
+                intersect_point = p + normal * t_final
+                return intersect_point
+    print('no intersect found')
+    print(p, normal)
+    return np.empty([0,2])
 
-        return intersect_point
+
+def Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size,y_notch_size):
+    """
+    clipping box for the 2D Voronoi diagram
+    """
+
+    if box_shape in ['square','Square','SQUARE']: # square box
+        x_min = box_center[0] - box_size/2
+        x_max = box_center[0] + box_size/2 
+        y_min = box_center[1] - box_size/2
+        y_max = box_center[1] + box_size/2
+        
+        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+        l0 = [(x_min, y_min), (x_max, y_min)]
+        l1 = [(x_max, y_min), (x_max, y_max)]
+        l2 = [(x_max, y_max), (x_min, y_max)]
+        l3 = [(x_min, y_max), (x_min, y_min)]
+        boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
+
+        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
+        else:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
+
+        
+    if box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangular box
+        x_min = box_center[0] - box_width/2
+        x_max = box_center[0] + box_width/2 
+        y_min = box_center[1] - box_depth/2
+        y_max = box_center[1] + box_depth/2
+        
+        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+        l0 = [(x_min, y_min), (x_max, y_min)]
+        l1 = [(x_max, y_min), (x_max, y_max)]
+        l2 = [(x_max, y_max), (x_min, y_max)]
+        l3 = [(x_min, y_max), (x_min, y_min)]
+        boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
+
+        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
+        else:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
+
+
+    elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE']: # notched sqaure box
+        x_min = box_center[0] - box_size/2
+        x_max = box_center[0] + box_size/2
+        y_min = box_center[1] - box_size/2
+        y_max = box_center[1] + box_size/2
+        x_notch = x_min + x_notch_size
+        y_notch_min = box_center[1] - y_notch_size/2
+        y_notch_max = box_center[1] + y_notch_size/2
+        
+        boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
+                            [x_notch,y_notch_min],[x_min,y_notch_min]])
+            
+        l0 = [(x_min, y_min), (x_max, y_min)]
+        l1 = [(x_max, y_min), (x_max, y_max)]
+        l2 = [(x_max, y_max), (x_min, y_max)]
+        l3 = [(x_min, y_max), (x_min, y_notch_max)]
+        l4 = [(x_min, y_notch_max), (x_notch, y_notch_max)]
+        l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
+        l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
+        l7 = [(x_min,y_notch_min), (x_min, y_min)]
+
+        
+        boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
+        
+        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
+        else:
+            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
+            
+    # elif box_shape in ['triangle','Triangle','TRIANGLE','triangular','Triangular','TRIANGULAR','tri','Tri','TRI','^']: # Triangle box
+    #     x_0 = box_center[0] - box_size
+    #     x_1 = box_center[0]
+    #     x_2 = box_center[0] + box_size
+    #     y_0 = box_center[1]
+    #     y_1 = box_center[1] + box_size*np.sqrt(3)
+    #     boundary_points = np.array([[x_0, y_0], [x_2, y_0], [x_1, y_1]])
+        
+    #     l0 = [(x_0, y_0), (x_2, y_0)]
+    #     l1 = [(x_2, y_0), (x_1, y_1)]
+    #     l2 = [(x_1, y_1), (x_0, y_0)]
+        
+    #     boundaries = [('bottom', l0), ('top-right', l1), ('top-left', l2)]
+        
+    #     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+    #         boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,edgecolor='k',facecolor='none')
+    #     else:
+    #         boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
+        
+    #     x_min = x_0
+    #     x_max = x_2
+    #     y_min = y_0
+    #     y_max = y_1
+        
+    # elif box_shape in ['hexagon','Hexagon','HEXAGON','hexagonal','Hexagonal','HEXAGONAL','hex','Hex','HEX','h']: # hexagonal box
+    #     x_0 = box_center[1] - box_size
+    #     x_1 = box_center[1] - box_size/2.0
+    #     x_2 = box_center[1] + box_size/2.0
+    #     x_3 = box_center[1] + box_size
+    #     y_0 = box_center[0] - box_size/2*np.sqrt(3)
+    #     y_1 = box_center[0]
+    #     y_2 = box_center[0] + box_size/2*np.sqrt(3)
+        
+    #     boundary_points = np.array([[x_1, y_0], [x_2, y_0], [x_3, y_1], [x_2, y_2], [x_1, y_2], [x_0, y_1]])
+        
+    #     l0 = [(x_1, y_0), (x_2, y_0)]
+    #     l1 = [(x_2, y_0), (x_3, y_1)]
+    #     l2 = [(x_3, y_1), (x_2, y_2)]
+    #     l3 = [(x_2, y_2), (x_1, y_2)]
+    #     l4 = [(x_1, y_2), (x_0, y_1)]
+    #     l5 = [(x_0, y_1), (x_1, y_0)]
+        
+    #     boundaries = [('bottom', l0), ('bottom-right', l1), ('top-right', l2), ('top', l3), ('top-left', l4), ('bottom-left', l5)]
+        
+    #     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+    #         boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,edgecolor='k',facecolor='none')
+    #     else:
+    #         boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
+        
+    #     x_min = x_0
+    #     x_max = x_3
+    #     y_min = y_0
+    #     y_max = y_2
+        
+    else:
+        print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
+        print('Now exitting...')
+        exit()
+
+    poly_path = mpltPath.Path(boundary_points.tolist())
+    path_in = poly_path.contains_points(sites)
+    sites_in = sites[path_in]
+        
+    return sites_in,x_min,x_max,y_min,y_max,boundaries,boundary_points,boundarylines
+
 
 def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
                          width_sparse,width_dense,cellsize_sparse,cellsize_dense,\
@@ -737,11 +631,10 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
 
     # generate point at center    
     sites = np.array([[-0.01,0.01],[0.01,-0.01]])
-    # sites = np.array([[-0.01,0.01],[0.01,-0.01],[0.01,0.01],[-0.01,-0.01]])
+    # sites = np.array([[-0.0125,0.0125],[0.0125,-0.0125],[0.0125,0.0125],[-0.0125,-0.0125]])
     # sites = np.array([[0.0,0.0]])
 
     return sites, radii
-
 
 
 def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,boundaryFlag):
@@ -1113,6 +1006,7 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
 
             pr = vorsci.point_region[p] # index of voronoi region
             pv = vorsci.regions[pr] # vertices of voronoi region
+            refpt = (delaun_nodes[nd[0],1:3] + delaun_nodes[nd[1],1:3])/2 # average xy of top/bot of long element to get average xy location
 
             if (-1) in pv: # check if boundary cell, as noted by -1 for vertice index
                 # this part gets the intersection of the infinite ray and a perpindicular line 
@@ -1136,7 +1030,9 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
                             # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
                             p = coord
                             normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                            int_pts[i,:] = find_intersect(coord,normal,boundaries)
+                            intpts = find_intersect(coord,normal,boundaries)
+                            if intpts.any():
+                                int_pts[i,:] = intpts
                         coords_out = np.vstack([coords_out,int_pts])
                 else: # side element, may or may not be touching a corner
 
@@ -1151,33 +1047,34 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
                             # Find the intersect point of infinite ridges (rays) with the boundary lines
                             p = coord
                             normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                            int_pts[i,:] = find_intersect(coord,normal,boundaries)
+                            intpts = find_intersect(coord,normal,boundaries)
+                            if intpts.any():
+                                int_pts[i,:] = intpts
                         if np.size(inds) > 1:
-                            refpt = (delaun_nodes[nd[0],1:3] + delaun_nodes[nd[1],1:3])/2 # average xy of top/bot of long element to get average xy location
                             index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
                             int_pts = int_pts[index,:]
                         coords_out = np.vstack([coords_out,int_pts])
 
                 coords = np.vstack([coords_int,coords_out])    # combine interior with exterior nodes     
-                flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
-                el_vol = el_len*flow_area/3 # element volume
-
+                # flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
+                # el_vol = el_len*flow_area/3 # element volume
             else:
                 coords = vorsci.vertices[pv] # coordinates of voronoi vertices
-                # calculate the flux area of voronoi region of arbitrary shape by the shoelace formula
-                flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
-                el_vol = el_len*flow_area/3 # element volume
-            
+
+            # calculate the flux area of voronoi region of arbitrary shape by the shoelace formula
+            coords_sort = sort_coordinates(coords)
+            flow_area = 0.5*np.abs(np.dot(coords_sort[:,0],np.roll(coords_sort[:,1],1))-np.dot(coords_sort[:,1],np.roll(coords_sort[:,0],1))) 
+            el_vol = el_len*flow_area/3 # element volume
             delaun_elems_long[nel_l,3] = flow_area
             delaun_elems_long[nel_l,4] =  el_vol
-            # if el_vol == 0:
+            # if el_vol == 0: # corner elements
             #     print('vol',nel_l,pv,coords)
             delaun_elems_long[nel_l,5] = typeFlag
             # delaun_elems_long[nel_l,6:len(pv)+6] =  pv
 
     # transverse elements
     for l in range(0,nsegments): # each segment
-        el_h = segment_length + connector_l_length # element height if at top or bottom (one less connector)
+        el_h = segment_length + connector_l_length # element height 
         typeFlag = 2
         for r in range(0,nrdgs):
             nel_t = r + l*nrdgs # element index
@@ -1191,15 +1088,21 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
 
             pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
             coordsv = vorsci.vertices[pv] # 2D vor coords
-            vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
-            flow_area = vor_len*el_h # flux area
+            # unsure if this is fully correct
+            if (check_iscollinear(coordsd[0,:],coordsd[1,:],boundaries) > 0): # check if the flow element is collinear with boundaries
+                # no flow volume on boundary
+                vor_len = 0
+                flow_area = vor_len*el_h 
+            else:
+                vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+                flow_area = vor_len*el_h # flux area
             delaun_elems_trans[nel_t,3] = flow_area 
             el_vol = el_len*flow_area/3 # element volume
             delaun_elems_trans[nel_t,4] = el_vol
             delaun_elems_trans[nel_t,5] = typeFlag # element type
 
             # delaun_elems_trans[nel_t,6:8] = pv # mark relevant 2D voronoi ridge for possible reference
-        
+    
     # print(nels_long,nel_l,nels_trans,nel_t,nels)
     delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
 
@@ -1331,11 +1234,11 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     for i in range(0,len(ttray_origins)):
         p = ttvertices[ttray_origins[i]]
         normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal                 
-        intersect_point = find_intersect(p,normal,boundaries)
-        boundary_points.append(intersect_point)
+        intpts = find_intersect(p,normal,boundaries)
+        if intpts.any():
+            boundary_points.append(intpts)
 
     boundary_points = np.asarray(boundary_points)
-    nboundary_pts_featured = 0
 
     nvertices_in = voronoi_vertices_in.shape[0]
     nboundary_pts = boundary_points.shape[0]
@@ -1380,7 +1283,7 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     
     return voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
+        nboundary_pts,voronoi_ridges,nridge
   
 
 def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,merge_tol,boundaryFlag):
@@ -2161,7 +2064,263 @@ def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttr
     return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
+
+
+def RebuildVoronoi_ConformingDelaunay_mergeNew(ttvertices,ttedges,ttray_origins,ttray_directions,\
+                                            boundaries,merge_tol,boundaryFlag):
+    """Clip Voronoi mesh by the boundaries, merge short Voronoi ridges, rebuild the new Voronoi mesh"""
+    # Store indices of Voronoi vertices for each finite ridge
+    finite_ridges = ttedges
+    infinite_ridges = np.zeros((ttray_origins.shape[0],2))
+    infinite_ridges[:,0] = ttray_origins
+    boundary_points = []
+    
+    # Form two new Voronoi vertices lists with and without out-of-bound vertices
+    voronoi_vertices_in = ttvertices
             
+    # Find the intersect point of infinite ridges (rays) with the boundary lines
+    for i in range(0,len(ttray_origins)):
+        p = ttvertices[ttray_origins[i]]
+        normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal                 
+        intpts = find_intersect(p,normal,boundaries)
+        if intpts.any():
+            boundary_points.append(intpts)
+
+    boundary_points = np.asarray(boundary_points)
+
+    nvertices_in = voronoi_vertices_in.shape[0]
+    nboundary_pts = boundary_points.shape[0]
+    finite_ridges = np.asarray(finite_ridges)
+    nfinite_ridge = finite_ridges.shape[0]
+
+    ninfinite_ridge = infinite_ridges.shape[0]
+           
+    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
+    finite_ridges_new = np.copy(finite_ridges)
+    infinite_ridges_new = np.copy(infinite_ridges)
+    for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
+        infinite_ridges_new[i,1] = nvertices_in + i
+    
+    # Merge operation
+    # Case 1 merge
+    voronoi_vertices_in_whole = np.copy(voronoi_vertices_in)
+    tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
+    rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
+    rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
+        
+    finite_ridges_merged = np.copy(finite_ridges_new)
+    infinite_ridges_merged = np.copy(infinite_ridges_new)
+    while len(rows_to_fuse_voronoi_vertices_in) != 0:
+        points_new = np.reshape(voronoi_vertices_in_whole[rows_to_fuse_voronoi_vertices_in_whole],(-1,2))
+        voronoi_vertices_in_fused = 0.5*(points_new[0::2] + points_new[1::2])
+        
+        # voronoi_vertices_in_fused = voronoi_vertices_in_fused.round(decimals=0)
+        voronoi_vertices_in_fused = np.round(voronoi_vertices_in_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
+
+        # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
+        if len(np.unique(voronoi_vertices_in_fused,axis=0)) != len(voronoi_vertices_in_fused):
+            [unique_pts,unique_inverse] = np.unique(voronoi_vertices_in_fused,return_inverse=True,axis=0)
+            
+            # Offset the indices of boundary points as we inserted points in vertice_in list
+            infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(unique_pts)
+            # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+            for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
+                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
+                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
+                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
+                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
+            voronoi_vertices_in_fused = unique_pts.astype(float)
+        else:
+            # Offset the indices of boundary points as we inserted points in vertice_in list
+            infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(rows_to_fuse_voronoi_vertices_in_whole)
+            # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+            for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
+                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
+                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
+                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
+                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
+                
+        voronoi_vertices_in_whole = np.vstack((voronoi_vertices_in_whole,voronoi_vertices_in_fused)) # create a whole vertex list
+        voronoi_vertices_in_new = np.vstack((np.delete(voronoi_vertices_in,rows_to_fuse_voronoi_vertices_in,0),voronoi_vertices_in_fused)) # create a new vertex list
+        # update the voronoi_vertices_in
+        voronoi_vertices_in = np.copy(voronoi_vertices_in_new)
+        nvertices_in = voronoi_vertices_in_whole.shape[0]
+        # update the kd-tree
+        tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
+        rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
+        # update the rows_to_fuse_voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
+        rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
+        for i in range(0,len(rows_to_fuse_voronoi_vertices_in)):
+            rows_to_fuse_voronoi_vertices_in_whole[i,0] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,0],:],axis=1))[0][0]
+            rows_to_fuse_voronoi_vertices_in_whole[i,1] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,1],:],axis=1))[0][0]
+
+    # delete rows with identical indices and reverse indices in finite_ridges_merged
+    zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+    finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+    
+    # delete rows with identical indices and reverse indices in infinite_ridges_merged
+    zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+    infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+    
+    if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+        # construct the connectivity for a line path consisting of the boundary points
+        boundary_ridges_new = np.zeros(boundary_points.shape)
+        boundary_points_new = np.copy(boundary_points) 
+        next_point = np.copy(boundary_points_new[0])  # get first point
+        boundary_points_new[0] = [np.inf,np.inf]
+        
+        for i in range(0,boundary_points_new.shape[0]-1):
+            next_point_id = cdist([next_point], boundary_points_new).argmin()
+            boundary_ridges_new[i,1] = next_point_id
+            boundary_ridges_new[i+1,0] = next_point_id
+            next_point = np.copy(boundary_points_new[next_point_id])
+            boundary_points_new[next_point_id] = [np.inf,np.inf]
+                
+        boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
+        
+        # Case 2 merge
+        tree_boundary_points = cKDTree(boundary_points)
+        rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
+        rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
+        boundary_ridges_merged = np.copy(boundary_ridges_new)
+        nboundary_pts = boundary_points.shape[0]
+        boundary_points_whole = np.copy(boundary_points)
+        
+        while len(rows_to_fuse_boundary_points) != 0:
+            points_new = np.reshape(boundary_points_whole[rows_to_fuse_boundary_points_whole],(-1,2))
+            boundary_points_fused = 0.5*(points_new[0::2] + points_new[1::2])
+            
+            # boundary_points_fused = boundary_points_fused.round(decimals=0)
+            boundary_points_fused = np.round(boundary_points_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
+            
+            # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
+            if len(np.unique(boundary_points_fused,axis=0)) != len(boundary_points_fused):
+                [unique_pts,unique_inverse] = np.unique(boundary_points_fused,return_inverse=True,axis=0)
+                # Replace the indices of closeby points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+                for i in range(0,len(rows_to_fuse_boundary_points)):
+                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+                boundary_points_fused = unique_pts.astype(float)
+            else:
+                # Replace the indices of two close points with the index of new merged point in both boundary_ridges_new and infinite_ridges_new lists
+                for i in range(0,len(rows_to_fuse_boundary_points)):
+                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
+                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
+                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
+                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
+                    
+            boundary_points_whole = np.vstack((boundary_points_whole,boundary_points_fused)) # create a whole vertex list        
+            boundary_points_new = np.vstack((np.delete(boundary_points,rows_to_fuse_boundary_points,0),boundary_points_fused)) # create a new vertex list
+            
+            # update the boundary_points
+            boundary_points = np.copy(boundary_points_new)
+            nboundary_pts = boundary_points_whole.shape[0]
+            # update the kd-tree
+            tree_boundary_points = cKDTree(boundary_points)
+            rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
+            # update the rows_to_fuse in list voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
+            rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
+            for i in range(0,len(rows_to_fuse_boundary_points)):
+                rows_to_fuse_boundary_points_whole[i,0] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,0],:],axis=1))[0][0]
+                rows_to_fuse_boundary_points_whole[i,1] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,1],:],axis=1))[0][0]
+        
+                    
+        # delete rows with identical indices and reverse indices in finite_ridges_merged
+        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)      
+        # delete rows with identical indices and reverse indices in infinite_ridges_merged
+        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)      
+        # delete rows with identical indices and reverse indices in boundary_ridges_merged
+        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+        # delete rows with identical indices and reverse indices in infinite_ridges_merged
+        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0).astype(int)
+        
+        # Case 3 merge (after loop of case 1 and 2)
+        for i in range(0,len(boundary_points)):
+            rows_to_replace_voronoi_vertices_in = tree_voronoi_vertices_in.query_ball_point(boundary_points[i,:],merge_tol)
+            if len(rows_to_replace_voronoi_vertices_in) != 0:
+                # update the rows_to_place_voronoi_vertices_in with the rows-to-replace in list voronoi_vertices_in_whole
+                rows_to_replace_voronoi_vertices_in_whole = np.copy(rows_to_replace_voronoi_vertices_in)
+                for j in range(0,len(rows_to_replace_voronoi_vertices_in_whole)):
+                    rows_to_replace_voronoi_vertices_in_whole[j] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in[rows_to_replace_voronoi_vertices_in[j],:],axis=1))[0][0]
+        
+                # replace indices
+                for rows in rows_to_replace_voronoi_vertices_in_whole:
+                    finite_ridges_merged[finite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
+                    infinite_ridges_merged[infinite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
+
+        zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+        finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+        
+        # delete rows with identical indices and reverse indices in infinite_ridges_merged
+        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+
+        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+        voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
+
+        all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged,boundary_ridges_merged)).astype(int)
+       
+    else:
+        boundary_points_whole = np.copy(boundary_points)
+        voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
+        all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged)).astype(int)
+  
+    
+    voronoi_vertices = np.unique(np.reshape(voronoi_vertices_whole[all_ridges_merged],(-1,2)),axis=0)
+    # update the indices from voronoi_vertices_whole to voronoi_vertices(which is the list with no useless points)
+    for i in range(0,len(finite_ridges_merged)):
+        finite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,0],:],axis=1))[0][0]
+        finite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,1],:],axis=1))[0][0]
+    for i in range(0,len(infinite_ridges_merged)):
+        infinite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,0],:],axis=1))[0][0]
+        infinite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,1],:],axis=1))[0][0]
+    if boundaryFlag in ['on','On','Y','y','Yes','yes']:  
+        for i in range(0,len(boundary_ridges_merged)):
+            boundary_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,0],:],axis=1))[0][0]
+            boundary_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,1],:],axis=1))[0][0]
+    # delete rows with identical indices and reverse indices in finite_ridges_merged
+    zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+    finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+    # delete rows with identical indices and reverse indices in infinite_ridges_merged
+    zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+    infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+    
+    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+        # delete rows with identical indices and reverse indices in boundary_ridges_merged
+        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+    
+    nvertex = voronoi_vertices.shape[0]
+    finite_ridges_new = finite_ridges_merged
+    nfinite_ridge = finite_ridges_new.shape[0]
+    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+        boundary_ridges_new = np.vstack((infinite_ridges_merged,boundary_ridges_merged))
+        nboundary_ridge = boundary_ridges_new.shape[0]
+        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+        nridge = voronoi_ridges.shape[0]
+        
+        intersect_temp = intersect2D(np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0),np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0))
+        nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0] - len(intersect_temp)
+        nboundary_pts = np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0).shape[0]
+    else:
+        boundary_ridges_new = np.copy(infinite_ridges_merged)  
+        nboundary_ridge = boundary_ridges_new.shape[0]
+        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+        nridge = voronoi_ridges.shape[0]
+        
+        nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0]
+        
+    
+    return voronoi_vertices,boundary_points,finite_ridges_new,\
+        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+        nboundary_pts,voronoi_ridges,nridge
+              
             
 def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,voronoi_vertices,nvertex,generation_center,knotFlag, knotParams,box_center,box_depth):
@@ -2251,6 +2410,7 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     # Vertex data in 3D
     voronoi_vertices_3D = np.reshape(vertices_new,(-1,3))
     nvertices_3D = voronoi_vertices_3D.shape[0]
+    voronoi_vertices_2D = voronoi_vertices_3D[0:npt_per_layer,0:2] # adhoc array for later use with random field
     
     # Voronoi ridge data in 3D 
     finite_ridges_3D = np.tile(finite_ridges_new, (nlayers,1)) # temporarily assume each layer has the same number of finite_ridges and same finite ridge connectivities
@@ -2269,7 +2429,7 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     
     
     return voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
-           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D
+           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D, voronoi_vertices_2D
         
         
 def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
@@ -2666,7 +2826,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                       nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                      randomFlag,random_field,knotParams,knotFlag,box_center):
+                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D):
     
     m1 = knotParams.get('m1')
     m2 = knotParams.get('m2')
@@ -2685,14 +2845,13 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     
     # calculate longitudinal connectors
     nlayers_conn_l = nsegments - 1
-    conn_l_ridge_index = flattened_all_vertices_2D[0,:].astype(int)
-    conn_l_lengths = flattened_all_vertices_2D[2,:]
-    # conn_l_widths = flattened_all_vertices_2D[3,:]  
-    conn_l_angles = flattened_all_vertices_2D[4,:]
+    conn_l_ridge_index_2D = flattened_all_vertices_2D[0,:].astype(int)
+    conn_l_lengths_2D = flattened_all_vertices_2D[2,:]
+    conn_l_angles_2D = flattened_all_vertices_2D[4,:]
     
-    conn_l_ridge_index = np.tile(conn_l_ridge_index,nlayers_conn_l)
-    conn_l_lengths = np.tile(conn_l_lengths,nlayers_conn_l)
-    conn_l_angles = np.tile(conn_l_angles,nlayers_conn_l)
+    conn_l_ridge_index = np.tile(conn_l_ridge_index_2D,nlayers_conn_l)
+    conn_l_lengths = np.tile(conn_l_lengths_2D,nlayers_conn_l)
+    conn_l_angles = np.tile(conn_l_angles_2D,nlayers_conn_l)
     
     for i in range(0,nlayers_conn_l):
         conn_l_angles[i*2*nridge:(i+1)*2*nridge] = conn_l_angles[i*2*nridge:(i+1)*2*nridge] - theta[(i+1)*nctrlpt_per_beam]
@@ -2700,9 +2859,17 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     rot = np.array([[np.cos(conn_l_angles), -np.sin(conn_l_angles)], [np.sin(conn_l_angles), np.cos(conn_l_angles)]]).T
     rot = np.hstack((rot[:,0,:],np.zeros(len(conn_l_angles))[:, np.newaxis])) # convert to 3D rotation matrix, assumes rotation remains still in-plane
     conn_l_tangents = rot
-    
-# Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
-# dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag] (22 elements)   
+            
+    ######################################################
+    # number of random field realizations is number of x-y points (i.e. one per beam column)
+    nrf = np.shape(voronoi_vertices_2D)[0]
+    # Create random field realizations
+    if randomFlag in ['on','On','Y','y','Yes','yes']:
+        random_field.generateRandVariables(nrf, seed = 8) # generation of random numbers, critical step
+        random_field.generateFieldOnGrid()                  # calculation of preparation files, can be used for any geometry
+        
+    # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
+    # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag] (22 elements)   
     Meshdata = np.zeros((nel_con,28))
     
     if knotFlag == 'On':
@@ -2711,11 +2878,11 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         ktol = 0.0
     # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for l)
     for i in range(0,nel_con_tbot): # transverse bottom of beam
-        Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:]
-        Meshdata[i,3:6] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,1]-1,:]
-        Meshdata[i,22] = height_connector_t
-        Meshdata[i,24] = 1
-        psi = calc_knotstream(Meshdata[i,1]-box_center[1],Meshdata[i,2],m1,m2,a1,a2,Uinf)
+        Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:] # xyzz coords of first half
+        Meshdata[i,3:6] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,1]-1,:] # xyz coords of second half
+        Meshdata[i,22] = height_connector_t # connector length
+        Meshdata[i,24] = 1 # connector type
+        psi = calc_knotstream(Meshdata[i,1]-box_center[1],Meshdata[i,2],m1,m2,a1,a2,Uinf) # check if in knot 
         if abs(psi) < ktol:
             Meshdata[i,25] = 1
     for i in range(0,nel_con_treg): # transverse mid beam
@@ -2739,10 +2906,15 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,22] = conn_l_lengths[i]
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,24] = 4
+        if randomFlag in ['on','On','Y','y','Yes','yes']:
+            rf_ind = np.where((voronoi_vertices_2D==Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,0:2]).all(axis=1))[0]
+            rf_val = random_field.getFieldEOLE(np.array([[Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,2],0,0]]),rf_ind) # EOLE projection with z value
+            Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,23] = rf_val
+        else:
+            Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,23] = 1
         psi = calc_knotstream(Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,1]-box_center[1],Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,2],m1,m2,a1,a2,Uinf)
         if abs(psi) < ktol:
             Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,25] = 1
-
     
     # Calculate connector center    
     Meshdata[:,6:9] = (Meshdata[:,0:3] + Meshdata[:,3:6])/2
@@ -2751,15 +2923,6 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # Calculate distance from center to vertex 2
     Meshdata[:,12:15] = Meshdata[:,6:9] - Meshdata[:,3:6]
 
-    # Add random field h(x) 
-    if randomFlag in ['on','On','Y','y','Yes','yes']:
-        random_field.GenerateRandVariables(5, seed = 8) # generation of random numbers, critical step
-        random_field.precomputeEOLE()                  # calculation of preparation files, can be used for any LDPM geometry
-        GF = random_field.GenerateField(Meshdata[:,6:9])           # EOLE projection
-        Meshdata[:,23] = GF[0,:,0]
-    else:
-        GF = np.ones(nel_con)
-        Meshdata[:,23] = GF
 
     # Calculate unit t vector
     tvects = np.zeros((nel_con,3))
@@ -2776,7 +2939,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     Meshdata[:,18:21] = nvects
 
     
-    # Add z-variation/random field for cellwall thicknesses/connector widths
+    # Add z-variation for cellwall thicknesses/connector widths
     for i in range(0,nridge):
         Meshdata[i,21] = all_vertices_2D[connector_t_bot_connectivity[i,1]-1,3+max_wings*3] # assign widths to all bot transverse connectors
     Meshdata[:nel_con-nel_con_l,21] = np.tile(Meshdata[0:nridge,21],3*nsegments) # use the same widths for reg and top transverse connectors
@@ -2803,7 +2966,7 @@ Number of top connectors\n'+ str(nel_con_ttop) +
 '\n\
 Number of long connectors\n'+ str(nel_con_l) +
 '\n\
-[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag]', comments='')  
+[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag 0 0]', comments='')  
 
     return Meshdata,conn_l_tangents,height_connector_t
 

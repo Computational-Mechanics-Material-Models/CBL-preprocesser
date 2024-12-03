@@ -41,7 +41,7 @@ from freecad.woodWorkbench.src.chronoInput import chronoInput
 from freecad.woodWorkbench.src.chronoInput import chronoAux
 
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
-from freecad.woodWorkbench.tools.rand_field_generator import RandomField
+from freecad.woodWorkbench.tools.rf_generator import RandomField
 
 
 def main(self):
@@ -72,6 +72,8 @@ def main(self):
     # height = z_max-z_min
     # nsegments = int(height/grain_length)
     # z_max = 100
+
+    print(x_notch_size, y_notch_size)
     
 
     # ==================================================================
@@ -100,14 +102,14 @@ def main(self):
     visualFilesName = geoName + '_visualFiles'
 
     # Write input parameters to log file for repeated use
-    outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
-        r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
+    outputLog(geoName, radial_growth_rule, iter_max, \
+        r_min, r_max, nrings, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-        boundaryFlag, box_shape, box_center, box_size, box_height, \
-        nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
+        boundaryFlag, box_shape, box_center, box_height, \
+        nsegments, theta_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, randomFlag, NURBS_degree, box_width, box_depth, visFlag, \
+        stlFlag, inpFlag, inpType, box_width, box_depth, visFlag, \
         knotFlag, knotParams, randomFlag, randomParams)
         
 
@@ -189,13 +191,8 @@ def main(self):
     self.form[1].statusWindow.setText("Status: Defining Boundaries.") 
     # ==================================================================
     # Clipping box (boundaries) of the model
-    x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
-        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,boundaryFlag)
-
-    sites_in = []
-    for i in range(0,sites.shape[0]):
-        if WoodMeshGen.check_isinside_boundbox2D(np.append(sites[i,:],0),x_min,x_max,y_min,y_max):
-            sites_in.append(sites[i,:])
+    sites_in,x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
+        WoodMeshGen.Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size,y_notch_size)
 
     # ---------------------------------------------
     # # Build flow mesh                    
@@ -206,7 +203,20 @@ def main(self):
 
     # ---------------------------------------------
     # # Build mechanical mesh 
-    ttvertices, ttedges, ttray_origins, ttray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
+    vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
+    # for some reason vor_vertices are not unique, might be a problem -SA
+
+
+    # plt.figure()
+    # ax = plt.gca()
+    # ax.set_aspect('equal', adjustable='box')
+    # # Flow
+    # vertsD = np.array(conforming_delaunay['vertices'])
+    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
+    # # Main cells
+    # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'ko',markersize=2.)
+    # plt.show()
+
 
     voronoiTime = time.time() 
     print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
@@ -216,36 +226,27 @@ def main(self):
     self.form[1].statusWindow.setText("Status: Clipping Mesh.") 
     # ==================================================================
     # Rebuild the Voronoi mesh
-    # if merge_operation in ['on','On','Y','y','Yes','yes']:
-    #     [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-    #     boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-    #     nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-    #         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttray_directions,\
-    #                                                             boundaries,merge_tol,boundaryFlag)
-        
-    #     RebuildvorTime = time.time() 
-    #     print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
-    # else:
-    #     [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-    #     boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-    #     nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-    #         WoodMeshGen.RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
-    #                                                     boundaries,boundaryFlag)
-    #     RebuildvorTime = time.time()
 
-    # print(np.shape(ttvertices),np.shape(ttedges),np.shape(ttray_origins),np.shape(ttray_directions),np.shape(boundaries))
-
-    [voronoi_vertices,boundary_points,finite_ridges_new,\
+    if merge_operation in ['on','On','Y','y','Yes','yes']:
+        [voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-        WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
+        nboundary_pts,voronoi_ridges,nridge] = \
+            WoodMeshGen.RebuildVoronoi_ConformingDelaunay_mergeNew(vor_vertices,vor_edges,ray_origins,ray_directions,\
+                                                                boundaries,merge_tol,boundaryFlag)
+        
+        RebuildvorTime = time.time() 
+        print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
+    else:
+            [voronoi_vertices,boundary_points,finite_ridges_new,\
+        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+        nboundary_pts,voronoi_ridges,nridge] = \
+        WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
                                                         boundaries,boundaryFlag)
-    
-    
+
     RebuildvorTime = time.time()
 
     # ---------------------------------------------
-    # # Visualize the mesh
+    # Visualize the mesh
 
     plt.figure()
     ax = plt.gca()
@@ -275,14 +276,31 @@ def main(self):
     plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
 
 
+    if randomFlag in ['on','On','Y','y','Yes','yes']:
+        # ==================================================================
+        self.form[1].progressBar.setValue(45) 
+        self.form[1].statusWindow.setText("Status: Generating Random Field.") 
+        # ==================================================================
+        # Calculate random field
+        RF_dist_types = randomParams.get('RF_dist_types')
+        RF_dist_params = randomParams.get('RF_dist_params')
+        RF_corr_l = randomParams.get('RF_corr_l')
+        RF_sampling_type = randomParams.get('RF_sampling_type')
+
+        random_field = RandomField(dimension = 1, readFromFolder = "none", dist_types=RF_dist_types, CC = np.array([[1]]), \
+                         dist_params=RF_dist_params, name=geoName,out=outDir,corr_l =RF_corr_l, corr_f='square_exponential',\
+                         x_range=[z_min,z_max], sampling_type = RF_sampling_type, periodic = True, filesavetype="binary")
+    else:
+        random_field = []
+
     # ==================================================================
     self.form[1].progressBar.setValue(50) 
     self.form[1].statusWindow.setText("Status: Writing Vertices.") 
     # ================================================================== 
     [voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
-           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D] = \
+           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D,voronoi_vertices_2D] = \
     WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
-                   z_min,z_max,long_connector_ratio,voronoi_vertices,nvertex,generation_center,knotFlag, knotParams, box_center,box_depth)
+                   z_min,z_max,long_connector_ratio,voronoi_vertices,nvertex,generation_center,knotFlag, knotParams, box_center,box_depth,)
     
 
     # Insert mid and quarter points on the Voronoi ridges (can be used as potential failure positions on cell walls)
@@ -320,23 +338,6 @@ def main(self):
     print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
 
 
-    # ==================================================================
-    # Calculate random field
-    RF_dist_types = randomParams.get('RF_dist_types')
-    RF_dist_params = randomParams.get('RF_dist_params')
-    RF_corr_l = randomParams.get('RF_corr_l')
-    RF_sampling_type = randomParams.get('RF_sampling_type')
-
-    if randomFlag in ['on','On','Y','y','Yes','yes']:
-        # RF = RandomField(RF_dimension,RF_dist_types,RF_dist_params,geoName,RF_corr_l,"text",[z_min,z_max],RF_sampling_type)
-        # RF = RandomField(dimension=RF_dimension,"none",RF_dist_types,np.array([[1]]),RF_dist_params,geoName,RF_corr_l,"text",x_range=[x_min,x_max],RF_sampling_type,"binary")
-        random_field = RandomField(dimension = 1, readFromFolder = "none", dist_types=RF_dist_types, CC = np.array([[1]]), \
-                         dist_params=RF_dist_params, name=geoName,out=outDir,corr_l =RF_corr_l, corr_f='exponential_square',\
-                         x_range=[x_min,x_max],y_range=[y_min,y_max],z_range=[z_min,z_max], sampling_type = RF_sampling_type, filesavetype="binary")
-        # RF = RandomField(dist_types=["TruncatedGaussian"], dist_params=[[1.,0.5,0]], name = "FIELD_1D_TruncNormal", corr_l = 0.05,filesavetype="text", x_range=[x_min,x_max],y_range=[y_min,y_max],z_range=[z_min,z_max], sampling_type="MC")
-    else:
-        random_field = []
-
     # ===============================================
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
@@ -370,7 +371,7 @@ def main(self):
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                    randomFlag,random_field,knotParams,knotFlag,box_center)
+                    randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D)
 
     # ===============================================
     # Calculate model properties

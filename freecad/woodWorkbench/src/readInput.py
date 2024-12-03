@@ -54,15 +54,13 @@ def readInput(self):
                 long_connector_ratio = line.split("=")[1].strip()
 
             elif "dist_types" in line:
-                Uinf = line.split("=")[1].strip()
+                dist_types = line.split("=")[1].strip()
             elif "dist_params" in line:
-                a1 = line.split("=")[1].strip()
+                dist_params = line.split("=")[1].strip()
             elif "corr_l" in line:
-                a2 = line.split("=")[1].strip()
+                corr_l = line.split("=")[1].strip()
             elif "sampling_type" in line:
-                m1 = line.split("=")[1].strip()
-            elif "m2" in line:
-                m2 = line.split("=")[1].strip()
+                sampling_type = line.split("=")[1].strip()
 
             elif "Uinf" in line:
                 Uinf = line.split("=")[1].strip()
@@ -137,8 +135,8 @@ def readInput(self):
             self.form[0].precrack_size.setText(precrack_size)
 
         self.form[0].boundaryFlag.setCurrentText(boundaryFlag)
-        self.form[0].randomFlag.setText(randomFlag)
-        self.form[0].knotFlag.setText(knotFlag)
+        self.form[0].randomFlag.setCurrentText(randomFlag)
+        self.form[0].knotFlag.setCurrentText(knotFlag)
         
         self.form[0].merge_operation.setCurrentText(merge_operation)
         # if merge_operation in ['on','On','Y','y','Yes','yes']:

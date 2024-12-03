@@ -75,8 +75,8 @@ def inputParams(form):
 
     # Precrack Parameters
     # notch and precrack are always centered on leftmost edge
-    x_notch_size = float(form[0].x_indent_size.text() or 0) # depth of notch box_size*0.120
-    y_notch_size = float(form[0].y_indent_size.text() or 0) # width of notch box_size*0.125
+    x_notch_size = float(form[0].x_indent_size.text() or box_size*0.1) # depth of notch
+    y_notch_size = float(form[0].y_indent_size.text() or box_size*0.1) # width of notch
     
     # Flags
     precrackFlag = form[0].precrackFlag.currentText()
@@ -96,13 +96,15 @@ def inputParams(form):
     if radial_growth_rule == 'debug':
         nsegments = int(2) 
         box_center = eval( "(0.0,0.0)") # coordinates of clipping box center
-        box_height = float(0.05) # specimen length
-        box_width = float(0.05) # side length
-        box_depth = float(0.05) # side length
+        box_height = 0.05 # specimen length
+        box_width = 0.05 # side length
+        box_depth = 0.05 # side length
         box_size = box_width
         z_min = 0
         z_max = box_height #box_size # segment_length = (z_max - z_min) / nsegments
-        randomFlag = 'Off'
+        randomFlag = 'On'
+        x_notch_size = box_size*0.1 # depth of notch
+        y_notch_size = box_size*0.1 # width of notch
 
     return geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \

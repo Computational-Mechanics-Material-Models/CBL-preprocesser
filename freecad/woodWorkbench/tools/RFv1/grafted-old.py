@@ -119,7 +119,7 @@ if __name__ == '__main__':
     params = [24,2.115,0.1501,0.6813]
     gd = GD(params[0],params[1],params[2],params[3])
     gd.printAll()
-    exit(1)    
+    # exit(1)    
 
     #params = [30,0.551821,0.201,0.7765]
     #gd = GD(params[0],params[1],params[2],params[3])

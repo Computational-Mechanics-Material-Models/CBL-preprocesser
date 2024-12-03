@@ -1096,12 +1096,12 @@
            </property>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
           </widget>

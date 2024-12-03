@@ -3,14 +3,14 @@ from pathlib import Path
 import FreeCAD as App # type: ignore
 
 
-def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
-        r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
+def outputLog(geoName, radial_growth_rule, iter_max, \
+        r_min, r_max, nrings, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-        boundaryFlag, box_shape, box_center, box_size, box_height, \
-        nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
+        boundaryFlag, box_shape, box_center, box_height, \
+        nsegments, theta_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, random_noise, NURBS_degree, box_width, box_depth, visFlag, \
+        stlFlag, inpFlag, inpType, box_width, box_depth, visFlag, \
         knotFlag, knotParams, randomFlag, randomParams):
 
     # Generate log file
@@ -46,7 +46,6 @@ def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
     logfile.write('cellwallthickness_late= ' + str(cellwallthickness_late) + '\n')
 
     logfile.write('skeleton_density= ' + str(skeleton_density) + '\n')
-    logfile.write('random_noise= ' + str(random_noise) + '\n')
 
     logfile.write('iter_max= ' + str(iter_max) + '\n')
 
@@ -90,6 +89,7 @@ def outputLog(geoName, radial_growth_rule, iter_max, print_interval, \
     logfile.write('stlFlag= ' + str(stlFlag) + '\n')
     logfile.write('inpFlag= ' + str(inpFlag) + '\n')
     logfile.write('inpType= ' + str(inpType) + '\n')
+    logfile.write('visFlag= ' + str(visFlag) + '\n')
 
     logfile.write('\n')
     
