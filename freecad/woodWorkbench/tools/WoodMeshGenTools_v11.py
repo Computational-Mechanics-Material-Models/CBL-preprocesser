@@ -2860,7 +2860,6 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     rot = np.hstack((rot[:,0,:],np.zeros(len(conn_l_angles))[:, np.newaxis])) # convert to 3D rotation matrix, assumes rotation remains still in-plane
     conn_l_tangents = rot
             
-    ######################################################
     # number of random field realizations is number of x-y points (i.e. one per beam column)
     nrf = np.shape(voronoi_vertices_2D)[0]
     # Create random field realizations
@@ -2906,10 +2905,11 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,22] = conn_l_lengths[i]
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,24] = 4
+        # calculate random field per connector
+        # inefficient to loop, need to make one operation but x3 -SA
         if randomFlag in ['on','On','Y','y','Yes','yes']:
             rf_ind = np.where((voronoi_vertices_2D==Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,0:2]).all(axis=1))[0]
-            rf_val = random_field.getFieldEOLE(np.array([[Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,2],0,0]]),rf_ind) # EOLE projection with z value
-            Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,23] = rf_val
+            Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,23] = random_field.getFieldEOLE(np.array([[Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,2],0,0]]),rf_ind) # EOLE projection with z value
         else:
             Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,23] = 1
         psi = calc_knotstream(Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,1]-box_center[1],Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,2],m1,m2,a1,a2,Uinf)

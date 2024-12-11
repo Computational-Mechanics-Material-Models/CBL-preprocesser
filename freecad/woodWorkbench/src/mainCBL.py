@@ -205,15 +205,16 @@ def main(self):
     # # Build mechanical mesh 
     vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
     # for some reason vor_vertices are not unique, might be a problem -SA
+    # print(vor_vertices, vor_edges, ray_origins, ray_directions)
 
 
     # plt.figure()
     # ax = plt.gca()
     # ax.set_aspect('equal', adjustable='box')
-    # # Flow
+    # # flow points
     # vertsD = np.array(conforming_delaunay['vertices'])
     # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
-    # # Main cells
+    # # voronoi vertices
     # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'ko',markersize=2.)
     # plt.show()
 
