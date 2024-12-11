@@ -289,7 +289,7 @@ def main(self):
 
         random_field = RandomField(dimension = 1, readFromFolder = "none", dist_types=RF_dist_types, CC = np.array([[1]]), \
                          dist_params=RF_dist_params, name=geoName,out=outDir,corr_l =RF_corr_l, corr_f='square_exponential',\
-                         x_range=[z_min,z_max], sampling_type = RF_sampling_type, periodic = True, filesavetype="binary")
+                         x_range=[z_min,z_max], sampling_type = RF_sampling_type, periodic = True, filesavetype="binary",sparse=True)
     else:
         random_field = []
 
