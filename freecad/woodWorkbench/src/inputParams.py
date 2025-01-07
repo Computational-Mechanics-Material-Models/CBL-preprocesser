@@ -84,6 +84,7 @@ def inputParams(form):
     precrack_size = float(form[0].x_precrack_size.text() or 0) # depth of precrack box_size*0.1
 
     boundaryFlag = form[0].boundaryFlag.currentText()
+    rveFlag = form[0].rveFlag.currentText()
 
     merge_operation = form[0].merge_operation.currentText() 
     merge_tol = float(form[0].merge_tol.text() or 0.015)
@@ -114,4 +115,4 @@ def inputParams(form):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams
+        knotFlag, knotParams, rveFlag

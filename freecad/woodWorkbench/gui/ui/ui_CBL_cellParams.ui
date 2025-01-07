@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>845</width>
-    <height>1463</height>
+    <width>879</width>
+    <height>1491</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -117,17 +117,12 @@
               <widget class="QComboBox" name="radial_growth_rule">
                <item>
                 <property name="text">
-                 <string>binary_lloyd</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
-                 <string>binary</string>
-                </property>
-               </item>
-               <item>
-                <property name="text">
                  <string>debug</string>
+                </property>
+               </item>
+               <item>
+                <property name="text">
+                 <string>binary_lloyd</string>
                 </property>
                </item>
               </widget>
@@ -1289,6 +1284,37 @@
         </layout>
        </item>
        <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_62">
+         <item>
+          <widget class="QComboBox" name="rveFlag">
+           <property name="maximumSize">
+            <size>
+             <width>100</width>
+             <height>16777215</height>
+            </size>
+           </property>
+           <item>
+            <property name="text">
+             <string>On</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Off</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_52">
+           <property name="text">
+            <string>RVE Flag</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <item>
           <widget class="QComboBox" name="merge_operation">
@@ -1691,7 +1717,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>845</width>
+     <width>879</width>
      <height>21</height>
     </rect>
    </property>

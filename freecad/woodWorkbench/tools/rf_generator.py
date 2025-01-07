@@ -887,7 +887,7 @@ class RandomField():
                 raise ValueError("Sampling type ", self.sampling_type, " not implemented - terminating")
                 exit(1)
             self.saveRandomVariables()
-            print("[DONE]"); sys.stdout.flush()
+            # print("[DONE]"); sys.stdout.flush()
 
     #############################################################################
     def generateFieldOnGrid(self):  

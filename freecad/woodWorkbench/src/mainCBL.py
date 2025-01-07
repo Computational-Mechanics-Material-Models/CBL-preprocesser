@@ -62,7 +62,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams]\
+        knotFlag, knotParams, rveFlag]\
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
@@ -190,8 +190,11 @@ def main(self):
     self.form[1].progressBar.setValue(30) 
     self.form[1].statusWindow.setText("Status: Defining Boundaries.") 
     # ==================================================================
-    # Clipping box (boundaries) of the model
-    sites_in,x_min,x_max,y_min,y_max,boundaries,boundary_points_original,boundarylines = \
+    # Clipping box (boundaries) of the centroidal delauney points
+    sites_centroid,x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
+        WoodMeshGen.Clipping_Box(new_sites,box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size,y_notch_size)
+    # Clipping box of the original points for voronoi
+    sites_vor,x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
         WoodMeshGen.Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size,y_notch_size)
 
     # ---------------------------------------------
@@ -242,7 +245,7 @@ def main(self):
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,voronoi_ridges,nridge] = \
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
-                                                        boundaries,boundaryFlag)
+                                                        boundaries,rveFlag,boundary_points_original) #*** added rveflag, clean up
 
     RebuildvorTime = time.time()
 
