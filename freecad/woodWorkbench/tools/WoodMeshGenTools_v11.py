@@ -235,19 +235,16 @@ def relax_points(vor,omega):
     
     nonempty_regions = list(filter(None, vor.regions))
     for region in nonempty_regions:
-        if not any(x < 0 for x in region):
+        if not any(x < 0 for x in region): # non-infinite regions only
             filtered_regions.append(region)
     
     centroids = np.zeros((len(filtered_regions),2))
     for i in range(0,len(filtered_regions)):   
         vertices = vor.vertices[filtered_regions[i] + [filtered_regions[i][0]], :]
-        # plt.plot(vertices[:,0],vertices[:,1], 'go', markersize=2.0)
         centroid = find_centroid(vertices,omega) # get the centroid of these verts
-        
-        # plt.plot(centroid[:,0],centroid[:,1], 'ro', markersize=2.0)
         centroids[i,:] = centroid
         
-    return centroids # store the centroids as the new point positions
+    return centroids # store the centroids as the new site positions
 
 def find_centroid(vertices,omega):
     """
@@ -278,8 +275,12 @@ def find_centroid(vertices,omega):
 def find_intersect(p,normal,boundaries):
 
     # Find the intersect point of infinite ridges (rays) with the boundary lines
-    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-
+    # intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=
+    # Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&
+    # text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
 
+    intersect_points = []
     for boundary in boundaries: # loop over boundary lines
         q = np.asarray(boundary[1][0])
         s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
@@ -290,15 +291,38 @@ def find_intersect(p,normal,boundaries):
             if (t >= 0) and math.isfinite(t):
                 t_final = t
                 intersect_point = p + normal * t_final
-                return intersect_point
-    print('no intersect found')
-    print(p, normal)
-    return np.empty([0,2])
+                intersect_points.append(intersect_point)
+    if not intersect_points:
+        print('no intersect found')
+        # print(p, normal)
+        return np.empty([0,2])
+    elif np.shape(intersect_points)[0] > 1:
+        # vector crosses multiple boundaries, get the closest one as adhoc solution
+        intersect_points = np.reshape(intersect_points,(np.shape(intersect_points)[0],2))
+        dists = ( (intersect_points.T[0] - p[0][0])**2 + (intersect_points.T[1] - p[0][1])**2)**0.5
+        close_ind = np.argmin(dists)
+        close_intersect = np.array([intersect_points[close_ind]])
+        return np.reshape(close_intersect,(1,2))
+    else:
+        # print(np.asarray(intersect_points))
+        return np.reshape(intersect_points,(1,2))
 
 
-def Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size,y_notch_size):
+def check_isinside(points,boundary_points):
+
     """
-    clipping box for the 2D Voronoi diagram
+    checks if points are inside poly path created by boundaries
+    """
+       
+    poly_path = mpltPath.Path(boundary_points.tolist())
+    path_in = poly_path.contains_points(points) # binary of points in or not
+    
+    return path_in
+
+def Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size):
+    """
+    clipping box for the delauney points (generated cell points)
+    TBD: adjust to general shape using polygon or similar
     """
 
     if box_shape in ['square','Square','SQUARE']: # square box
@@ -306,38 +330,26 @@ def Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundar
         x_max = box_center[0] + box_size/2 
         y_min = box_center[1] - box_size/2
         y_max = box_center[1] + box_size/2
-        
         boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+
         l0 = [(x_min, y_min), (x_max, y_min)]
         l1 = [(x_max, y_min), (x_max, y_max)]
         l2 = [(x_max, y_max), (x_min, y_max)]
         l3 = [(x_min, y_max), (x_min, y_min)]
         boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-
         
     if box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangular box
         x_min = box_center[0] - box_width/2
         x_max = box_center[0] + box_width/2 
         y_min = box_center[1] - box_depth/2
         y_max = box_center[1] + box_depth/2
-        
         boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+        
         l0 = [(x_min, y_min), (x_max, y_min)]
         l1 = [(x_max, y_min), (x_max, y_max)]
         l2 = [(x_max, y_max), (x_min, y_max)]
         l3 = [(x_min, y_max), (x_min, y_min)]
         boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-
 
     elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE']: # notched sqaure box
         x_min = box_center[0] - box_size/2
@@ -347,7 +359,6 @@ def Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundar
         x_notch = x_min + x_notch_size
         y_notch_min = box_center[1] - y_notch_size/2
         y_notch_max = box_center[1] + y_notch_size/2
-        
         boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
                             [x_notch,y_notch_min],[x_min,y_notch_min]])
             
@@ -359,76 +370,14 @@ def Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundar
         l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
         l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
         l7 = [(x_min,y_notch_min), (x_min, y_min)]
-
-        
         boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
-        
-        if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, edgecolor='k',facecolor='none')
-        else:
-            boundarylines = patches.Rectangle(boundaries[0][1][0], x_max-x_min, y_max-y_min, linewidth=2, linestyle='-.', edgecolor='k',facecolor='none')
-            
-    # elif box_shape in ['triangle','Triangle','TRIANGLE','triangular','Triangular','TRIANGULAR','tri','Tri','TRI','^']: # Triangle box
-    #     x_0 = box_center[0] - box_size
-    #     x_1 = box_center[0]
-    #     x_2 = box_center[0] + box_size
-    #     y_0 = box_center[1]
-    #     y_1 = box_center[1] + box_size*np.sqrt(3)
-    #     boundary_points = np.array([[x_0, y_0], [x_2, y_0], [x_1, y_1]])
-        
-    #     l0 = [(x_0, y_0), (x_2, y_0)]
-    #     l1 = [(x_2, y_0), (x_1, y_1)]
-    #     l2 = [(x_1, y_1), (x_0, y_0)]
-        
-    #     boundaries = [('bottom', l0), ('top-right', l1), ('top-left', l2)]
-        
-    #     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-    #         boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,edgecolor='k',facecolor='none')
-    #     else:
-    #         boundarylines = patches.RegularPolygon((box_center[0]+0,box_center[1]+np.sqrt(3)/3*box_size),numVertices=3,radius=2*np.sqrt(3)/3*box_size,orientation=0,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
-        
-    #     x_min = x_0
-    #     x_max = x_2
-    #     y_min = y_0
-    #     y_max = y_1
-        
-    # elif box_shape in ['hexagon','Hexagon','HEXAGON','hexagonal','Hexagonal','HEXAGONAL','hex','Hex','HEX','h']: # hexagonal box
-    #     x_0 = box_center[1] - box_size
-    #     x_1 = box_center[1] - box_size/2.0
-    #     x_2 = box_center[1] + box_size/2.0
-    #     x_3 = box_center[1] + box_size
-    #     y_0 = box_center[0] - box_size/2*np.sqrt(3)
-    #     y_1 = box_center[0]
-    #     y_2 = box_center[0] + box_size/2*np.sqrt(3)
-        
-    #     boundary_points = np.array([[x_1, y_0], [x_2, y_0], [x_3, y_1], [x_2, y_2], [x_1, y_2], [x_0, y_1]])
-        
-    #     l0 = [(x_1, y_0), (x_2, y_0)]
-    #     l1 = [(x_2, y_0), (x_3, y_1)]
-    #     l2 = [(x_3, y_1), (x_2, y_2)]
-    #     l3 = [(x_2, y_2), (x_1, y_2)]
-    #     l4 = [(x_1, y_2), (x_0, y_1)]
-    #     l5 = [(x_0, y_1), (x_1, y_0)]
-        
-    #     boundaries = [('bottom', l0), ('bottom-right', l1), ('top-right', l2), ('top', l3), ('top-left', l4), ('bottom-left', l5)]
-        
-    #     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-    #         boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,edgecolor='k',facecolor='none')
-    #     else:
-    #         boundarylines = patches.RegularPolygon(box_center,numVertices=6,radius=box_size,orientation=np.pi/6,linewidth=2,linestyle='-.',edgecolor='k',facecolor='none')
-        
-    #     x_min = x_0
-    #     x_max = x_3
-    #     y_min = y_0
-    #     y_max = y_2
         
     else:
         print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
         print('Now exitting...')
         exit()
 
-    poly_path = mpltPath.Path(boundary_points.tolist())
-    path_in = poly_path.contains_points(sites)
+    path_in = check_isinside(sites,boundary_points) # checks sites inside boundary using path
     sites_in = sites[path_in]
         
     return sites_in,x_min,x_max,y_min,y_max,boundaries,boundary_points
@@ -495,7 +444,7 @@ def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
 def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
                                nrings,width_heart,width_sparse,width_dense,\
                                cellsize_sparse,cellsize_dense,iter_max,\
-                               print_interval,omega=0.1):
+                               print_interval,omega=10):
     """
     packing cells by firstly placing new cells and then performing Lloyd's relaxation in the generation rings
     """
@@ -521,16 +470,14 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
     # not too small or else flow mesh is too extreme at center, changed 1e-3 to 1e-1 -SA
     
     sites = np.vstack((PerimeterPointsSites,inside_cells))
-    
-    # lloyd_iter = 0
-    # while lloyd_iter < iter_max:
-    #     vor = Voronoi(sites)
-    #     # sites = relax_points(vor,omega)
-        
-    #     sites = np.vstack((PerimeterPointsSites,sites))
-    #     lloyd_iter += 1
 
-    
+    lloyd_iter = 0
+    while lloyd_iter < iter_max:
+        vor = Voronoi(sites)
+        sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
+        sites = np.vstack((PerimeterPointsSites,sites))
+        lloyd_iter += 1
+
     existing_sites = np.copy(sites[npoint:,:])
     
     # generate sites for each ring    
@@ -576,9 +523,18 @@ def CellPlacement_Binary_Lloyd(geoName,path,generation_center,r_max,r_min,\
                     
         existing_sites = np.vstack((sites,existing_sites))
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
-    sites = existing_sites
+    
+    lloyd_iter = 0
+    while lloyd_iter < iter_max:
+        vor = Voronoi(existing_sites)
+        existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
+        lloyd_iter += 1
 
-    return sites, radii
+    sites = existing_sites
+    vor = Voronoi(sites) # final mech mesh of relaxed sites
+    new_sites = relax_points(vor,1) # returns sites which are exact centroids of vor based on relaxed old sites (new method)
+
+    return sites, radii, new_sites
 
 
 def CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,box_center,box_size,\
@@ -630,11 +586,194 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     radii = np.concatenate(([0],np.cumsum(radii)))
 
     # generate point at center    
-    sites = np.array([[-0.01,0.01],[0.01,-0.01]])
+    sites = np.array([[0,0.0125],[-0.007,-0.007],[0.007,-0.007]])
+    # sites = np.array([[-0.008,0.008],[0.008,-0.008]])
     # sites = np.array([[-0.0125,0.0125],[0.0125,-0.0125],[0.0125,0.0125],[-0.0125,-0.0125]])
     # sites = np.array([[0.0,0.0]])
 
     return sites, radii
+
+
+def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries):
+
+
+    ''' 
+    NOTE: There are nsegment number of transverse layers, shifted to occur at 
+    the mid-segment location, and there are nsegment+1 longitudinal layers.
+    There are 2*nsegments+1 number of node layers.
+    '''
+    #***************************************************************************
+    delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
+    npts = len(delaunay_pts)
+
+    # different package to calculate voronoi region info because it produces output in different form
+    # checked and within tolerance of triangle package -SA
+    vorsci = Voronoi(conforming_delaunay['vertices']) # location of flow points
+    vortri = tr.voronoi(conforming_delaunay.get('vertices'))
+
+    vortri_rayinds = vortri[2]
+    vortri_vertices = vortri[0]
+    vortri_raycoords = vortri_vertices[vortri_rayinds]
+    vortri_raydirs = vortri[3]
+
+    nrdgs = len(vorsci.ridge_points) # number of ridges and thus number of flow elements
+    nlayers = 2*nsegments + 1 # number of node layers 
+    nnodes = npts*nlayers 
+    nels_long = npts*(nsegments+1)
+    nels_trans = nrdgs*nsegments
+    nels = nels_long + nels_trans
+    delaun_elems_long = np.zeros((nels_long,6)) 
+    delaun_elems_trans = np.zeros((nels_trans,6)) # empty arrays for flow info
+    # n1, n2, length, area, volume, element type, v1, v2 ... vn
+
+    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
+    connector_l_length = segment_length*long_connector_ratio
+
+    # define z coordinate for each node layer
+    z_coord = z_min    
+    coordsz = np.zeros((nnodes,1))
+    for l in range(0,nlayers):
+        for p in range(0,npts):
+            coordsz[p+l*npts] = z_coord
+        if (l == 0) or (l == nlayers-2): # the first or last layer
+            z_coord += segment_length/2
+        else: # for middle elements include connector distance
+            z_coord += segment_length/2 + connector_l_length/2
+
+    # nodes
+    delaun_num = np.zeros(((nnodes),1)) # delaun_num is hacky because of np dimension nonsense -SA
+    delaun_num[:,0] = np.linspace(0,nnodes-1,nnodes,dtype='int64')
+    delaun_verts_layers = np.tile(delaunay_pts,(nlayers,1)) # tile node xy coords for each layer
+    delaun_nodes = np.concatenate((delaun_num,delaun_verts_layers,coordsz),axis=1)
+
+
+    # longitudinal elements
+    for l in range(0,nsegments+1):
+        # get layer properties
+        if (l == 0) or (l == nsegments): # the first or last layer
+            typeFlag = 1
+            el_len = segment_length/2
+            ni = 1
+        else:
+            typeFlag = 0
+            el_len = segment_length + connector_l_length
+            ni = 3
+        # for each element in layer
+        for p in range(0,npts):
+            nel_l = p + l*npts # element index
+            nd = [p + l*npts, p + (l+ni)*npts] # manual calculation of 3D node numbers
+            delaun_elems_long[nel_l,0:2] = nd # element connectivity
+            delaun_elems_long[nel_l,2] =  el_len
+
+            pr = vorsci.point_region[p] # index of voronoi region
+            pv = vorsci.regions[pr] # vertices of voronoi region
+            refpt = (delaun_nodes[nd[0],1:3] + delaun_nodes[nd[1],1:3])/2 # average xy of top/bot of long element to get average xy location
+
+            if (-1) in pv: # check if boundary cell, as noted by -1 for vertice index
+                # this part gets the intersection of the infinite ray and a perpindicular line 
+                # through the delaunay point (flow node), since for boundary cells the flow node is on the boundary,
+                # then all intersection points are added to the region vertices to calculate the region area 
+                # it could probably be done more efficiently -SA
+
+                gen = (v for v in pv if v != -1)
+                coords_int = np.empty((0,2)) # coordinates of voronoi vertices
+                coords_out = np.empty((0,2))
+                if len(pv)==2: # corner element, only one real node with two rays
+
+                    for v in gen: 
+                        coord = vorsci.vertices[v]
+                        coords_int = np.vstack([coords_int,coord])
+                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
+                        ray_dir = vortri_raydirs[inds]     
+                        int_pts = np.empty((np.size(inds),2))  
+                        for i in range(0, np.size(inds)):           
+                            # Find the intersect point of infinite ridges (rays) with the boundary lines
+                            # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+                            p = coord
+                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
+                            intpts = find_intersect(coord,normal,boundaries)
+                            if intpts.any():
+                                int_pts[i,:] = intpts
+                        coords_out = np.vstack([coords_out,int_pts])
+                else: # side element, may or may not be touching a corner
+
+                    for v in gen: 
+                        coord = vorsci.vertices[v]
+                        coords_int = np.vstack([coords_int,coord])
+                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
+                        ray_dir = vortri_raydirs[inds] 
+                        int_pts = np.empty((np.size(inds),2))   
+                        #
+                        for i in range(0, np.size(inds)):    
+                            # Find the intersect point of infinite ridges (rays) with the boundary lines
+                            p = coord
+                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
+                            intpts = find_intersect(coord,normal,boundaries)
+                            if intpts.any():
+                                int_pts[i,:] = intpts
+                        if np.size(inds) > 1:
+                            index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
+                            int_pts = int_pts[index,:]
+                        coords_out = np.vstack([coords_out,int_pts])
+
+                coords = np.vstack([coords_int,coords_out])    # combine interior with exterior nodes     
+                # flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
+                # el_vol = el_len*flow_area/3 # element volume
+            else:
+                coords = vorsci.vertices[pv] # coordinates of voronoi vertices
+
+            # calculate the flux area of voronoi region of arbitrary shape by the shoelace formula
+            coords_sort = sort_coordinates(coords)
+            flow_area = 0.5*np.abs(np.dot(coords_sort[:,0],np.roll(coords_sort[:,1],1))-np.dot(coords_sort[:,1],np.roll(coords_sort[:,0],1))) 
+            el_vol = el_len*flow_area/3 # element volume
+            delaun_elems_long[nel_l,3] = flow_area
+            delaun_elems_long[nel_l,4] =  el_vol
+            # if el_vol == 0: # corner elements
+            #     print('vol',nel_l,pv,coords)
+            delaun_elems_long[nel_l,5] = typeFlag
+            # delaun_elems_long[nel_l,6:len(pv)+6] =  pv
+
+    # transverse elements
+    for l in range(0,nsegments): # each segment
+        el_h = segment_length + connector_l_length # element height 
+        typeFlag = 2
+        for r in range(0,nrdgs):
+            nel_t = r + l*nrdgs # element index
+
+            pd = vorsci.ridge_points[r] # 2D flow index for ridge
+            coordsd = delaunay_pts[pd] # 2D flow coords
+            nd = pd + (2*l+1)*npts # translate 2D flow index to 3D flow index
+            delaun_elems_trans[nel_t,0:2] = nd # element connectivity
+            el_len = np.linalg.norm((coordsd[0,:]-coordsd[1,:])) # distance bewteen flow nodes (element length)
+            delaun_elems_trans[nel_t,2] =  el_len
+
+            pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
+            coordsv = vorsci.vertices[pv] # 2D vor coords
+            # unsure if this is fully correct
+            if (check_iscollinear(coordsd[0,:],coordsd[1,:],boundaries) > 0): # check if the flow element is collinear with boundaries
+                # no flow volume on boundary
+                vor_len = 0
+                flow_area = vor_len*el_h 
+            else:
+                vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+                flow_area = vor_len*el_h # flux area
+            delaun_elems_trans[nel_t,3] = flow_area 
+            el_vol = el_len*flow_area/3 # element volume
+            delaun_elems_trans[nel_t,4] = el_vol
+            delaun_elems_trans[nel_t,5] = typeFlag # element type
+
+            # delaun_elems_trans[nel_t,6:8] = pv # mark relevant 2D voronoi ridge for possible reference
+    
+    # print(nels_long,nel_l,nels_trans,nel_t,nels)
+    delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
+
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
+        ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
+    
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%d']\
+        ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l A V type v1 v2 ... vn]')
+    
+    return delaun_nodes, delaun_elems
 
 
 def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,boundaryFlag):
@@ -934,249 +1073,208 @@ def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_
             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
 
 
-def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries):
-
-
-    ''' 
-    NOTE: There are nsegment number of transverse layers, shifted to occur at 
-    the mid-segment location, and there are nsegment+1 longitudinal layers.
-    There are 2*nsegments+1 number of node layers.
-    '''
-    #***************************************************************************
-    delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
-    npts = len(delaunay_pts)
-
-    # different package to calculate voronoi region info because it produces output in different form
-    # checked and within tolerance of triangle package -SA
-    vorsci = Voronoi(conforming_delaunay['vertices']) # location of flow points
-    vortri = tr.voronoi(conforming_delaunay.get('vertices'))
-    vortri_rayinds = vortri[2]
-    vortri_vertices = vortri[0]
-    vortri_raycoords = vortri_vertices[vortri_rayinds]
-    vortri_raydirs = vortri[3]
-
-    nrdgs = len(vorsci.ridge_points) # number of ridges and thus number of flow elements
-    nlayers = 2*nsegments + 1 # number of node layers 
-    nnodes = npts*nlayers 
-    nels_long = npts*(nsegments+1)
-    nels_trans = nrdgs*nsegments
-    nels = nels_long + nels_trans
-    delaun_elems_long = np.zeros((nels_long,6)) 
-    delaun_elems_trans = np.zeros((nels_trans,6)) # empty arrays for flow info
-    # n1, n2, length, area, volume, element type, v1, v2 ... vn
-
-    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
-    connector_l_length = segment_length*long_connector_ratio
-
-    # define z coordinate for each node layer
-    z_coord = z_min    
-    coordsz = np.zeros((nnodes,1))
-    for l in range(0,nlayers):
-        for p in range(0,npts):
-            coordsz[p+l*npts] = z_coord
-        if (l == 0) or (l == nlayers-2): # the first or last layer
-            z_coord += segment_length/2
-        else: # for middle elements include connector distance
-            z_coord += segment_length/2 + connector_l_length/2
-
-    # nodes
-    delaun_num = np.zeros(((nnodes),1)) # delaun_num is hacky because of np dimension nonsense -SA
-    delaun_num[:,0] = np.linspace(0,nnodes-1,nnodes,dtype='int64')
-    delaun_verts_layers = np.tile(delaunay_pts,(nlayers,1)) # tile node xy coords for each layer
-    delaun_nodes = np.concatenate((delaun_num,delaun_verts_layers,coordsz),axis=1)
-
-
-    # longitudinal elements
-    for l in range(0,nsegments+1):
-        # get layer properties
-        if (l == 0) or (l == nsegments): # the first or last layer
-            typeFlag = 1
-            el_len = segment_length/2
-            ni = 1
-        else:
-            typeFlag = 0
-            el_len = segment_length + connector_l_length
-            ni = 3
-        # for each element in layer
-        for p in range(0,npts):
-            nel_l = p + l*npts # element index
-            nd = [p + l*npts, p + (l+ni)*npts] # manual calculation of 3D node numbers
-            delaun_elems_long[nel_l,0:2] = nd # element connectivity
-            delaun_elems_long[nel_l,2] =  el_len
-
-            pr = vorsci.point_region[p] # index of voronoi region
-            pv = vorsci.regions[pr] # vertices of voronoi region
-            refpt = (delaun_nodes[nd[0],1:3] + delaun_nodes[nd[1],1:3])/2 # average xy of top/bot of long element to get average xy location
-
-            if (-1) in pv: # check if boundary cell, as noted by -1 for vertice index
-                # this part gets the intersection of the infinite ray and a perpindicular line 
-                # through the delaunay point (flow node), since for boundary cells the flow node is on the boundary,
-                # then all intersection points are added to the region vertices to calculate the region area 
-                # it could probably be done more efficiently -SA
-
-                gen = (v for v in pv if v != -1)
-                coords_int = np.empty((0,2)) # coordinates of voronoi vertices
-                coords_out = np.empty((0,2))
-                if len(pv)==2: # corner element, only one real node with two rays
-
-                    for v in gen: 
-                        coord = vorsci.vertices[v]
-                        coords_int = np.vstack([coords_int,coord])
-                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
-                        ray_dir = vortri_raydirs[inds]     
-                        int_pts = np.empty((np.size(inds),2))  
-                        for i in range(0, np.size(inds)):           
-                            # Find the intersect point of infinite ridges (rays) with the boundary lines
-                            # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
-                            p = coord
-                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                            intpts = find_intersect(coord,normal,boundaries)
-                            if intpts.any():
-                                int_pts[i,:] = intpts
-                        coords_out = np.vstack([coords_out,int_pts])
-                else: # side element, may or may not be touching a corner
-
-                    for v in gen: 
-                        coord = vorsci.vertices[v]
-                        coords_int = np.vstack([coords_int,coord])
-                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
-                        ray_dir = vortri_raydirs[inds] 
-                        int_pts = np.empty((np.size(inds),2))   
-                        #
-                        for i in range(0, np.size(inds)):    
-                            # Find the intersect point of infinite ridges (rays) with the boundary lines
-                            p = coord
-                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                            intpts = find_intersect(coord,normal,boundaries)
-                            if intpts.any():
-                                int_pts[i,:] = intpts
-                        if np.size(inds) > 1:
-                            index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
-                            int_pts = int_pts[index,:]
-                        coords_out = np.vstack([coords_out,int_pts])
-
-                coords = np.vstack([coords_int,coords_out])    # combine interior with exterior nodes     
-                # flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
-                # el_vol = el_len*flow_area/3 # element volume
-            else:
-                coords = vorsci.vertices[pv] # coordinates of voronoi vertices
-
-            # calculate the flux area of voronoi region of arbitrary shape by the shoelace formula
-            coords_sort = sort_coordinates(coords)
-            flow_area = 0.5*np.abs(np.dot(coords_sort[:,0],np.roll(coords_sort[:,1],1))-np.dot(coords_sort[:,1],np.roll(coords_sort[:,0],1))) 
-            el_vol = el_len*flow_area/3 # element volume
-            delaun_elems_long[nel_l,3] = flow_area
-            delaun_elems_long[nel_l,4] =  el_vol
-            # if el_vol == 0: # corner elements
-            #     print('vol',nel_l,pv,coords)
-            delaun_elems_long[nel_l,5] = typeFlag
-            # delaun_elems_long[nel_l,6:len(pv)+6] =  pv
-
-    # transverse elements
-    for l in range(0,nsegments): # each segment
-        el_h = segment_length + connector_l_length # element height 
-        typeFlag = 2
-        for r in range(0,nrdgs):
-            nel_t = r + l*nrdgs # element index
-
-            pd = vorsci.ridge_points[r] # 2D flow index for ridge
-            coordsd = delaunay_pts[pd] # 2D flow coords
-            nd = pd + (2*l+1)*npts # translate 2D flow index to 3D flow index
-            delaun_elems_trans[nel_t,0:2] = nd # element connectivity
-            el_len = np.linalg.norm((coordsd[0,:]-coordsd[1,:])) # distance bewteen flow nodes (element length)
-            delaun_elems_trans[nel_t,2] =  el_len
-
-            pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
-            coordsv = vorsci.vertices[pv] # 2D vor coords
-            # unsure if this is fully correct
-            if (check_iscollinear(coordsd[0,:],coordsd[1,:],boundaries) > 0): # check if the flow element is collinear with boundaries
-                # no flow volume on boundary
-                vor_len = 0
-                flow_area = vor_len*el_h 
-            else:
-                vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
-                flow_area = vor_len*el_h # flux area
-            delaun_elems_trans[nel_t,3] = flow_area 
-            el_vol = el_len*flow_area/3 # element volume
-            delaun_elems_trans[nel_t,4] = el_vol
-            delaun_elems_trans[nel_t,5] = typeFlag # element type
-
-            # delaun_elems_trans[nel_t,6:8] = pv # mark relevant 2D voronoi ridge for possible reference
+# def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
+#                                       boundaries,boundaryFlag):
+#     """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh"""
+#     # Store indices of Voronoi vertices for each finite ridge
+#     finite_ridges = ttedges
+#     infinite_ridges = np.zeros((ttray_origins.shape[0],2))
+#     infinite_ridges[:,0] = ttray_origins
+#     boundary_points = []
     
-    # print(nels_long,nel_l,nels_trans,nel_t,nels)
-    delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
-
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
-        ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
-    
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%d']\
-        ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l A V type v1 v2 ... vn]')
-    
-    return delaun_nodes, delaun_elems
-
-
-def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_directions,\
-                                      boundaries,boundaryFlag):
-    """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh"""
-    # Store indices of Voronoi vertices for each finite ridge
-    finite_ridges = ttedges
-    infinite_ridges = np.zeros((ttray_origins.shape[0],2))
-    infinite_ridges[:,0] = ttray_origins
-    boundary_points = []
-    
-    # Form two new Voronoi vertices lists with and without out-of-bound vertices
-    voronoi_vertices_in = ttvertices
+#     # Form two new Voronoi vertices lists with and without out-of-bound vertices
+#     voronoi_vertices_in = ttvertices
             
-    # Find the intersect point of infinite ridges (rays) with the boundary lines
-    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
-    for i in range(0,len(ttray_origins)):
-        p = ttvertices[ttray_origins[i]]
-        normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal
+#     # Find the intersect point of infinite ridges (rays) with the boundary lines
+#     # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+#     for i in range(0,len(ttray_origins)):
+#         p = ttvertices[ttray_origins[i]]
+#         normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal
 
-        for boundary in boundaries: # loop over boundary lines
-            q = np.asarray(boundary[1][0])
-            s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-            t = np.cross((q-p),s)/np.cross(normal,s)
-            u = np.cross((q-p),normal)/np.cross(normal,s)
+#         for boundary in boundaries: # loop over boundary lines
+#             q = np.asarray(boundary[1][0])
+#             s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+#             t = np.cross((q-p),s)/np.cross(normal,s)
+#             u = np.cross((q-p),normal)/np.cross(normal,s)
             
-            if (u >= 0) and (u <= 1):
-                if (t >= 0) and math.isfinite(t):
-                    t_final = t
+#             if (u >= 0) and (u <= 1):
+#                 if (t >= 0) and math.isfinite(t):
+#                     t_final = t
                             
-        intersect_point = p + normal * t_final
-        boundary_points.append(intersect_point)
+#         intersect_point = p + normal * t_final
+#         boundary_points.append(intersect_point)
             
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-        boundary_points = np.asarray(boundary_points)
-        boundary_points_featured = [x[1][0] for x in boundaries]
-        boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
-        nboundary_pts_featured = boundary_points_featured.shape[0]
-        boundary_points = np.vstack((boundary_points,boundary_points_featured))
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+#         boundary_points = np.asarray(boundary_points)
+#         boundary_points_featured = [x[1][0] for x in boundaries]
+#         boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
+#         nboundary_pts_featured = boundary_points_featured.shape[0]
+#         boundary_points = np.vstack((boundary_points,boundary_points_featured))
            
-    else:
-        boundary_points = np.asarray(boundary_points)
-        nboundary_pts_featured = 0
+#     else:
+#         boundary_points = np.asarray(boundary_points)
+#         nboundary_pts_featured = 0
 
+#     nvertices_in = voronoi_vertices_in.shape[0]
+#     nboundary_pts = boundary_points.shape[0]
+#     finite_ridges = np.asarray(finite_ridges)
+#     nfinite_ridge = finite_ridges.shape[0]
+
+#     ninfinite_ridge = infinite_ridges.shape[0]
+           
+#     # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
+#     finite_ridges_new = np.copy(finite_ridges)
+#     infinite_ridges_new = np.copy(infinite_ridges)
+#     for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
+#         infinite_ridges_new[i,1] = nvertices_in + i
+    
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+#         # construct the connectivity for a line path consisting of the boundary points
+#         boundary_ridges_new = np.zeros(boundary_points.shape)
+#         boundary_points_new = np.copy(boundary_points) 
+#         next_point = np.copy(boundary_points_new[0])  # get first point
+#         boundary_points_new[0] = [np.inf,np.inf]
+        
+#         for i in range(0,boundary_points_new.shape[0]-1):
+#             next_point_id = cdist([next_point], boundary_points_new).argmin()
+#             if check_iscollinear(next_point,boundary_points_new[next_point_id],boundaries) > 0: # check if the new line segment is collinear with any boundary line segment
+#                 boundary_ridges_new[i,1] = next_point_id
+#                 boundary_ridges_new[i+1,0] = next_point_id
+#                 next_point = np.copy(boundary_points_new[next_point_id])
+#                 boundary_points_new[next_point_id] = [np.inf,np.inf]
+#             else:
+#                 boundary_points_new_check = np.copy(boundary_points_new)
+#                 while check_iscollinear(next_point,boundary_points_new_check[next_point_id],boundaries) == 0:
+#                     boundary_points_new_check[next_point_id] = [np.inf,np.inf]
+#                     next_point_id = cdist([next_point], boundary_points_new_check).argmin()
+                    
+#                 boundary_ridges_new[i,1] = next_point_id
+#                 boundary_ridges_new[i+1,0] = next_point_id
+#                 next_point = np.copy(boundary_points_new[next_point_id])
+#                 boundary_points_new[next_point_id] = [np.inf,np.inf]
+                
+#         boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
+        
+#         voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+#         nvertex = voronoi_vertices.shape[0]
+#         boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
+        
+#     else:
+#         voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+#         nvertex = voronoi_vertices.shape[0]
+#         boundary_ridges_new = np.copy(infinite_ridges_new)
+
+#     nboundary_ridge = boundary_ridges_new.shape[0]
+#     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+#     nridge = voronoi_ridges.shape[0]
+    
+#     return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
+#         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+#             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
+
+
+def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
+                                      boundaries,boundaryFlag,boundary_points_original):
+    """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh
+        Modified to fix incorrect addition of boundary corner points - SA
+        NOTE: 'tt' prefix to refer to original tessellation, while w/o prefix refers to boundary conforming tesselation)
+    """
+    ax = plt.gca()
+
+    # Store indices of Voronoi vertices for each finite ridge
+    finite_ridges = [] 
+    voronoi_vertices_in = [] 
+    infinite_ridges = [] 
+    ray_origins = []
+    ray_directions = []
+    boundary_points = []
+
+    vertices_in = ttvertices[check_isinside(ttvertices,boundary_points_original)] # list of vertices inside boundaries
+
+    for ridge in ttedges: # for finite ridges
+        points = ttvertices[ridge] # coordinates of ridge vertices
+        points_check = check_isinside(points,boundary_points_original) # check check if fully in
+        if all(points_check): # if fully in
+            # get new index for vertices
+            inds = [np.where(np.all(vertices_in == points[0],axis=1))[0],np.where(np.all(vertices_in == points[1],axis=1))[0]]
+            finite_ridges.append([inds[0][0],inds[1][0]]) # add to finite ridges with new vertex index
+        # possibly can make this next part better but for now just checking the two cases uniquely 
+        # checking finite ridges which have become infinite due to boundary
+        elif points_check[0] and not points_check[1]: # if only the first point is inside
+            # now becomes an infinite ray
+            ind = np.where(np.all(vertices_in == points[0],axis=1))[0]
+            infinite_ridges.append((ind[0],-1)) # add to infinite ridges
+            # get origin and define direction
+            ray_origins.append(ind) # append vertex index to ray_origins list
+            direction = points[1] - points[0]
+            ray_directions.append(direction)
+        elif points_check[1] and not points_check[0]: # if the second point is in
+            ind = np.where(np.all(vertices_in == points[1],axis=1))[0]
+            infinite_ridges.append((ind[0],-1)) # add to infinite ridges
+            # get origin and define direction
+            ray_origins.append(ind) # append vertex index to ray_origins list
+            direction = points[0] - points[1]
+            ray_directions.append(direction)
+
+    for origin in range(0,len(ttray_origins)): # for infinite ridges
+        point_ind = ttray_origins[origin] # old index of originating point
+        points_check = check_isinside([ttvertices[point_ind]],boundary_points_original) # check coords of orginating vertex
+        if all(points_check): # if infinite ridge originates within the boundaries (i.e. original infinite ridge which is still an infinite ridge)
+            ind = np.where(np.all(vertices_in == ttvertices[point_ind],axis=1))[0]
+            infinite_ridges.append((ind[0],-1))
+            ray_origins.append(ind) # append new vertex index to ray_origins list
+            ray_directions.append(ttray_directions[origin]) # get original ray_direction and append
+
+    # Store and update arrays
+    finite_ridges_new = np.asarray(finite_ridges)
+    nfinite_ridge = finite_ridges_new.shape[0]
+
+    voronoi_vertices_in = vertices_in
     nvertices_in = voronoi_vertices_in.shape[0]
-    nboundary_pts = boundary_points.shape[0]
-    finite_ridges = np.asarray(finite_ridges)
-    nfinite_ridge = finite_ridges.shape[0]
 
-    ninfinite_ridge = infinite_ridges.shape[0]
-           
-    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
-    finite_ridges_new = np.copy(finite_ridges)
-    infinite_ridges_new = np.copy(infinite_ridges)
+    infinite_ridges_new = np.asarray(infinite_ridges)
+    ninfinite_ridge = infinite_ridges_new.shape[0]
+
+    ray_directions = np.asarray(ray_directions) 
+    ray_origins = np.asarray(ray_origins) 
+
+    # shouldn't be necessary with new method, need to figure out why - SA
+    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices 
     for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
         infinite_ridges_new[i,1] = nvertices_in + i
+        # ax.plot(voronoi_vertices_in[i,0],voronoi_vertices_in[i,1],'go',linewidth=2.)
+
+    # Find the intersect point of infinite ridges (rays) with the boundary lines
+    for i in range(0,len(ray_origins)):
+        p = vertices_in[ray_origins[i]]
+        normal = ray_directions[i,:]/np.linalg.norm(ray_directions[i,:]) # normal                 
+        intpts = find_intersect(p,normal,boundaries)
+        if intpts.any():
+            boundary_points.append(intpts)
+            # plt.quiver(p[0,0],p[0,1],normal[0],normal[1],color='b')
+        else:
+            print('no intersect found (voronoi)')
+
+    nboundary_pts = len(boundary_points)
+    boundary_points = np.reshape(boundary_points,(nboundary_pts,2)) # need to reshape because extra second dimension for some reason
+
+    if boundaryFlag == 'On': # add the boundary points for homogenization 
+        boundary_points = np.vstack((boundary_points,boundary_points_original)) # have to be at end for indexing
+        nboundary_pts = np.shape(boundary_points)[0]
+        # sometimes there is a bug in the corner when using boundaries, not sure why, just remesh for now -SA
+
+    # ax.plot(boundary_points[:,0],boundary_points[:,1],'b^',markersize=5)
+
+    # construct the connectivity for a line path consisting of the boundary points
+    boundary_ridges_new = np.zeros((nboundary_pts,2))
+    boundary_points_new = np.copy(boundary_points) 
+    next_point = np.copy(boundary_points_new[0])  # get first point
+    boundary_points_new[0] = [np.inf,np.inf]
+    # plt.text(next_point[0],next_point[1],str(0))
     
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-        # construct the connectivity for a line path consisting of the boundary points
-        boundary_ridges_new = np.zeros(boundary_points.shape)
-        boundary_points_new = np.copy(boundary_points) 
-        next_point = np.copy(boundary_points_new[0])  # get first point
-        boundary_points_new[0] = [np.inf,np.inf]
-        
+
+    
+    if boundaryFlag == 'On': 
         for i in range(0,boundary_points_new.shape[0]-1):
             next_point_id = cdist([next_point], boundary_points_new).argmin()
             if check_iscollinear(next_point,boundary_points_new[next_point_id],boundaries) > 0: # check if the new line segment is collinear with any boundary line segment
@@ -1184,6 +1282,7 @@ def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_dir
                 boundary_ridges_new[i+1,0] = next_point_id
                 next_point = np.copy(boundary_points_new[next_point_id])
                 boundary_points_new[next_point_id] = [np.inf,np.inf]
+                # plt.text(next_point[0],next_point[1],str(i+1))
             else:
                 boundary_points_new_check = np.copy(boundary_points_new)
                 while check_iscollinear(next_point,boundary_points_new_check[next_point_id],boundaries) == 0:
@@ -1194,879 +1293,808 @@ def RebuildVoronoi_ConformingDelaunay(ttvertices,ttedges,ttray_origins,ttray_dir
                 boundary_ridges_new[i+1,0] = next_point_id
                 next_point = np.copy(boundary_points_new[next_point_id])
                 boundary_points_new[next_point_id] = [np.inf,np.inf]
-                
-        boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
-        
-        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-        nvertex = voronoi_vertices.shape[0]
-        boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
-        
+                # plt.text(next_point[0],next_point[1],str(i+1))
     else:
-        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-        nvertex = voronoi_vertices.shape[0]
-        boundary_ridges_new = np.copy(infinite_ridges_new)
-
-    nboundary_ridge = boundary_ridges_new.shape[0]
-    voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-    nridge = voronoi_ridges.shape[0]
-    
-    return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-            nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
-                        
-
-def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
-                                      boundaries,rveFlag,boundary_points_original):
-    """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh
-        Modified to fix incorrect addition of boundary corner points - SA
-    """
-
-    # Store indices of Voronoi vertices for each finite ridge
-    finite_ridges = ttedges
-    boundary_points = []
+        for i in range(0,boundary_points_new.shape[0]-1):
+            next_point_id = cdist([next_point], boundary_points_new).argmin()
+            boundary_ridges_new[i,1] = next_point_id
+            boundary_ridges_new[i+1,0] = next_point_id
+            next_point = np.copy(boundary_points_new[next_point_id])
+            boundary_points_new[next_point_id] = [np.inf,np.inf]
+            # plt.text(next_point[0],next_point[1],str(i+1))
             
-    # Find the intersect point of infinite ridges (rays) with the boundary lines
-    for i in range(0,len(ttray_origins)):
-        p = ttvertices[ttray_origins[i]]
-        normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal                 
-        intpts = find_intersect(p,normal,boundaries)
-        if intpts.any():
-            boundary_points.append(intpts)
-        else:
-            print('none found')
-
-    if rveFlag == 'On': # add the boundary points for homogenization 
-        for point in boundary_points_original:
-            if not (np.isin(boundary_points, point).all(axis=1)).all(): # checks if there happens to already be a boundary point at the same location
-                boundary_points.append(point)
-        #there is a bug here sometimes in the corner, but tbd how robust this needs to be -SA
-
-    # Form two new Voronoi vertices lists with and without out-of-bound vertices
-    voronoi_vertices_in = ttvertices
-    infinite_ridges = np.zeros((ttray_origins.shape[0],2))
-    infinite_ridges[:,0] = ttray_origins
-    boundary_points = np.asarray(boundary_points)
-
-    nvertices_in = voronoi_vertices_in.shape[0]
-    nboundary_pts = boundary_points.shape[0]
-    finite_ridges = np.asarray(finite_ridges)
-    nfinite_ridge = finite_ridges.shape[0]
-
-    ninfinite_ridge = infinite_ridges.shape[0]
-           
-    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
-    finite_ridges_new = np.copy(finite_ridges)
-    infinite_ridges_new = np.copy(infinite_ridges)
-    for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
-        infinite_ridges_new[i,1] = nvertices_in + i
-    
-    # construct the connectivity for a line path consisting of the boundary points
-    boundary_ridges_new = np.zeros(boundary_points.shape)
-    boundary_points_new = np.copy(boundary_points) 
-    next_point = np.copy(boundary_points_new[0])  # get first point
-    boundary_points_new[0] = [np.inf,np.inf]
-    
-    for i in range(0,boundary_points_new.shape[0]-1):
-        next_point_id = cdist([next_point], boundary_points_new).argmin()
-        boundary_ridges_new[i,1] = next_point_id
-        boundary_ridges_new[i+1,0] = next_point_id
-        next_point = np.copy(boundary_points_new[next_point_id])
-        boundary_points_new[next_point_id] = [np.inf,np.inf]
-            
-    boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
-    voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-    nvertex = voronoi_vertices.shape[0]
+    boundary_ridges_new = (boundary_ridges_new + nvertices_in).astype(int) # shift the indices with "nvertices_in"
+    voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vertices and "cross" boundary points
+    nvertices = voronoi_vertices.shape[0]
     boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
 
     nboundary_ridge = boundary_ridges_new.shape[0]
     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
     nridge = voronoi_ridges.shape[0]
-
-    print(np.shape(voronoi_vertices),np.shape(voronoi_ridges),np.max(voronoi_ridges))
     
     return voronoi_vertices,boundary_points,finite_ridges_new,\
-        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,voronoi_ridges,nridge
+        boundary_ridges_new,nvertices,nvertices_in,nfinite_ridge,nboundary_ridge,\
+        nboundary_pts,voronoi_ridges,nridge,infinite_ridges_new
   
 
-def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,merge_tol,boundaryFlag):
-    """Clip Voronoi mesh by the boundaries, merge short Voronoi ridges, and rebuild the new Voronoi mesh"""
-    # Store indices of Voronoi vertices for each finite ridge
-    finite_ridges = []
-    finite_ridges_pointid = []
-    infinite_ridges = []
-    infinite_ridges_pointid = []
-    boundary_points = []
+# def RebuildVoronoi_merge(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,merge_tol,boundaryFlag):
+#     """Clip Voronoi mesh by the boundaries, merge short Voronoi ridges, and rebuild the new Voronoi mesh"""
+#     # Store indices of Voronoi vertices for each finite ridge
+#     finite_ridges = []
+#     finite_ridges_pointid = []
+#     infinite_ridges = []
+#     infinite_ridges_pointid = []
+#     boundary_points = []
     
-    # Form two new Voronoi vertices lists with and without out-of-bound vertices
-    voronoi_vertices_in = []
-    voronoi_vertices_out = []
+#     # Form two new Voronoi vertices lists with and without out-of-bound vertices
+#     voronoi_vertices_in = []
+#     voronoi_vertices_out = []
     
-    if box_shape == 'notched_square': # notched
+#     if box_shape == 'notched_square': # notched
         
-        x_min = boundaries[0][1][0][0]
-        x_max = boundaries[1][1][0][0]
-        y_min = boundaries[0][1][0][1]
-        y_max = boundaries[2][1][0][1]
-        x_notch = boundaries[5][1][0][0]
-        y_notch_min = boundaries[6][1][0][1]
-        y_notch_max = boundaries[4][1][0][1]
+#         x_min = boundaries[0][1][0][0]
+#         x_max = boundaries[1][1][0][0]
+#         y_min = boundaries[0][1][0][1]
+#         y_max = boundaries[2][1][0][1]
+#         x_notch = boundaries[5][1][0][0]
+#         y_notch_min = boundaries[6][1][0][1]
+#         y_notch_max = boundaries[4][1][0][1]
         
-        for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
-            simplex = np.asarray(simplex)
-            simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max):
-                voronoi_vertices_in.append(vor.vertices[simplex[0]])
-                voronoi_vertices_in.append(vor.vertices[simplex[1]])
-                finite_ridges.append(simplex)
-                finite_ridges_pointid.append(pointidx)
-                plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-')
-            else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                if np.all(simplex >= 0) and (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) or check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max)): # finite Voronoi ridge but one vertex is far
-                    if (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):# if vertex is out-of-bound, inverse its index
-                        voronoi_vertices_out.append(vor.vertices[simplex[0]])
-                        if simplex[0] == 0:
-                            simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[0] = -simplex[0]
-                    elif (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):
-                        voronoi_vertices_out.append(vor.vertices[simplex[1]])
-                        if simplex[1] == 0:
-                            simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[1] = -simplex[1]
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max): # index of finite end Voronoi vertex of the infinite ridge
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-    else:
-        for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
-            simplex = np.asarray(simplex)
-            simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) and check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max):
-                voronoi_vertices_in.append(vor.vertices[simplex[0]])
-                voronoi_vertices_in.append(vor.vertices[simplex[1]])
-                finite_ridges.append(simplex)
-                finite_ridges_pointid.append(pointidx)
-            else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                if np.all(simplex >= 0) and (check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) or check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max)): # finite Voronoi ridge but one vertex is far
+#         for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
+#             simplex = np.asarray(simplex)
+#             simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
+#             if np.all(simplex >= 0) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max):
+#                 voronoi_vertices_in.append(vor.vertices[simplex[0]])
+#                 voronoi_vertices_in.append(vor.vertices[simplex[1]])
+#                 finite_ridges.append(simplex)
+#                 finite_ridges_pointid.append(pointidx)
+#                 plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-')
+#             else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
+#                 if np.all(simplex >= 0) and (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) or check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max)): # finite Voronoi ridge but one vertex is far
+#                     if (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):# if vertex is out-of-bound, inverse its index
+#                         voronoi_vertices_out.append(vor.vertices[simplex[0]])
+#                         if simplex[0] == 0:
+#                             simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
+#                         else:
+#                             simplex[0] = -simplex[0]
+#                     elif (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):
+#                         voronoi_vertices_out.append(vor.vertices[simplex[1]])
+#                         if simplex[1] == 0:
+#                             simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
+#                         else:
+#                             simplex[1] = -simplex[1]
+#                     infinite_ridges.append(simplex)
+#                     infinite_ridges_pointid.append(pointidx) 
+#                 elif check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max): # index of finite end Voronoi vertex of the infinite ridge
+#                     infinite_ridges.append(simplex)
+#                     infinite_ridges_pointid.append(pointidx) 
+#     else:
+#         for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
+#             simplex = np.asarray(simplex)
+#             simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
+#             if np.all(simplex >= 0) and check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) and check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max):
+#                 voronoi_vertices_in.append(vor.vertices[simplex[0]])
+#                 voronoi_vertices_in.append(vor.vertices[simplex[1]])
+#                 finite_ridges.append(simplex)
+#                 finite_ridges_pointid.append(pointidx)
+#             else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
+#                 if np.all(simplex >= 0) and (check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) or check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max)): # finite Voronoi ridge but one vertex is far
         
-                    if (check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) == 0):# if vertex is out-of-bound, inverse its index
-                        voronoi_vertices_out.append(vor.vertices[simplex[0]])
-                        voronoi_vertices_in.append(vor.vertices[simplex[1]])
-                        if simplex[0] == 0:
-                            simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[0] = -simplex[0]
-                    elif (check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max) == 0):
-                        voronoi_vertices_out.append(vor.vertices[simplex[1]])
-                        voronoi_vertices_in.append(vor.vertices[simplex[0]])
-                        if simplex[1] == 0:
-                            simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[1] = -simplex[1]
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundbox2D(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max): # index of finite end Voronoi vertex of the infinite ridge
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
+#                     if (check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) == 0):# if vertex is out-of-bound, inverse its index
+#                         voronoi_vertices_out.append(vor.vertices[simplex[0]])
+#                         voronoi_vertices_in.append(vor.vertices[simplex[1]])
+#                         if simplex[0] == 0:
+#                             simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
+#                         else:
+#                             simplex[0] = -simplex[0]
+#                     elif (check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max) == 0):
+#                         voronoi_vertices_out.append(vor.vertices[simplex[1]])
+#                         voronoi_vertices_in.append(vor.vertices[simplex[0]])
+#                         if simplex[1] == 0:
+#                             simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
+#                         else:
+#                             simplex[1] = -simplex[1]
+#                     infinite_ridges.append(simplex)
+#                     infinite_ridges_pointid.append(pointidx) 
+#                 elif check_isinside_boundbox2D(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max): # index of finite end Voronoi vertex of the infinite ridge
+#                     infinite_ridges.append(simplex)
+#                     infinite_ridges_pointid.append(pointidx) 
      
-    voronoi_vertices_in = np.unique(voronoi_vertices_in,axis=0)
-    voronoi_vertices_out = np.unique(voronoi_vertices_out,axis=0)
+#     voronoi_vertices_in = np.unique(voronoi_vertices_in,axis=0)
+#     voronoi_vertices_out = np.unique(voronoi_vertices_out,axis=0)
             
-    # Find the intersect point of infinite ridges (rays) with the boundary lines
-    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
-    for pointidx, simplex in zip(infinite_ridges_pointid, infinite_ridges):
-        simplex = np.asarray(simplex)
-        i = simplex[simplex >= 0][0] # index of finite end Voronoi vertex of the infinite ridge
-        p = vor.vertices[i]
-        s = circles[pointidx[1],0:2] - circles[pointidx[0],0:2]
-        if simplex[simplex < 0][0] == -9999999999:
-            tangent = s / np.linalg.norm(s)
-            normal = np.array([-tangent[0,1], tangent[0,0]]) # normal
-            midpoint = circles[:,0:2][pointidx].mean(axis=0) # midpoint between site points
-            for boundary in boundaries: # loop over boundary lines
-                q = np.asarray(boundary[1][0])
-                s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-                t = np.cross((q-p),s)/np.cross(normal,s)
-                u = np.cross((q-p),normal)/np.cross(normal,s)
+#     # Find the intersect point of infinite ridges (rays) with the boundary lines
+#     # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+#     for pointidx, simplex in zip(infinite_ridges_pointid, infinite_ridges):
+#         simplex = np.asarray(simplex)
+#         i = simplex[simplex >= 0][0] # index of finite end Voronoi vertex of the infinite ridge
+#         p = vor.vertices[i]
+#         s = circles[pointidx[1],0:2] - circles[pointidx[0],0:2]
+#         if simplex[simplex < 0][0] == -9999999999:
+#             tangent = s / np.linalg.norm(s)
+#             normal = np.array([-tangent[0,1], tangent[0,0]]) # normal
+#             midpoint = circles[:,0:2][pointidx].mean(axis=0) # midpoint between site points
+#             for boundary in boundaries: # loop over boundary lines
+#                 q = np.asarray(boundary[1][0])
+#                 s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+#                 t = np.cross((q-p),s)/np.cross(normal,s)
+#                 u = np.cross((q-p),normal)/np.cross(normal,s)
                 
-                if (u>= 0) and (u<=1):
-                    if np.sign(np.dot(midpoint - generation_center, normal)) == 1: # facing outwards
-                        if (t >= 0) and math.isfinite(t):
-                            t_final = t
-                    elif np.sign(np.dot(midpoint - generation_center, normal)) == -1: # facing inwards
-                        if (t < 0) and math.isfinite(t):
-                            t_final = t
+#                 if (u>= 0) and (u<=1):
+#                     if np.sign(np.dot(midpoint - generation_center, normal)) == 1: # facing outwards
+#                         if (t >= 0) and math.isfinite(t):
+#                             t_final = t
+#                     elif np.sign(np.dot(midpoint - generation_center, normal)) == -1: # facing inwards
+#                         if (t < 0) and math.isfinite(t):
+#                             t_final = t
                             
-        elif simplex[simplex < 0][0] == -9999999998:
-            t_final = np.inf
-            normal = (vor.vertices[0] - p)/np.linalg.norm(vor.vertices[0] - p)
-            for boundary in boundaries: # loop over boundary lines
-                q = np.asarray(boundary[1][0])
-                s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-                t = np.cross((q-p),s)/np.cross(normal,s)
-                u = np.cross((q-p),normal)/np.cross(normal,s)
+#         elif simplex[simplex < 0][0] == -9999999998:
+#             t_final = np.inf
+#             normal = (vor.vertices[0] - p)/np.linalg.norm(vor.vertices[0] - p)
+#             for boundary in boundaries: # loop over boundary lines
+#                 q = np.asarray(boundary[1][0])
+#                 s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+#                 t = np.cross((q-p),s)/np.cross(normal,s)
+#                 u = np.cross((q-p),normal)/np.cross(normal,s)
                 
-                if (u >= 0) and (u <= 1):
-                    if (t > 0) and (t < t_final):
-                        t_final = t
-        else:
-            t_final = np.inf
-            normal = (vor.vertices[-simplex[simplex < 0][0]] - p)/np.linalg.norm(vor.vertices[-simplex[simplex < 0][0]] - p)
-            for boundary in boundaries: # loop over boundary lines
-                q = np.asarray(boundary[1][0])
-                s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-                t = np.cross((q-p),s)/np.cross(normal,s)
-                u = np.cross((q-p),normal)/np.cross(normal,s)
+#                 if (u >= 0) and (u <= 1):
+#                     if (t > 0) and (t < t_final):
+#                         t_final = t
+#         else:
+#             t_final = np.inf
+#             normal = (vor.vertices[-simplex[simplex < 0][0]] - p)/np.linalg.norm(vor.vertices[-simplex[simplex < 0][0]] - p)
+#             for boundary in boundaries: # loop over boundary lines
+#                 q = np.asarray(boundary[1][0])
+#                 s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+#                 t = np.cross((q-p),s)/np.cross(normal,s)
+#                 u = np.cross((q-p),normal)/np.cross(normal,s)
                 
-                if (u >= 0) and (u <= 1):
-                    if (t > 0) and (t < t_final):
-                        t_final = t
+#                 if (u >= 0) and (u <= 1):
+#                     if (t > 0) and (t < t_final):
+#                         t_final = t
                             
-        intersect_point = p + normal * t_final
-        boundary_points.append(intersect_point)
+#         intersect_point = p + normal * t_final
+#         boundary_points.append(intersect_point)
             
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:            
-        boundary_points = np.asarray(boundary_points)
-        boundary_points_featured = [x[1][0] for x in boundaries]
-        boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
-        nboundary_pts_ini = boundary_points.shape[0]
-        nboundary_pts_featured = boundary_points_featured.shape[0]
-        boundary_points = np.vstack((boundary_points,boundary_points_featured))
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']:            
+#         boundary_points = np.asarray(boundary_points)
+#         boundary_points_featured = [x[1][0] for x in boundaries]
+#         boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
+#         nboundary_pts_ini = boundary_points.shape[0]
+#         nboundary_pts_featured = boundary_points_featured.shape[0]
+#         boundary_points = np.vstack((boundary_points,boundary_points_featured))
         
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
-        infinite_ridges = np.asarray(infinite_ridges)
-        ninfinite_ridge = infinite_ridges.shape[0]
-    else:
-        boundary_points = np.asarray(boundary_points)
-        nboundary_pts_featured = 0
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
-        infinite_ridges = np.asarray(infinite_ridges)
-        ninfinite_ridge = infinite_ridges.shape[0]
+#         nvertices_in = voronoi_vertices_in.shape[0]
+#         nboundary_pts = boundary_points.shape[0]
+#         finite_ridges = np.asarray(finite_ridges)
+#         nfinite_ridge = finite_ridges.shape[0]
+#         infinite_ridges = np.asarray(infinite_ridges)
+#         ninfinite_ridge = infinite_ridges.shape[0]
+#     else:
+#         boundary_points = np.asarray(boundary_points)
+#         nboundary_pts_featured = 0
+#         nvertices_in = voronoi_vertices_in.shape[0]
+#         nboundary_pts = boundary_points.shape[0]
+#         finite_ridges = np.asarray(finite_ridges)
+#         nfinite_ridge = finite_ridges.shape[0]
+#         infinite_ridges = np.asarray(infinite_ridges)
+#         ninfinite_ridge = infinite_ridges.shape[0]
         
-    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
-    finite_ridges_new = np.copy(finite_ridges)
-    for i in range(0,nfinite_ridge): # loop over voronoi ridges in original finite_ridge list 
-        ii = np.where(np.all(voronoi_vertices_in==vor.vertices[finite_ridges[i,0]],axis=1))[0][0]  # index of first vertex in voronoi_vertices_in array
-        jj = np.where(np.all(voronoi_vertices_in==vor.vertices[finite_ridges[i,1]],axis=1))[0][0]  # index of second vertex in voronoi_vertices_in array
-        finite_ridges_new[i,:] = [ii,jj]
+#     # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
+#     finite_ridges_new = np.copy(finite_ridges)
+#     for i in range(0,nfinite_ridge): # loop over voronoi ridges in original finite_ridge list 
+#         ii = np.where(np.all(voronoi_vertices_in==vor.vertices[finite_ridges[i,0]],axis=1))[0][0]  # index of first vertex in voronoi_vertices_in array
+#         jj = np.where(np.all(voronoi_vertices_in==vor.vertices[finite_ridges[i,1]],axis=1))[0][0]  # index of second vertex in voronoi_vertices_in array
+#         finite_ridges_new[i,:] = [ii,jj]
             
-    infinite_ridges_new = np.copy(infinite_ridges)
-    for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
-        if (infinite_ridges[i,:] < 0).argmax(axis=0) == 0: # first vertex is of negative index
-            ii = nvertices_in + i
-            jj = np.where(np.all(voronoi_vertices_in==vor.vertices[infinite_ridges[i,1]],axis=1))[0][0]  # index of finite vertex in voronoi_vertices_in array
-        else:
-            ii = np.where(np.all(voronoi_vertices_in==vor.vertices[infinite_ridges[i,0]],axis=1))[0][0]  # index of finite vertex in voronoi_vertices_in array
-            jj = nvertices_in + i
-        infinite_ridges_new[i,:] = [ii,jj]
+#     infinite_ridges_new = np.copy(infinite_ridges)
+#     for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
+#         if (infinite_ridges[i,:] < 0).argmax(axis=0) == 0: # first vertex is of negative index
+#             ii = nvertices_in + i
+#             jj = np.where(np.all(voronoi_vertices_in==vor.vertices[infinite_ridges[i,1]],axis=1))[0][0]  # index of finite vertex in voronoi_vertices_in array
+#         else:
+#             ii = np.where(np.all(voronoi_vertices_in==vor.vertices[infinite_ridges[i,0]],axis=1))[0][0]  # index of finite vertex in voronoi_vertices_in array
+#             jj = nvertices_in + i
+#         infinite_ridges_new[i,:] = [ii,jj]
     
     
-    # Merge operation
-    # Case 1 merge
-    voronoi_vertices_in_whole = np.copy(voronoi_vertices_in)
-    tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
-    rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
-    rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
+#     # Merge operation
+#     # Case 1 merge
+#     voronoi_vertices_in_whole = np.copy(voronoi_vertices_in)
+#     tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
+#     rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
+#     rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
         
-    finite_ridges_merged = np.copy(finite_ridges_new)
-    infinite_ridges_merged = np.copy(infinite_ridges_new)
-    while len(rows_to_fuse_voronoi_vertices_in) != 0:
-        points_new = np.reshape(voronoi_vertices_in_whole[rows_to_fuse_voronoi_vertices_in_whole],(-1,2))
-        voronoi_vertices_in_fused = 0.5*(points_new[0::2] + points_new[1::2])
+#     finite_ridges_merged = np.copy(finite_ridges_new)
+#     infinite_ridges_merged = np.copy(infinite_ridges_new)
+#     while len(rows_to_fuse_voronoi_vertices_in) != 0:
+#         points_new = np.reshape(voronoi_vertices_in_whole[rows_to_fuse_voronoi_vertices_in_whole],(-1,2))
+#         voronoi_vertices_in_fused = 0.5*(points_new[0::2] + points_new[1::2])
         
-        # voronoi_vertices_in_fused = voronoi_vertices_in_fused.round(decimals=0)
-        voronoi_vertices_in_fused = np.round(voronoi_vertices_in_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
+#         # voronoi_vertices_in_fused = voronoi_vertices_in_fused.round(decimals=0)
+#         voronoi_vertices_in_fused = np.round(voronoi_vertices_in_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
 
-        # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
-        if len(np.unique(voronoi_vertices_in_fused,axis=0)) != len(voronoi_vertices_in_fused):
-            [unique_pts,unique_inverse] = np.unique(voronoi_vertices_in_fused,return_inverse=True,axis=0)
+#         # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
+#         if len(np.unique(voronoi_vertices_in_fused,axis=0)) != len(voronoi_vertices_in_fused):
+#             [unique_pts,unique_inverse] = np.unique(voronoi_vertices_in_fused,return_inverse=True,axis=0)
             
-            # Offset the indices of boundary points as we inserted points in vertice_in list
-            infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(unique_pts)
-            # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
-            for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
-            voronoi_vertices_in_fused = unique_pts.astype(float)
-        else:
-            # Offset the indices of boundary points as we inserted points in vertice_in list
-            infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(rows_to_fuse_voronoi_vertices_in_whole)
-            # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
-            for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
+#             # Offset the indices of boundary points as we inserted points in vertice_in list
+#             infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(unique_pts)
+#             # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+#             for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
+#             voronoi_vertices_in_fused = unique_pts.astype(float)
+#         else:
+#             # Offset the indices of boundary points as we inserted points in vertice_in list
+#             infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(rows_to_fuse_voronoi_vertices_in_whole)
+#             # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+#             for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
                 
-        voronoi_vertices_in_whole = np.vstack((voronoi_vertices_in_whole,voronoi_vertices_in_fused)) # create a whole vertex list
-        voronoi_vertices_in_new = np.vstack((np.delete(voronoi_vertices_in,rows_to_fuse_voronoi_vertices_in,0),voronoi_vertices_in_fused)) # create a new vertex list
-        # update the voronoi_vertices_in
-        voronoi_vertices_in = np.copy(voronoi_vertices_in_new)
-        nvertices_in = voronoi_vertices_in_whole.shape[0]
-        # update the kd-tree
-        tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
-        rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
-        # update the rows_to_fuse_voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
-        rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
-        for i in range(0,len(rows_to_fuse_voronoi_vertices_in)):
-            rows_to_fuse_voronoi_vertices_in_whole[i,0] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,0],:],axis=1))[0][0]
-            rows_to_fuse_voronoi_vertices_in_whole[i,1] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,1],:],axis=1))[0][0]
+#         voronoi_vertices_in_whole = np.vstack((voronoi_vertices_in_whole,voronoi_vertices_in_fused)) # create a whole vertex list
+#         voronoi_vertices_in_new = np.vstack((np.delete(voronoi_vertices_in,rows_to_fuse_voronoi_vertices_in,0),voronoi_vertices_in_fused)) # create a new vertex list
+#         # update the voronoi_vertices_in
+#         voronoi_vertices_in = np.copy(voronoi_vertices_in_new)
+#         nvertices_in = voronoi_vertices_in_whole.shape[0]
+#         # update the kd-tree
+#         tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
+#         rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
+#         # update the rows_to_fuse_voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
+#         rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
+#         for i in range(0,len(rows_to_fuse_voronoi_vertices_in)):
+#             rows_to_fuse_voronoi_vertices_in_whole[i,0] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,0],:],axis=1))[0][0]
+#             rows_to_fuse_voronoi_vertices_in_whole[i,1] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,1],:],axis=1))[0][0]
 
-    # delete rows with identical indices and reverse indices in finite_ridges_merged
-    zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
-    finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+#     # delete rows with identical indices and reverse indices in finite_ridges_merged
+#     zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+#     finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
     
-    # delete rows with identical indices and reverse indices in infinite_ridges_merged
-    zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-    infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#     # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#     zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#     infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
     
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
-        # construct the connectivity for a line path consisting of the boundary points
-        ####################################################################################################################################################
-        # The algorithm here needs improve: bug contains when searching for the closest point, the closest point may be on the other sides
-        ####################################################################################################################################################
-        boundary_points_ini = np.copy(boundary_points) 
-        boundary_ridges_new = np.zeros(boundary_points.shape)
-        boundary_points_new = np.copy(boundary_points) 
-        next_point = np.copy(boundary_points_new[0])  # get first point
-        boundary_points_new[0] = [np.inf,np.inf]
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+#         # construct the connectivity for a line path consisting of the boundary points
+#         ####################################################################################################################################################
+#         # The algorithm here needs improve: bug contains when searching for the closest point, the closest point may be on the other sides
+#         ####################################################################################################################################################
+#         boundary_points_ini = np.copy(boundary_points) 
+#         boundary_ridges_new = np.zeros(boundary_points.shape)
+#         boundary_points_new = np.copy(boundary_points) 
+#         next_point = np.copy(boundary_points_new[0])  # get first point
+#         boundary_points_new[0] = [np.inf,np.inf]
         
-        for i in range(0,boundary_points_new.shape[0]-1):
-            next_point_id = cdist([next_point], boundary_points_new).argmin()
-            boundary_ridges_new[i,1] = next_point_id
-            boundary_ridges_new[i+1,0] = next_point_id
-            next_point = np.copy(boundary_points_new[next_point_id])
-            boundary_points_new[next_point_id] = [np.inf,np.inf]
-        boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
+#         for i in range(0,boundary_points_new.shape[0]-1):
+#             next_point_id = cdist([next_point], boundary_points_new).argmin()
+#             boundary_ridges_new[i,1] = next_point_id
+#             boundary_ridges_new[i+1,0] = next_point_id
+#             next_point = np.copy(boundary_points_new[next_point_id])
+#             boundary_points_new[next_point_id] = [np.inf,np.inf]
+#         boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
         
-        # Case 2 merge
-        tree_boundary_points = cKDTree(boundary_points)
-        rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
-        rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
-        boundary_ridges_merged = np.copy(boundary_ridges_new)
-        nboundary_pts = boundary_points.shape[0]
-        boundary_points_whole = np.copy(boundary_points)
+#         # Case 2 merge
+#         tree_boundary_points = cKDTree(boundary_points)
+#         rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
+#         rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
+#         boundary_ridges_merged = np.copy(boundary_ridges_new)
+#         nboundary_pts = boundary_points.shape[0]
+#         boundary_points_whole = np.copy(boundary_points)
         
-        while len(rows_to_fuse_boundary_points) != 0:
-            points_new = np.reshape(boundary_points_whole[rows_to_fuse_boundary_points_whole],(-1,2))
-            boundary_points_fused = 0.5*(points_new[0::2] + points_new[1::2])
+#         while len(rows_to_fuse_boundary_points) != 0:
+#             points_new = np.reshape(boundary_points_whole[rows_to_fuse_boundary_points_whole],(-1,2))
+#             boundary_points_fused = 0.5*(points_new[0::2] + points_new[1::2])
             
-            # boundary_points_fused = boundary_points_fused.round(decimals=0)
-            boundary_points_fused = np.round(boundary_points_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
+#             # boundary_points_fused = boundary_points_fused.round(decimals=0)
+#             boundary_points_fused = np.round(boundary_points_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
             
-            # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
-            if len(np.unique(boundary_points_fused,axis=0)) != len(boundary_points_fused):
-                [unique_pts,unique_inverse] = np.unique(boundary_points_fused,return_inverse=True,axis=0)
-                # Replace the indices of closeby points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
-                for i in range(0,len(rows_to_fuse_boundary_points)):
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                boundary_points_fused = unique_pts.astype(float)
-            else:
-                # Replace the indices of two close points with the index of new merged point in both boundary_ridges_new and infinite_ridges_new lists
-                for i in range(0,len(rows_to_fuse_boundary_points)):
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#             # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
+#             if len(np.unique(boundary_points_fused,axis=0)) != len(boundary_points_fused):
+#                 [unique_pts,unique_inverse] = np.unique(boundary_points_fused,return_inverse=True,axis=0)
+#                 # Replace the indices of closeby points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+#                 for i in range(0,len(rows_to_fuse_boundary_points)):
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                 boundary_points_fused = unique_pts.astype(float)
+#             else:
+#                 # Replace the indices of two close points with the index of new merged point in both boundary_ridges_new and infinite_ridges_new lists
+#                 for i in range(0,len(rows_to_fuse_boundary_points)):
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
                     
-            boundary_points_whole = np.vstack((boundary_points_whole,boundary_points_fused)) # create a whole vertex list        
-            boundary_points_new = np.vstack((np.delete(boundary_points,rows_to_fuse_boundary_points,0),boundary_points_fused)) # create a new vertex list
+#             boundary_points_whole = np.vstack((boundary_points_whole,boundary_points_fused)) # create a whole vertex list        
+#             boundary_points_new = np.vstack((np.delete(boundary_points,rows_to_fuse_boundary_points,0),boundary_points_fused)) # create a new vertex list
             
             
-            # update the boundary_points
-            boundary_points = np.copy(boundary_points_new)
-            nboundary_pts = boundary_points_whole.shape[0]
-            # update the kd-tree
-            tree_boundary_points = cKDTree(boundary_points)
-            rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
-            # update the rows_to_fuse in list voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
-            rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
-            for i in range(0,len(rows_to_fuse_boundary_points)):
-                rows_to_fuse_boundary_points_whole[i,0] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,0],:],axis=1))[0][0]
-                rows_to_fuse_boundary_points_whole[i,1] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,1],:],axis=1))[0][0]
+#             # update the boundary_points
+#             boundary_points = np.copy(boundary_points_new)
+#             nboundary_pts = boundary_points_whole.shape[0]
+#             # update the kd-tree
+#             tree_boundary_points = cKDTree(boundary_points)
+#             rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
+#             # update the rows_to_fuse in list voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
+#             rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
+#             for i in range(0,len(rows_to_fuse_boundary_points)):
+#                 rows_to_fuse_boundary_points_whole[i,0] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,0],:],axis=1))[0][0]
+#                 rows_to_fuse_boundary_points_whole[i,1] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,1],:],axis=1))[0][0]
         
                     
-        # delete rows with identical indices and reverse indices in finite_ridges_merged
-        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
-        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in finite_ridges_merged
+#         zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+#         boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
         
-        # delete rows with identical indices and reverse indices in infinite_ridges_merged
-        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#         zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#         infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
           
-        # replace too close boundary points with the featured
-        tree_boundary_points_whole = cKDTree(boundary_points_whole)
-        for i in range(0,boundary_points_featured.shape[0]):
-            rows_to_replace_boundary_points_whole = tree_boundary_points_whole.query_ball_point(boundary_points_featured[i,:],merge_tol)
-            if len(rows_to_replace_boundary_points_whole) != 0: 
-                # Visualize nearby points
-                nearby_points = boundary_points_whole[rows_to_replace_boundary_points_whole]
-                # replace indices
-                for j in range(0,len(rows_to_replace_boundary_points_whole)):
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
+#         # replace too close boundary points with the featured
+#         tree_boundary_points_whole = cKDTree(boundary_points_whole)
+#         for i in range(0,boundary_points_featured.shape[0]):
+#             rows_to_replace_boundary_points_whole = tree_boundary_points_whole.query_ball_point(boundary_points_featured[i,:],merge_tol)
+#             if len(rows_to_replace_boundary_points_whole) != 0: 
+#                 # Visualize nearby points
+#                 nearby_points = boundary_points_whole[rows_to_replace_boundary_points_whole]
+#                 # replace indices
+#                 for j in range(0,len(rows_to_replace_boundary_points_whole)):
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
         
-        # delete rows with identical indices and reverse indices in boundary_ridges_merged
-        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
-        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in boundary_ridges_merged
+#         zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+#         boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
         
-        # delete rows with identical indices and reverse indices in infinite_ridges_merged
-        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#         zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#         infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
         
-        # Case 3 merge (after loop of case 1 and 2)
-        for i in range(0,len(boundary_points)):
-            rows_to_replace_voronoi_vertices_in = tree_voronoi_vertices_in.query_ball_point(boundary_points[i,:],merge_tol)
-            if len(rows_to_replace_voronoi_vertices_in) != 0:
-                # update the rows_to_place_voronoi_vertices_in with the rows-to-replace in list voronoi_vertices_in_whole
-                rows_to_replace_voronoi_vertices_in_whole = np.copy(rows_to_replace_voronoi_vertices_in)
-                for j in range(0,len(rows_to_replace_voronoi_vertices_in_whole)):
-                    rows_to_replace_voronoi_vertices_in_whole[j] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in[rows_to_replace_voronoi_vertices_in[j],:],axis=1))[0][0]
+#         # Case 3 merge (after loop of case 1 and 2)
+#         for i in range(0,len(boundary_points)):
+#             rows_to_replace_voronoi_vertices_in = tree_voronoi_vertices_in.query_ball_point(boundary_points[i,:],merge_tol)
+#             if len(rows_to_replace_voronoi_vertices_in) != 0:
+#                 # update the rows_to_place_voronoi_vertices_in with the rows-to-replace in list voronoi_vertices_in_whole
+#                 rows_to_replace_voronoi_vertices_in_whole = np.copy(rows_to_replace_voronoi_vertices_in)
+#                 for j in range(0,len(rows_to_replace_voronoi_vertices_in_whole)):
+#                     rows_to_replace_voronoi_vertices_in_whole[j] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in[rows_to_replace_voronoi_vertices_in[j],:],axis=1))[0][0]
         
-                # Visualize nearby points
-                nearby_points = voronoi_vertices_in_whole[rows_to_replace_voronoi_vertices_in_whole]
-                # replace indices
-                for rows in rows_to_replace_voronoi_vertices_in_whole:
-                    finite_ridges_merged[finite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
-                    infinite_ridges_merged[infinite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
+#                 # Visualize nearby points
+#                 nearby_points = voronoi_vertices_in_whole[rows_to_replace_voronoi_vertices_in_whole]
+#                 # replace indices
+#                 for rows in rows_to_replace_voronoi_vertices_in_whole:
+#                     finite_ridges_merged[finite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
+#                     infinite_ridges_merged[infinite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
 
-        zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
-        finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+#         zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+#         finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
         
-        # delete rows with identical indices and reverse indices in infinite_ridges_merged
-        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#         zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#         infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
 
-        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-        voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
+#         voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+#         voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
 
-        all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged,boundary_ridges_merged))
+#         all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged,boundary_ridges_merged))
         
-    else:
-        boundary_points_whole = np.copy(boundary_points)
-        voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
-        all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged))
+#     else:
+#         boundary_points_whole = np.copy(boundary_points)
+#         voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
+#         all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged))
         
-    # Visualize merged mesh   
-    for vpair in all_ridges_merged:
-        plt.plot([voronoi_vertices_whole[vpair[0],0], voronoi_vertices_whole[vpair[1],0]],[voronoi_vertices_whole[vpair[0],1], voronoi_vertices_whole[vpair[1],1]], 'g--')
+#     # Visualize merged mesh   
+#     for vpair in all_ridges_merged:
+#         plt.plot([voronoi_vertices_whole[vpair[0],0], voronoi_vertices_whole[vpair[1],0]],[voronoi_vertices_whole[vpair[0],1], voronoi_vertices_whole[vpair[1],1]], 'g--')
     
     
-    voronoi_vertices = np.unique(np.reshape(voronoi_vertices_whole[all_ridges_merged],(-1,2)),axis=0)
-    # update the indices from voronoi_vertices_whole to voronoi_vertices(which is the list with no useless points)
-    for i in range(0,len(finite_ridges_merged)):
-        finite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,0],:],axis=1))[0][0]
-        finite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,1],:],axis=1))[0][0]
-    for i in range(0,len(infinite_ridges_merged)):
-        infinite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,0],:],axis=1))[0][0]
-        infinite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,1],:],axis=1))[0][0]
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:  
-        for i in range(0,len(boundary_ridges_merged)):
-            boundary_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,0],:],axis=1))[0][0]
-            boundary_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,1],:],axis=1))[0][0]
-    # delete rows with identical indices and reverse indices in finite_ridges_merged
-    zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
-    finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
-    # delete rows with identical indices and reverse indices in infinite_ridges_merged
-    zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-    infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#     voronoi_vertices = np.unique(np.reshape(voronoi_vertices_whole[all_ridges_merged],(-1,2)),axis=0)
+#     # update the indices from voronoi_vertices_whole to voronoi_vertices(which is the list with no useless points)
+#     for i in range(0,len(finite_ridges_merged)):
+#         finite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,0],:],axis=1))[0][0]
+#         finite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,1],:],axis=1))[0][0]
+#     for i in range(0,len(infinite_ridges_merged)):
+#         infinite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,0],:],axis=1))[0][0]
+#         infinite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,1],:],axis=1))[0][0]
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']:  
+#         for i in range(0,len(boundary_ridges_merged)):
+#             boundary_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,0],:],axis=1))[0][0]
+#             boundary_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,1],:],axis=1))[0][0]
+#     # delete rows with identical indices and reverse indices in finite_ridges_merged
+#     zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+#     finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+#     # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#     zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#     infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
     
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
-        # delete rows with identical indices and reverse indices in boundary_ridges_merged
-        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
-        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+#         # delete rows with identical indices and reverse indices in boundary_ridges_merged
+#         zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+#         boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
     
-    # voronoi_vertices = voronoi_vertices_whole
-    nvertex = voronoi_vertices.shape[0]
-    finite_ridges_new = finite_ridges_merged
-    nfinite_ridge = finite_ridges_new.shape[0]
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
-        boundary_ridges_new = np.vstack((infinite_ridges_merged,boundary_ridges_merged))
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
+#     # voronoi_vertices = voronoi_vertices_whole
+#     nvertex = voronoi_vertices.shape[0]
+#     finite_ridges_new = finite_ridges_merged
+#     nfinite_ridge = finite_ridges_new.shape[0]
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+#         boundary_ridges_new = np.vstack((infinite_ridges_merged,boundary_ridges_merged))
+#         nboundary_ridge = boundary_ridges_new.shape[0]
+#         voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+#         nridge = voronoi_ridges.shape[0]
         
-        intersect_temp = intersect2D(np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0),np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0))
-        nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0] - len(intersect_temp)
-        nboundary_pts = np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0).shape[0]
-    else:
-        boundary_ridges_new = np.copy(infinite_ridges_merged)  
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
+#         intersect_temp = intersect2D(np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0),np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0))
+#         nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0] - len(intersect_temp)
+#         nboundary_pts = np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0).shape[0]
+#     else:
+#         boundary_ridges_new = np.copy(infinite_ridges_merged)  
+#         nboundary_ridge = boundary_ridges_new.shape[0]
+#         voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+#         nridge = voronoi_ridges.shape[0]
         
-        nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0]
+#         nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0]
 
-    return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-           boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-           nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
+#     return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
+#            boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+#            nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
            
 
-def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttray_directions,\
-                                            boundaries,merge_tol,boundaryFlag):
-    """Clip Voronoi mesh by the boundaries, merge short Voronoi ridges, rebuild the new Voronoi mesh"""
-    # Store indices of Voronoi vertices for each finite ridge
-    finite_ridges = ttedges
-    finite_ridges_pointid = []
-    infinite_ridges = np.zeros((ttray_origins.shape[0],2))
-    infinite_ridges[:,0] = ttray_origins
-    infinite_ridges_pointid = []
-    boundary_points = []
+# def RebuildVoronoi_ConformingDelaunay_merge(ttvertices,ttedges,ttray_origins,ttray_directions,\
+#                                             boundaries,merge_tol,boundaryFlag):
+#     """Clip Voronoi mesh by the boundaries, merge short Voronoi ridges, rebuild the new Voronoi mesh"""
+#     # Store indices of Voronoi vertices for each finite ridge
+#     finite_ridges = ttedges
+#     finite_ridges_pointid = []
+#     infinite_ridges = np.zeros((ttray_origins.shape[0],2))
+#     infinite_ridges[:,0] = ttray_origins
+#     infinite_ridges_pointid = []
+#     boundary_points = []
     
-    # Form two new Voronoi vertices lists with and without out-of-bound vertices
-    voronoi_vertices_in = ttvertices
-    # plt.plot(voronoi_vertices_in[:, 0], voronoi_vertices_in[:, 1], 'ro')
+#     # Form two new Voronoi vertices lists with and without out-of-bound vertices
+#     voronoi_vertices_in = ttvertices
+#     # plt.plot(voronoi_vertices_in[:, 0], voronoi_vertices_in[:, 1], 'ro')
             
-    # Find the intersect point of infinite ridges (rays) with the boundary lines
-    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
-    for i in range(0,len(ttray_origins)):
-        p = ttvertices[ttray_origins[i]]
-        normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal
+#     # Find the intersect point of infinite ridges (rays) with the boundary lines
+#     # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+#     for i in range(0,len(ttray_origins)):
+#         p = ttvertices[ttray_origins[i]]
+#         normal = ttray_directions[i,:]/np.linalg.norm(ttray_directions[i,:]) # normal
 
-        for boundary in boundaries: # loop over boundary lines
-            q = np.asarray(boundary[1][0])
-            s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-            t = np.cross((q-p),s)/np.cross(normal,s)
-            u = np.cross((q-p),normal)/np.cross(normal,s)
+#         for boundary in boundaries: # loop over boundary lines
+#             q = np.asarray(boundary[1][0])
+#             s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+#             t = np.cross((q-p),s)/np.cross(normal,s)
+#             u = np.cross((q-p),normal)/np.cross(normal,s)
             
-            if (u >= 0) and (u <= 1):
-                if (t >= 0) and math.isfinite(t):
-                    t_final = t
+#             if (u >= 0) and (u <= 1):
+#                 if (t >= 0) and math.isfinite(t):
+#                     t_final = t
                             
-        intersect_point = p + normal * t_final
-        boundary_points.append(intersect_point)
-        # plt.plot([ttvertices[ttray_origins[i],0], intersect_point[0]], [ttvertices[ttray_origins[i],1], intersect_point[1]], 'b-',linewidth=1)
+#         intersect_point = p + normal * t_final
+#         boundary_points.append(intersect_point)
+#         # plt.plot([ttvertices[ttray_origins[i],0], intersect_point[0]], [ttvertices[ttray_origins[i],1], intersect_point[1]], 'b-',linewidth=1)
             
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-        boundary_points = np.asarray(boundary_points)
-        boundary_points_featured = [x[1][0] for x in boundaries]
-        boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
-        nboundary_pts_featured = boundary_points_featured.shape[0]
-        boundary_points = np.vstack((boundary_points,boundary_points_featured))
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
-        nboundary_pts_ini = boundary_points.shape[0]
-        ninfinite_ridge = infinite_ridges.shape[0]
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+#         boundary_points = np.asarray(boundary_points)
+#         boundary_points_featured = [x[1][0] for x in boundaries]
+#         boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
+#         nboundary_pts_featured = boundary_points_featured.shape[0]
+#         boundary_points = np.vstack((boundary_points,boundary_points_featured))
+#         nvertices_in = voronoi_vertices_in.shape[0]
+#         nboundary_pts = boundary_points.shape[0]
+#         finite_ridges = np.asarray(finite_ridges)
+#         nfinite_ridge = finite_ridges.shape[0]
+#         nboundary_pts_ini = boundary_points.shape[0]
+#         ninfinite_ridge = infinite_ridges.shape[0]
            
-    else:
-        boundary_points = np.asarray(boundary_points)
-        nboundary_pts_featured = 0
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
+#     else:
+#         boundary_points = np.asarray(boundary_points)
+#         nboundary_pts_featured = 0
+#         nvertices_in = voronoi_vertices_in.shape[0]
+#         nboundary_pts = boundary_points.shape[0]
+#         finite_ridges = np.asarray(finite_ridges)
+#         nfinite_ridge = finite_ridges.shape[0]
 
-        ninfinite_ridge = infinite_ridges.shape[0]
+#         ninfinite_ridge = infinite_ridges.shape[0]
            
-    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
-    finite_ridges_new = np.copy(finite_ridges)
-    infinite_ridges_new = np.copy(infinite_ridges)
-    for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
-        infinite_ridges_new[i,1] = nvertices_in + i
+#     # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
+#     finite_ridges_new = np.copy(finite_ridges)
+#     infinite_ridges_new = np.copy(infinite_ridges)
+#     for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
+#         infinite_ridges_new[i,1] = nvertices_in + i
 
     
-    # Merge operation
-    # Case 1 merge
-    voronoi_vertices_in_whole = np.copy(voronoi_vertices_in)
-    tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
-    rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
-    rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
+#     # Merge operation
+#     # Case 1 merge
+#     voronoi_vertices_in_whole = np.copy(voronoi_vertices_in)
+#     tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
+#     rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
+#     rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
         
-    finite_ridges_merged = np.copy(finite_ridges_new)
-    infinite_ridges_merged = np.copy(infinite_ridges_new)
-    while len(rows_to_fuse_voronoi_vertices_in) != 0:
-        points_new = np.reshape(voronoi_vertices_in_whole[rows_to_fuse_voronoi_vertices_in_whole],(-1,2))
-        voronoi_vertices_in_fused = 0.5*(points_new[0::2] + points_new[1::2])
+#     finite_ridges_merged = np.copy(finite_ridges_new)
+#     infinite_ridges_merged = np.copy(infinite_ridges_new)
+#     while len(rows_to_fuse_voronoi_vertices_in) != 0:
+#         points_new = np.reshape(voronoi_vertices_in_whole[rows_to_fuse_voronoi_vertices_in_whole],(-1,2))
+#         voronoi_vertices_in_fused = 0.5*(points_new[0::2] + points_new[1::2])
         
-        # voronoi_vertices_in_fused = voronoi_vertices_in_fused.round(decimals=0)
-        voronoi_vertices_in_fused = np.round(voronoi_vertices_in_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
+#         # voronoi_vertices_in_fused = voronoi_vertices_in_fused.round(decimals=0)
+#         voronoi_vertices_in_fused = np.round(voronoi_vertices_in_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
 
-        # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
-        if len(np.unique(voronoi_vertices_in_fused,axis=0)) != len(voronoi_vertices_in_fused):
-            [unique_pts,unique_inverse] = np.unique(voronoi_vertices_in_fused,return_inverse=True,axis=0)
+#         # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
+#         if len(np.unique(voronoi_vertices_in_fused,axis=0)) != len(voronoi_vertices_in_fused):
+#             [unique_pts,unique_inverse] = np.unique(voronoi_vertices_in_fused,return_inverse=True,axis=0)
             
-            # Offset the indices of boundary points as we inserted points in vertice_in list
-            infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(unique_pts)
-            # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
-            for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
-            voronoi_vertices_in_fused = unique_pts.astype(float)
-        else:
-            # Offset the indices of boundary points as we inserted points in vertice_in list
-            infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(rows_to_fuse_voronoi_vertices_in_whole)
-            # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
-            for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
-                finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
-                infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
+#             # Offset the indices of boundary points as we inserted points in vertice_in list
+#             infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(unique_pts)
+#             # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+#             for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + unique_inverse[i]
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + unique_inverse[i]
+#             voronoi_vertices_in_fused = unique_pts.astype(float)
+#         else:
+#             # Offset the indices of boundary points as we inserted points in vertice_in list
+#             infinite_ridges_merged[infinite_ridges_merged >= nvertices_in] += len(rows_to_fuse_voronoi_vertices_in_whole)
+#             # Replace the indices of two close points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+#             for i in range(0,len(rows_to_fuse_voronoi_vertices_in_whole)):
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
+#                 finite_ridges_merged[finite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,0]] = nvertices_in + i
+#                 infinite_ridges_merged[infinite_ridges_merged == rows_to_fuse_voronoi_vertices_in_whole[i,1]] = nvertices_in + i
                 
-        voronoi_vertices_in_whole = np.vstack((voronoi_vertices_in_whole,voronoi_vertices_in_fused)) # create a whole vertex list
-        voronoi_vertices_in_new = np.vstack((np.delete(voronoi_vertices_in,rows_to_fuse_voronoi_vertices_in,0),voronoi_vertices_in_fused)) # create a new vertex list
-        # update the voronoi_vertices_in
-        voronoi_vertices_in = np.copy(voronoi_vertices_in_new)
-        nvertices_in = voronoi_vertices_in_whole.shape[0]
-        # update the kd-tree
-        tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
-        rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
-        # update the rows_to_fuse_voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
-        rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
-        for i in range(0,len(rows_to_fuse_voronoi_vertices_in)):
-            rows_to_fuse_voronoi_vertices_in_whole[i,0] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,0],:],axis=1))[0][0]
-            rows_to_fuse_voronoi_vertices_in_whole[i,1] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,1],:],axis=1))[0][0]
+#         voronoi_vertices_in_whole = np.vstack((voronoi_vertices_in_whole,voronoi_vertices_in_fused)) # create a whole vertex list
+#         voronoi_vertices_in_new = np.vstack((np.delete(voronoi_vertices_in,rows_to_fuse_voronoi_vertices_in,0),voronoi_vertices_in_fused)) # create a new vertex list
+#         # update the voronoi_vertices_in
+#         voronoi_vertices_in = np.copy(voronoi_vertices_in_new)
+#         nvertices_in = voronoi_vertices_in_whole.shape[0]
+#         # update the kd-tree
+#         tree_voronoi_vertices_in = cKDTree(voronoi_vertices_in)
+#         rows_to_fuse_voronoi_vertices_in = tree_voronoi_vertices_in.query_pairs(r=merge_tol,output_type='ndarray')
+#         # update the rows_to_fuse_voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
+#         rows_to_fuse_voronoi_vertices_in_whole = np.copy(rows_to_fuse_voronoi_vertices_in)
+#         for i in range(0,len(rows_to_fuse_voronoi_vertices_in)):
+#             rows_to_fuse_voronoi_vertices_in_whole[i,0] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,0],:],axis=1))[0][0]
+#             rows_to_fuse_voronoi_vertices_in_whole[i,1] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in_new[rows_to_fuse_voronoi_vertices_in[i,1],:],axis=1))[0][0]
 
-    # delete rows with identical indices and reverse indices in finite_ridges_merged
-    zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
-    finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+#     # delete rows with identical indices and reverse indices in finite_ridges_merged
+#     zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+#     finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
     
-    # delete rows with identical indices and reverse indices in infinite_ridges_merged
-    zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-    infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#     # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#     zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#     infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
     
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
-        # construct the connectivity for a line path consisting of the boundary points
-        ####################################################################################################################################################
-        # The algorithm here needs improve: bug contains when searching for the closest point, the closest point may be on the other sides
-        ####################################################################################################################################################
-        boundary_points_ini = np.copy(boundary_points) 
-        boundary_ridges_new = np.zeros(boundary_points.shape)
-        boundary_points_new = np.copy(boundary_points) 
-        next_point = np.copy(boundary_points_new[0])  # get first point
-        boundary_points_new[0] = [np.inf,np.inf]
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+#         # construct the connectivity for a line path consisting of the boundary points
+#         ####################################################################################################################################################
+#         # The algorithm here needs improve: bug contains when searching for the closest point, the closest point may be on the other sides
+#         ####################################################################################################################################################
+#         boundary_points_ini = np.copy(boundary_points) 
+#         boundary_ridges_new = np.zeros(boundary_points.shape)
+#         boundary_points_new = np.copy(boundary_points) 
+#         next_point = np.copy(boundary_points_new[0])  # get first point
+#         boundary_points_new[0] = [np.inf,np.inf]
         
-        for i in range(0,boundary_points_new.shape[0]-1):
-            next_point_id = cdist([next_point], boundary_points_new).argmin()
-            boundary_ridges_new[i,1] = next_point_id
-            boundary_ridges_new[i+1,0] = next_point_id
-            next_point = np.copy(boundary_points_new[next_point_id])
-            boundary_points_new[next_point_id] = [np.inf,np.inf]
-        boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
+#         for i in range(0,boundary_points_new.shape[0]-1):
+#             next_point_id = cdist([next_point], boundary_points_new).argmin()
+#             boundary_ridges_new[i,1] = next_point_id
+#             boundary_ridges_new[i+1,0] = next_point_id
+#             next_point = np.copy(boundary_points_new[next_point_id])
+#             boundary_points_new[next_point_id] = [np.inf,np.inf]
+#         boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
         
-        # Case 2 merge
-        tree_boundary_points = cKDTree(boundary_points)
-        rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
-        rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
-        boundary_ridges_merged = np.copy(boundary_ridges_new)
-        nboundary_pts = boundary_points.shape[0]
-        boundary_points_whole = np.copy(boundary_points)
+#         # Case 2 merge
+#         tree_boundary_points = cKDTree(boundary_points)
+#         rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
+#         rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
+#         boundary_ridges_merged = np.copy(boundary_ridges_new)
+#         nboundary_pts = boundary_points.shape[0]
+#         boundary_points_whole = np.copy(boundary_points)
         
-        while len(rows_to_fuse_boundary_points) != 0:
-            points_new = np.reshape(boundary_points_whole[rows_to_fuse_boundary_points_whole],(-1,2))
-            boundary_points_fused = 0.5*(points_new[0::2] + points_new[1::2])
+#         while len(rows_to_fuse_boundary_points) != 0:
+#             points_new = np.reshape(boundary_points_whole[rows_to_fuse_boundary_points_whole],(-1,2))
+#             boundary_points_fused = 0.5*(points_new[0::2] + points_new[1::2])
             
-            # boundary_points_fused = boundary_points_fused.round(decimals=0)
-            boundary_points_fused = np.round(boundary_points_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
+#             # boundary_points_fused = boundary_points_fused.round(decimals=0)
+#             boundary_points_fused = np.round(boundary_points_fused/merge_tol).astype(int)*merge_tol # here we have to round to the nearest merge_tol number to avoid infinite loop
             
-            # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
-            if len(np.unique(boundary_points_fused,axis=0)) != len(boundary_points_fused):
-                [unique_pts,unique_inverse] = np.unique(boundary_points_fused,return_inverse=True,axis=0)
-                # Replace the indices of closeby points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
-                for i in range(0,len(rows_to_fuse_boundary_points)):
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
-                boundary_points_fused = unique_pts.astype(float)
-            else:
-                # Replace the indices of two close points with the index of new merged point in both boundary_ridges_new and infinite_ridges_new lists
-                for i in range(0,len(rows_to_fuse_boundary_points)):
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#             # check if there are identical merged points from different pairs of closeby points (usually happens when three points are clustered)
+#             if len(np.unique(boundary_points_fused,axis=0)) != len(boundary_points_fused):
+#                 [unique_pts,unique_inverse] = np.unique(boundary_points_fused,return_inverse=True,axis=0)
+#                 # Replace the indices of closeby points with the index of new merged point in both finite_ridges_new and infinite_ridges_new lists
+#                 for i in range(0,len(rows_to_fuse_boundary_points)):
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + unique_inverse[i]
+#                 boundary_points_fused = unique_pts.astype(float)
+#             else:
+#                 # Replace the indices of two close points with the index of new merged point in both boundary_ridges_new and infinite_ridges_new lists
+#                 for i in range(0,len(rows_to_fuse_boundary_points)):
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,0]+nvertices_in)] = nvertices_in + nboundary_pts + i
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_fuse_boundary_points_whole[i,1]+nvertices_in)] = nvertices_in + nboundary_pts + i
                     
-            boundary_points_whole = np.vstack((boundary_points_whole,boundary_points_fused)) # create a whole vertex list        
-            boundary_points_new = np.vstack((np.delete(boundary_points,rows_to_fuse_boundary_points,0),boundary_points_fused)) # create a new vertex list
+#             boundary_points_whole = np.vstack((boundary_points_whole,boundary_points_fused)) # create a whole vertex list        
+#             boundary_points_new = np.vstack((np.delete(boundary_points,rows_to_fuse_boundary_points,0),boundary_points_fused)) # create a new vertex list
             
             
-            # update the boundary_points
-            boundary_points = np.copy(boundary_points_new)
-            nboundary_pts = boundary_points_whole.shape[0]
-            # update the kd-tree
-            tree_boundary_points = cKDTree(boundary_points)
-            rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
-            # update the rows_to_fuse in list voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
-            rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
-            for i in range(0,len(rows_to_fuse_boundary_points)):
-                rows_to_fuse_boundary_points_whole[i,0] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,0],:],axis=1))[0][0]
-                rows_to_fuse_boundary_points_whole[i,1] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,1],:],axis=1))[0][0]
+#             # update the boundary_points
+#             boundary_points = np.copy(boundary_points_new)
+#             nboundary_pts = boundary_points_whole.shape[0]
+#             # update the kd-tree
+#             tree_boundary_points = cKDTree(boundary_points)
+#             rows_to_fuse_boundary_points = tree_boundary_points.query_pairs(r=merge_tol,output_type='ndarray')
+#             # update the rows_to_fuse in list voronoi_vertices_in with the rows-to-fuse in list voronoi_vertices_in_whole
+#             rows_to_fuse_boundary_points_whole = np.copy(rows_to_fuse_boundary_points)
+#             for i in range(0,len(rows_to_fuse_boundary_points)):
+#                 rows_to_fuse_boundary_points_whole[i,0] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,0],:],axis=1))[0][0]
+#                 rows_to_fuse_boundary_points_whole[i,1] = np.where(np.all(boundary_points_whole==boundary_points_new[rows_to_fuse_boundary_points[i,1],:],axis=1))[0][0]
         
                     
-        # delete rows with identical indices and reverse indices in finite_ridges_merged
-        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
-        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in finite_ridges_merged
+#         zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+#         boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
         
-        # delete rows with identical indices and reverse indices in infinite_ridges_merged
-        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#         zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#         infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
           
-        # replace too close boundary points with the featured
-        tree_boundary_points_whole = cKDTree(boundary_points_whole)
-        for i in range(0,boundary_points_featured.shape[0]):
-            rows_to_replace_boundary_points_whole = tree_boundary_points_whole.query_ball_point(boundary_points_featured[i,:],merge_tol)
-            if len(rows_to_replace_boundary_points_whole) != 0: 
-                # Visualize nearby points
-                nearby_points = boundary_points_whole[rows_to_replace_boundary_points_whole]
-                # replace indices
-                for j in range(0,len(rows_to_replace_boundary_points_whole)):
-                    boundary_ridges_merged[boundary_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
-                    infinite_ridges_merged[infinite_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
+#         # replace too close boundary points with the featured
+#         tree_boundary_points_whole = cKDTree(boundary_points_whole)
+#         for i in range(0,boundary_points_featured.shape[0]):
+#             rows_to_replace_boundary_points_whole = tree_boundary_points_whole.query_ball_point(boundary_points_featured[i,:],merge_tol)
+#             if len(rows_to_replace_boundary_points_whole) != 0: 
+#                 # Visualize nearby points
+#                 nearby_points = boundary_points_whole[rows_to_replace_boundary_points_whole]
+#                 # replace indices
+#                 for j in range(0,len(rows_to_replace_boundary_points_whole)):
+#                     boundary_ridges_merged[boundary_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
+#                     infinite_ridges_merged[infinite_ridges_merged == (rows_to_replace_boundary_points_whole[j]+nvertices_in)] = nvertices_in + nboundary_pts_ini + i
         
-        # delete rows with identical indices and reverse indices in boundary_ridges_merged
-        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
-        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in boundary_ridges_merged
+#         zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+#         boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
         
-        # delete rows with identical indices and reverse indices in infinite_ridges_merged
-        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0).astype(int)
+#         # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#         zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#         infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0).astype(int)
         
-        # Case 3 merge (after loop of case 1 and 2)
-        for i in range(0,len(boundary_points)):
-            rows_to_replace_voronoi_vertices_in = tree_voronoi_vertices_in.query_ball_point(boundary_points[i,:],merge_tol)
-            if len(rows_to_replace_voronoi_vertices_in) != 0:
-                # update the rows_to_place_voronoi_vertices_in with the rows-to-replace in list voronoi_vertices_in_whole
-                rows_to_replace_voronoi_vertices_in_whole = np.copy(rows_to_replace_voronoi_vertices_in)
-                for j in range(0,len(rows_to_replace_voronoi_vertices_in_whole)):
-                    rows_to_replace_voronoi_vertices_in_whole[j] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in[rows_to_replace_voronoi_vertices_in[j],:],axis=1))[0][0]
+#         # Case 3 merge (after loop of case 1 and 2)
+#         for i in range(0,len(boundary_points)):
+#             rows_to_replace_voronoi_vertices_in = tree_voronoi_vertices_in.query_ball_point(boundary_points[i,:],merge_tol)
+#             if len(rows_to_replace_voronoi_vertices_in) != 0:
+#                 # update the rows_to_place_voronoi_vertices_in with the rows-to-replace in list voronoi_vertices_in_whole
+#                 rows_to_replace_voronoi_vertices_in_whole = np.copy(rows_to_replace_voronoi_vertices_in)
+#                 for j in range(0,len(rows_to_replace_voronoi_vertices_in_whole)):
+#                     rows_to_replace_voronoi_vertices_in_whole[j] = np.where(np.all(voronoi_vertices_in_whole==voronoi_vertices_in[rows_to_replace_voronoi_vertices_in[j],:],axis=1))[0][0]
         
-                # Visualize nearby points
-                nearby_points = voronoi_vertices_in_whole[rows_to_replace_voronoi_vertices_in_whole]
-                # replace indices
-                for rows in rows_to_replace_voronoi_vertices_in_whole:
-                    finite_ridges_merged[finite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
-                    infinite_ridges_merged[infinite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
+#                 # Visualize nearby points
+#                 nearby_points = voronoi_vertices_in_whole[rows_to_replace_voronoi_vertices_in_whole]
+#                 # replace indices
+#                 for rows in rows_to_replace_voronoi_vertices_in_whole:
+#                     finite_ridges_merged[finite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
+#                     infinite_ridges_merged[infinite_ridges_merged == rows] = np.where(np.all(boundary_points_whole == boundary_points[i,:],axis=1))[0][0] + nvertices_in
 
-        zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
-        finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+#         zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+#         finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
         
-        # delete rows with identical indices and reverse indices in infinite_ridges_merged
-        zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-        infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#         # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#         zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#         infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
 
-        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-        voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
+#         voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+#         voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
 
-        all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged,boundary_ridges_merged)).astype(int)
+#         all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged,boundary_ridges_merged)).astype(int)
         
-    else:
-        boundary_points_whole = np.copy(boundary_points)
-        voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
-        all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged)).astype(int)
+#     else:
+#         boundary_points_whole = np.copy(boundary_points)
+#         voronoi_vertices_whole = np.vstack((voronoi_vertices_in_whole,boundary_points_whole)) # vertical stack "in" vetices and "cross" boundary points
+#         all_ridges_merged = np.vstack((finite_ridges_merged,infinite_ridges_merged)).astype(int)
 
-    # Visualize merged mesh   
-    for vpair in all_ridges_merged:
-        plt.plot([voronoi_vertices_whole[vpair[0],0], voronoi_vertices_whole[vpair[1],0]],[voronoi_vertices_whole[vpair[0],1], voronoi_vertices_whole[vpair[1],1]], 'g--')
+#     # Visualize merged mesh   
+#     for vpair in all_ridges_merged:
+#         plt.plot([voronoi_vertices_whole[vpair[0],0], voronoi_vertices_whole[vpair[1],0]],[voronoi_vertices_whole[vpair[0],1], voronoi_vertices_whole[vpair[1],1]], 'g--')
     
     
-    voronoi_vertices = np.unique(np.reshape(voronoi_vertices_whole[all_ridges_merged],(-1,2)),axis=0)
-    # update the indices from voronoi_vertices_whole to voronoi_vertices(which is the list with no useless points)
-    for i in range(0,len(finite_ridges_merged)):
-        finite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,0],:],axis=1))[0][0]
-        finite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,1],:],axis=1))[0][0]
-    for i in range(0,len(infinite_ridges_merged)):
-        infinite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,0],:],axis=1))[0][0]
-        infinite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,1],:],axis=1))[0][0]
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:  
-        for i in range(0,len(boundary_ridges_merged)):
-            boundary_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,0],:],axis=1))[0][0]
-            boundary_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,1],:],axis=1))[0][0]
-    # delete rows with identical indices and reverse indices in finite_ridges_merged
-    zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
-    finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
-    # delete rows with identical indices and reverse indices in infinite_ridges_merged
-    zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
-    infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
+#     voronoi_vertices = np.unique(np.reshape(voronoi_vertices_whole[all_ridges_merged],(-1,2)),axis=0)
+#     # update the indices from voronoi_vertices_whole to voronoi_vertices(which is the list with no useless points)
+#     for i in range(0,len(finite_ridges_merged)):
+#         finite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,0],:],axis=1))[0][0]
+#         finite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[finite_ridges_merged[i,1],:],axis=1))[0][0]
+#     for i in range(0,len(infinite_ridges_merged)):
+#         infinite_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,0],:],axis=1))[0][0]
+#         infinite_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[infinite_ridges_merged[i,1],:],axis=1))[0][0]
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']:  
+#         for i in range(0,len(boundary_ridges_merged)):
+#             boundary_ridges_merged[i,0] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,0],:],axis=1))[0][0]
+#             boundary_ridges_merged[i,1] = np.where(np.all(voronoi_vertices==voronoi_vertices_whole[boundary_ridges_merged[i,1],:],axis=1))[0][0]
+#     # delete rows with identical indices and reverse indices in finite_ridges_merged
+#     zero_rows = np.where((finite_ridges_merged[:,0] - finite_ridges_merged[:,1]) == 0)[0]
+#     finite_ridges_merged = np.delete(finite_ridges_merged,zero_rows,0)
+#     # delete rows with identical indices and reverse indices in infinite_ridges_merged
+#     zero_rows = np.where((infinite_ridges_merged[:,0] - infinite_ridges_merged[:,1]) == 0)[0]
+#     infinite_ridges_merged = np.delete(infinite_ridges_merged,zero_rows,0)
     
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
-        # delete rows with identical indices and reverse indices in boundary_ridges_merged
-        zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
-        boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+#         # delete rows with identical indices and reverse indices in boundary_ridges_merged
+#         zero_rows = np.where((boundary_ridges_merged[:,0] - boundary_ridges_merged[:,1]) == 0)[0]
+#         boundary_ridges_merged = np.delete(boundary_ridges_merged,zero_rows,0)
     
-    # voronoi_vertices = voronoi_vertices_whole
-    nvertex = voronoi_vertices.shape[0]
-    finite_ridges_new = finite_ridges_merged
-    nfinite_ridge = finite_ridges_new.shape[0]
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
-        boundary_ridges_new = np.vstack((infinite_ridges_merged,boundary_ridges_merged))
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
+#     # voronoi_vertices = voronoi_vertices_whole
+#     nvertex = voronoi_vertices.shape[0]
+#     finite_ridges_new = finite_ridges_merged
+#     nfinite_ridge = finite_ridges_new.shape[0]
+#     if boundaryFlag in ['on','On','Y','y','Yes','yes']: 
+#         boundary_ridges_new = np.vstack((infinite_ridges_merged,boundary_ridges_merged))
+#         nboundary_ridge = boundary_ridges_new.shape[0]
+#         voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+#         nridge = voronoi_ridges.shape[0]
         
-        intersect_temp = intersect2D(np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0),np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0))
-        nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0] - len(intersect_temp)
-        nboundary_pts = np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0).shape[0]
-    else:
-        boundary_ridges_new = np.copy(infinite_ridges_merged)  
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
+#         intersect_temp = intersect2D(np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0),np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0))
+#         nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0] - len(intersect_temp)
+#         nboundary_pts = np.unique(np.reshape(voronoi_vertices_whole[boundary_ridges_merged],(-1,2)),axis=0).shape[0]
+#     else:
+#         boundary_ridges_new = np.copy(infinite_ridges_merged)  
+#         nboundary_ridge = boundary_ridges_new.shape[0]
+#         voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+#         nridge = voronoi_ridges.shape[0]
         
-        nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0]
+#         nvertices_in = np.unique(np.reshape(voronoi_vertices_whole[finite_ridges_merged],(-1,2)),axis=0).shape[0]
         
         
-    # if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-    #     # construct the connectivity for a line path consisting of the boundary points
-    #     boundary_ridges_new = np.zeros(boundary_points.shape)
-    #     boundary_points_new = np.copy(boundary_points) 
-    #     next_point = np.copy(boundary_points_new[0])  # get first point
-    #     boundary_points_new[0] = [np.inf,np.inf]
+#     # if boundaryFlag in ['on','On','Y','y','Yes','yes']:
+#     #     # construct the connectivity for a line path consisting of the boundary points
+#     #     boundary_ridges_new = np.zeros(boundary_points.shape)
+#     #     boundary_points_new = np.copy(boundary_points) 
+#     #     next_point = np.copy(boundary_points_new[0])  # get first point
+#     #     boundary_points_new[0] = [np.inf,np.inf]
         
-    #     for i in range(0,boundary_points_new.shape[0]-1):
-    #         next_point_id = cdist([next_point], boundary_points_new).argmin()
-    #         if check_iscollinear(next_point,boundary_points_new[next_point_id],boundaries) > 0: # check if the new line segment is collinear with any boundary line segment
-    #             boundary_ridges_new[i,1] = next_point_id
-    #             boundary_ridges_new[i+1,0] = next_point_id
-    #             next_point = np.copy(boundary_points_new[next_point_id])
-    #             boundary_points_new[next_point_id] = [np.inf,np.inf]
-    #         else:
-    #             boundary_points_new_check = np.copy(boundary_points_new)
-    #             while check_iscollinear(next_point,boundary_points_new_check[next_point_id],boundaries) == 0:
-    #                 boundary_points_new_check[next_point_id] = [np.inf,np.inf]
-    #                 next_point_id = cdist([next_point], boundary_points_new_check).argmin()
+#     #     for i in range(0,boundary_points_new.shape[0]-1):
+#     #         next_point_id = cdist([next_point], boundary_points_new).argmin()
+#     #         if check_iscollinear(next_point,boundary_points_new[next_point_id],boundaries) > 0: # check if the new line segment is collinear with any boundary line segment
+#     #             boundary_ridges_new[i,1] = next_point_id
+#     #             boundary_ridges_new[i+1,0] = next_point_id
+#     #             next_point = np.copy(boundary_points_new[next_point_id])
+#     #             boundary_points_new[next_point_id] = [np.inf,np.inf]
+#     #         else:
+#     #             boundary_points_new_check = np.copy(boundary_points_new)
+#     #             while check_iscollinear(next_point,boundary_points_new_check[next_point_id],boundaries) == 0:
+#     #                 boundary_points_new_check[next_point_id] = [np.inf,np.inf]
+#     #                 next_point_id = cdist([next_point], boundary_points_new_check).argmin()
                     
-    #             boundary_ridges_new[i,1] = next_point_id
-    #             boundary_ridges_new[i+1,0] = next_point_id
-    #             next_point = np.copy(boundary_points_new[next_point_id])
-    #             boundary_points_new[next_point_id] = [np.inf,np.inf]
+#     #             boundary_ridges_new[i,1] = next_point_id
+#     #             boundary_ridges_new[i+1,0] = next_point_id
+#     #             next_point = np.copy(boundary_points_new[next_point_id])
+#     #             boundary_points_new[next_point_id] = [np.inf,np.inf]
                 
-    #     boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
+#     #     boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
         
-    #     voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-    #     nvertex = voronoi_vertices.shape[0]
-    #     boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
-    #     nboundary_ridge = boundary_ridges_new.shape[0]
-    #     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-    #     nridge = voronoi_ridges.shape[0]
-    # else:
-    #     voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-    #     nvertex = voronoi_vertices.shape[0]
-    #     boundary_ridges_new = np.copy(infinite_ridges_new)
-    #     nboundary_ridge = boundary_ridges_new.shape[0]
-    #     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-    #     nridge = voronoi_ridges.shape[0]
+#     #     voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+#     #     nvertex = voronoi_vertices.shape[0]
+#     #     boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
+#     #     nboundary_ridge = boundary_ridges_new.shape[0]
+#     #     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+#     #     nridge = voronoi_ridges.shape[0]
+#     # else:
+#     #     voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
+#     #     nvertex = voronoi_vertices.shape[0]
+#     #     boundary_ridges_new = np.copy(infinite_ridges_new)
+#     #     nboundary_ridge = boundary_ridges_new.shape[0]
+#     #     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
+#     #     nridge = voronoi_ridges.shape[0]
     
-    return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-            nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
+#     return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
+#         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+#             nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
 
 
 def RebuildVoronoi_ConformingDelaunay_mergeNew(ttvertices,ttedges,ttray_origins,ttray_directions,\

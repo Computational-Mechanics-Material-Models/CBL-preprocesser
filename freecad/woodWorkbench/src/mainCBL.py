@@ -21,11 +21,10 @@ from pylab import *
 import os
 import time
 
-import shutil
-import tempfile
 from pathlib import Path
 import triangle as tr
 from scipy.spatial import Voronoi, voronoi_plot_2d
+import matplotlib.path as mpltPath
 import FreeCAD as App # type: ignore
 import FreeCADGui as Gui # type: ignore
 import feminout.importVTKResults as importVTK # type: ignore
@@ -62,7 +61,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         skeleton_density, merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams, rveFlag]\
+        knotFlag, knotParams]\
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
@@ -73,7 +72,7 @@ def main(self):
     # nsegments = int(height/grain_length)
     # z_max = 100
 
-    print(x_notch_size, y_notch_size)
+    # print(x_notch_size, y_notch_size)
     
 
     # ==================================================================
@@ -153,7 +152,7 @@ def main(self):
     elif radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
-        sites,radii = WoodMeshGen.CellPlacement_Binary_Lloyd(geoName,outDir,generation_center,r_max,r_min,\
+        sites,radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(geoName,outDir,generation_center,r_max,r_min,\
                                                     nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
                                                     print_interval)            
@@ -176,6 +175,7 @@ def main(self):
         # ---------------------------------------------
         # debug run
         sites,radii = WoodMeshGen.CellPlacement_Debug(nrings,width_heart,width_early,width_late)     
+        new_sites = sites
         
     else:
         print('Growth rule: {:s} is not supported for the current version, please check the README for more details.'.format(radial_growth_rule))
@@ -192,38 +192,47 @@ def main(self):
     # ==================================================================
     # Clipping box (boundaries) of the centroidal delauney points
     sites_centroid,x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
-        WoodMeshGen.Clipping_Box(new_sites,box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size,y_notch_size)
+        WoodMeshGen.Clipping_Box(new_sites,box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
     # Clipping box of the original points for voronoi
     sites_vor,x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
-        WoodMeshGen.Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,boundaryFlag,x_notch_size,y_notch_size)
+        WoodMeshGen.Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
+    
+    num_bound = np.shape(boundary_points_original)[0]  # create boundary segements to enforce boundaries 
+    boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
+    boundary_region = np.array([[box_center[0],box_center[1],1,0]])
 
     # ---------------------------------------------
-    # # Build flow mesh                    
-    delaunay_vertices = np.concatenate((np.array(sites_in), boundary_points_original))
-    # Conforming Delaunay
-    conforming_delaunay = tr.triangulate({'vertices': delaunay_vertices}, 'pq0Dec')
+    # # Build Delauney (flow) mesh             
+    # based on new centroid points       
+    delaunay_vertices = np.concatenate((boundary_points_original,np.array(sites_centroid))) # important the boundary points are listed first for index reasons
+    tri_inp = {'vertices': delaunay_vertices,'segments':boundary_segments,'regions':boundary_region}
+    conforming_delaunay = tr.triangulate(tri_inp, 'peAq0D') # peAq0c where the c encloses notches etc, needs to be fixed
     flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries)
 
     # ---------------------------------------------
     # # Build mechanical mesh 
-    vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
-    # for some reason vor_vertices are not unique, might be a problem -SA
-    # print(vor_vertices, vor_edges, ray_origins, ray_directions)
+    # based on old sites to get vor
+    delaunay_vertices_old = np.concatenate((boundary_points_original,np.array(sites_vor))) 
+    # important the boundary points are listed first for region index reasons, and thus not included in tessellation
+    tri_inp = {'vertices': delaunay_vertices_old,'segments':boundary_segments,'regions':boundary_region}
+    conforming_delaunay_old = tr.triangulate(tri_inp, 'peAq0D') 
+    vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay_old.get('vertices'))
 
+    plt.figure()
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
 
-    # plt.figure()
-    # ax = plt.gca()
-    # ax.set_aspect('equal', adjustable='box')
     # # flow points
     # vertsD = np.array(conforming_delaunay['vertices'])
     # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
+    # # vertsC = np.array(conforming_delaunay_old['vertices'])
+    # # ax.triplot(vertsC[:, 0], vertsC[:, 1], conforming_delaunay_old['triangles'], 'r^-',markersize=3.,linewidth=0.5)
     # # voronoi vertices
     # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'ko',markersize=2.)
-    # plt.show()
-
+    # # plt.show()
 
     voronoiTime = time.time() 
-    print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
+    # print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
 
     # ==================================================================
     self.form[1].progressBar.setValue(40) 
@@ -232,6 +241,9 @@ def main(self):
     # Rebuild the Voronoi mesh
 
     if merge_operation in ['on','On','Y','y','Yes','yes']:
+        # [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
+        # boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
+        #     nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
         [voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,voronoi_ridges,nridge] = \
@@ -239,41 +251,50 @@ def main(self):
                                                                 boundaries,merge_tol,boundaryFlag)
         
         RebuildvorTime = time.time() 
-        print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
+        # print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
     else:
             [voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,voronoi_ridges,nridge] = \
+        nboundary_pts,voronoi_ridges,nridge,infinite_ridges_new] = \
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
-                                                        boundaries,rveFlag,boundary_points_original) #*** added rveflag, clean up
+                                                        boundaries,boundaryFlag,boundary_points_original) #*** added rveflag, clean up
 
     RebuildvorTime = time.time()
 
     # ---------------------------------------------
     # Visualize the mesh
 
-    plt.figure()
     ax = plt.gca()
-    ax.set_aspect('equal', adjustable='box')
 
     # Flow
     vertsD = np.array(conforming_delaunay['vertices'])
-    ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
+    ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=1.,linewidth=0.5)
 
     # Main cells
+    # for beg, end in boundary_ridges_new.astype(int):
+    #     x0, y0 = voronoi_vertices[beg, :]
+    #     x1, y1 = voronoi_vertices[end, :]
+    #     ax.plot(
+    #         [x0, x1],
+    #         [y0, y1],'go-',linewidth=1.0,markersize=2.)
+    # for beg, end in infinite_ridges_new.astype(int):
+    #     x0, y0 = voronoi_vertices[beg, :]
+    #     x1, y1 = voronoi_vertices[end, :]
+    #     ax.plot(
+    #         [x0, x1],
+    #         [y0, y1],'ro-',linewidth=1.0,markersize=2.)
+    # for beg, end in finite_ridges_new.astype(int):
+    #     x0, y0 = voronoi_vertices[beg, :]
+    #     x1, y1 = voronoi_vertices[end, :]
+    #     ax.plot(
+    #         [x0, x1],
+    #         [y0, y1],'ko-',linewidth=1.0,markersize=2.)
     for beg, end in voronoi_ridges.astype(int):
         x0, y0 = voronoi_vertices[beg, :]
         x1, y1 = voronoi_vertices[end, :]
-        ax.fill(
-            [x0, x1],
-            [y0, y1],
-            facecolor='none',
-            edgecolor='k',
-            linewidth=1.0,
-        )
         ax.plot(
             [x0, x1],
-            [y0, y1],'ko',markersize=1.)
+            [y0, y1],'ko-',linewidth=1.0,markersize=2.)
         
     # plt.show()
     
@@ -448,7 +469,7 @@ def main(self):
     #     print('Generated cells and rings info has been saved.')
     
     FileTime = time.time() 
-    print('Files generated in {:.3f} seconds'.format(FileTime - BeamTime))
+    # print('Files generated in {:.3f} seconds'.format(FileTime - BeamTime))
 
 
     # ==============================================

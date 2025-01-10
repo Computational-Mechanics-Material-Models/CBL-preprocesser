@@ -84,7 +84,6 @@ def inputParams(form):
     precrack_size = float(form[0].x_precrack_size.text() or 0) # depth of precrack box_size*0.1
 
     boundaryFlag = form[0].boundaryFlag.currentText()
-    rveFlag = form[0].rveFlag.currentText()
 
     merge_operation = form[0].merge_operation.currentText() 
     merge_tol = float(form[0].merge_tol.text() or 0.015)
@@ -103,7 +102,7 @@ def inputParams(form):
         box_size = box_width
         z_min = 0
         z_max = box_height #box_size # segment_length = (z_max - z_min) / nsegments
-        randomFlag = 'On'
+        randomFlag = 'Off'
         x_notch_size = box_size*0.1 # depth of notch
         y_notch_size = box_size*0.1 # width of notch
 
