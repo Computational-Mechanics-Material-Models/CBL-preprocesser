@@ -117,12 +117,12 @@
               <widget class="QComboBox" name="radial_growth_rule">
                <item>
                 <property name="text">
-                 <string>debug</string>
+                 <string>binary_lloyd</string>
                 </property>
                </item>
                <item>
                 <property name="text">
-                 <string>binary_lloyd</string>
+                 <string>debug</string>
                 </property>
                </item>
               </widget>

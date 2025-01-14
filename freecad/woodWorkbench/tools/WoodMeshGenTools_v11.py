@@ -1273,7 +1273,6 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     # plt.text(next_point[0],next_point[1],str(0))
     
 
-    
     if boundaryFlag == 'On': 
         for i in range(0,boundary_points_new.shape[0]-1):
             next_point_id = cdist([next_point], boundary_points_new).argmin()
@@ -2895,7 +2894,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         ktol = 0.02
     else:
         ktol = 0.0
-    # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for l)
+    # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for long)
     for i in range(0,nel_con_tbot): # transverse bottom of beam
         Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:] # xyzz coords of first half
         Meshdata[i,3:6] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,1]-1,:] # xyz coords of second half
