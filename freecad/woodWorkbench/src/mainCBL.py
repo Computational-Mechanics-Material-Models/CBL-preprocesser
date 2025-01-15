@@ -374,6 +374,7 @@ def main(self):
         y_precrack = box_center[1]
         
         precrack_nodes = np.array([[x_notch, y_precrack, x_precrack, y_precrack]])
+
         [precrack_elem,nconnector_t_precrack,nconnector_l_precrack] = \
             WoodMeshGen.insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
                                     npt_per_layer_normal,npt_per_layer_vtk,\

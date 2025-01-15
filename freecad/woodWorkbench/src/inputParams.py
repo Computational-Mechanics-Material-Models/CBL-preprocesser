@@ -81,7 +81,7 @@ def inputParams(form):
     # Flags
     precrackFlag = form[0].precrackFlag.currentText()
     # precrack_widths = float(form[0].precrack_widths.text() or 0.1) # not used
-    precrack_size = float(form[0].x_precrack_size.text() or 0) # depth of precrack box_size*0.1
+    precrack_size = float(form[0].x_precrack_size.text() or 0.1) # depth of precrack
 
     boundaryFlag = form[0].boundaryFlag.currentText()
 
@@ -105,6 +105,7 @@ def inputParams(form):
         randomFlag = 'Off'
         x_notch_size = box_size*0.1 # depth of notch
         y_notch_size = box_size*0.1 # width of notch
+        precrack_size = box_size*0.01
 
     return geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \

@@ -2994,14 +2994,14 @@ def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
                      npt_per_layer_normal,npt_per_layer_vtk,\
                      nlayer,precrack_nodes,precrack_size,\
                      cellsize_early,nsegments):
-    
+
     precrack_midpts = (precrack_nodes[:,0:2]+precrack_nodes[:,2:4])/2.0
     ridge_midpts = all_pts_2D[all_ridges[:,2]]
     ridge_midpts_tree = cKDTree(ridge_midpts)
     near_ridges = []
     for i in range(0,len(precrack_midpts)):
         near_ridges.append(ridge_midpts_tree.query_ball_point(precrack_midpts[i,:],max(3*cellsize_early,1.5*np.linalg.norm(precrack_nodes[i,2:4]-precrack_midpts[i,:]))))
-        
+
     # Find the intersect point of neighboring ridges (lines) with the precrack line
     precrack_elem = []
     for i in range(0,len(precrack_nodes)):
@@ -3013,8 +3013,8 @@ def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
             u = np.cross((q-p),normal)/np.cross(normal,s)
             if (u >= 0) and (u <= 1):
                 precrack_elem.append(ridge)
-                
-    nprecracked_elem = len(precrack_elem)
+           
+    nprecracked_elem = len(precrack_elem) 
     
     # Apply precrack to every layer of beam segment
     precrack_elem = precrack_elem*nsegments # repeat list 
@@ -3024,8 +3024,12 @@ def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
     
     nconnector_t_precrack = len(precrack_elem)*3 # times 3 for bot,reg,top layers
     nconnector_l_precrack = 0
+
     # Visualize the precracks in the preview plot
-    plt.plot(precrack_nodes[0,0::2],precrack_nodes[0,1::2],'r-',linewidth=2)
+    ax = plt.gca()
+    ax.plot(precrack_nodes[0,0::2],precrack_nodes[0,1::2],'r-',linewidth=3)
+    plt.show()
+
     return precrack_elem, nconnector_t_precrack, nconnector_l_precrack
 
 
