@@ -18,7 +18,7 @@ from freecad.woodWorkbench.tools.grafted import GD, findGD
 from freecad.woodWorkbench.tools.custom_dist import pointDist
 from scipy.stats.stats import pearsonr, spearmanr
 from scipy.interpolate import interp1d
-from scipy.sparse import csr_array
+from scipy.sparse import bsr_array, coo_array
 import sys
 
 ############################################################################################################    
@@ -370,7 +370,7 @@ class RandomField():
         data = np.concatenate(data)
         row = np.concatenate(row)
         col = np.concatenate(col)
-        D0 = csr_array((data, (row, col)), shape=(n, m))
+        D0 = coo_array((data, (row, col)), shape=(n, m))
         return D0
 
     #############################################################################
