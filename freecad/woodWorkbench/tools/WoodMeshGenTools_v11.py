@@ -2840,12 +2840,56 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
     nconnector_t,nconnector_l,connector_l_vertex_dict
 
 
+def insert_precracks(all_pts_2D,all_ridges,nridge,precrack_nodes,\
+                     cellsize_early,nsegments):
+
+    precrack_midpts = (precrack_nodes[:,0:2]+precrack_nodes[:,2:4])/2.0
+    ridge_midpts = all_pts_2D[all_ridges[:,2]]
+    ridge_midpts_tree = cKDTree(ridge_midpts)
+    near_ridges = []
+    for i in range(0,len(precrack_midpts)):
+        near_ridges.append(ridge_midpts_tree.query_ball_point(precrack_midpts[i,:],max(1*cellsize_early,1*np.linalg.norm(precrack_nodes[i,2:4]-precrack_midpts[i,:]))))
+    print(near_ridges)
+    # Find the intersect point of neighboring ridges (lines) with the precrack line
+    # actually finding if the precrack just interesects? - SA
+    precrack_elem = []
+    for i in range(0,len(precrack_nodes)):
+        p = precrack_nodes[i,0:2] # find starting point of the precrack
+        normal = (precrack_nodes[i,2:4] - p)/np.linalg.norm(precrack_nodes[i,2:4] - p) # find precrack normal
+        for ridge in near_ridges[i]:
+            q = all_pts_2D[all_ridges[ridge,0],:]
+            s = all_pts_2D[all_ridges[ridge,1],:] - q
+            u = np.cross((q-p),normal)/np.cross(normal,s)
+            if (u >= 0) and (u <= 1):
+                precrack_elem.append(ridge)
+    nprecracked_elem = len(precrack_elem) 
+    
+    # Apply precrack to every layer of beam segment
+    precrack_elem = precrack_elem*nsegments # repeat list 
+    offset = np.repeat(list(range(0,nsegments)),nprecracked_elem)
+    offset = [i * nridge for i in offset]
+    precrack_elem = [a + b for a, b in zip(precrack_elem, offset)]
+    
+    nconnector_t_precrack = len(precrack_elem)*3 # times 3 for bot,reg,top layers
+    nconnector_l_precrack = 0
+
+    # Visualize the precracks in the preview plot
+    ax = plt.gca()
+    ax.plot(precrack_nodes[0,0::2],precrack_nodes[0,1::2],'r-',linewidth=3)
+    plt.show()
+
+    # print(precrack_elem)
+
+    return precrack_elem, nconnector_t_precrack, nconnector_l_precrack
+
+
+
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                       nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D):
+                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem):
     
     m1 = knotParams.get('m1')
     m2 = knotParams.get('m2')
@@ -2887,13 +2931,14 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         random_field.generateFieldOnGrid()                  # calculation of preparation files, can be used for any geometry
         
     # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
-    # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag] (22 elements)   
+    # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag] (22 elements)   
     Meshdata = np.zeros((nel_con,28))
     
     if knotFlag == 'On':
-        ktol = 0.02
+        ktol = 0.02 # needs to be calibrated -SA
     else:
         ktol = 0.0
+    
     # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for long)
     for i in range(0,nel_con_tbot): # transverse bottom of beam
         Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:] # xyzz coords of first half
@@ -2903,6 +2948,8 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         psi = calc_knotstream(Meshdata[i,1]-box_center[1],Meshdata[i,2],m1,m2,a1,a2,Uinf) # check if in knot 
         if abs(psi) < ktol:
             Meshdata[i,25] = 1
+        if i in precrack_elem: # 
+            Meshdata[i,26] = 1 # precrack flag
     for i in range(0,nel_con_treg): # transverse mid beam
         Meshdata[i+nel_con_tbot,0:3] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,0]-1,:]
         Meshdata[i+nel_con_tbot,3:6] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,1]-1,:]
@@ -2911,6 +2958,8 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         psi = calc_knotstream(Meshdata[i+nel_con_tbot,1]-box_center[1],Meshdata[i+nel_con_tbot,2],m1,m2,a1,a2,Uinf)
         if abs(psi) < ktol:
             Meshdata[i+nel_con_tbot,25] = 1
+        if i in precrack_elem:
+            Meshdata[i+nel_con_tbot,26] = 1 # precrack flag
     for i in range(0,nel_con_ttop): # transverse top of beam
         Meshdata[i+nel_con_tbot+nel_con_treg,0:3] = np.copy(IGAvertices)[connector_t_top_connectivity[i,0]-1,:]
         Meshdata[i+nel_con_tbot+nel_con_treg,3:6] = np.copy(IGAvertices)[connector_t_top_connectivity[i,1]-1,:]
@@ -2919,6 +2968,8 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         psi = calc_knotstream(Meshdata[i+nel_con_tbot+nel_con_treg,1]-box_center[1],Meshdata[i+nel_con_tbot+nel_con_treg,2],m1,m2,a1,a2,Uinf)
         if abs(psi) < ktol:
             Meshdata[i+nel_con_tbot+nel_con_treg,25] = 1
+        if i in precrack_elem:
+            Meshdata[i+nel_con_tbot+nel_con_treg,26] = 1 # precrack flag
     for i in range(0,nel_con_l): # longitudinal
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,0:3] = np.copy(IGAvertices)[connector_l_connectivity[i,0]-1,:]
         Meshdata[i+nel_con_tbot+nel_con_treg+nel_con_ttop,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
@@ -2985,52 +3036,9 @@ Number of top connectors\n'+ str(nel_con_ttop) +
 '\n\
 Number of long connectors\n'+ str(nel_con_l) +
 '\n\
-[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag 0 0]', comments='')  
+[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag 0]', comments='')  
 
     return Meshdata,conn_l_tangents,height_connector_t
-
-
-def insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
-                     npt_per_layer_normal,npt_per_layer_vtk,\
-                     nlayer,precrack_nodes,precrack_size,\
-                     cellsize_early,nsegments):
-
-    precrack_midpts = (precrack_nodes[:,0:2]+precrack_nodes[:,2:4])/2.0
-    ridge_midpts = all_pts_2D[all_ridges[:,2]]
-    ridge_midpts_tree = cKDTree(ridge_midpts)
-    near_ridges = []
-    for i in range(0,len(precrack_midpts)):
-        near_ridges.append(ridge_midpts_tree.query_ball_point(precrack_midpts[i,:],max(3*cellsize_early,1.5*np.linalg.norm(precrack_nodes[i,2:4]-precrack_midpts[i,:]))))
-
-    # Find the intersect point of neighboring ridges (lines) with the precrack line
-    precrack_elem = []
-    for i in range(0,len(precrack_nodes)):
-        p = precrack_nodes[i,0:2] # find starting point of the precrack
-        normal = (precrack_nodes[i,2:4] - p)/np.linalg.norm(precrack_nodes[i,2:4] - p) # find precrack normal
-        for ridge in near_ridges[i]:
-            q = all_pts_2D[all_ridges[ridge,0],:]
-            s = all_pts_2D[all_ridges[ridge,1],:] - q
-            u = np.cross((q-p),normal)/np.cross(normal,s)
-            if (u >= 0) and (u <= 1):
-                precrack_elem.append(ridge)
-           
-    nprecracked_elem = len(precrack_elem) 
-    
-    # Apply precrack to every layer of beam segment
-    precrack_elem = precrack_elem*nsegments # repeat list 
-    offset = np.repeat(list(range(0,nsegments)),nprecracked_elem)
-    offset = [i * nridge for i in offset]
-    precrack_elem = [a + b for a, b in zip(precrack_elem, offset)]
-    
-    nconnector_t_precrack = len(precrack_elem)*3 # times 3 for bot,reg,top layers
-    nconnector_l_precrack = 0
-
-    # Visualize the precracks in the preview plot
-    ax = plt.gca()
-    ax.plot(precrack_nodes[0,0::2],precrack_nodes[0,1::2],'r-',linewidth=3)
-    plt.show()
-
-    return precrack_elem, nconnector_t_precrack, nconnector_l_precrack
 
 
 def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
@@ -3497,6 +3505,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     Quad_width_vtk = np.tile(Quad_width,(2))
     knot_vtk = np.tile(np.copy(ConnMeshData[:,21]),(2))
     RF_vtk = np.tile(np.copy(ConnMeshData[:,19]),(2))
+    precrack_vtk = np.tile(np.copy(ConnMeshData[:,22]),(2))
 
     vtkfile_conns_vol = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '_conns_vol'+'.vtu'),'w')
     
@@ -3558,16 +3567,23 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
         vtkfile_conns_vol.write('%11.8e'%X+'\n')
     vtkfile_conns_vol.write('</DataArray>'+'\n')
 
+    # add knot visualization
     vtkfile_conns_vol.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"knotFlag"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
     for i in range(0,ncell_conns_vol):
         K = knot_vtk[i]
         vtkfile_conns_vol.write('%11.8e'%K+'\n')
     vtkfile_conns_vol.write('</DataArray>'+'\n')
-
+    # add random field visualization
     vtkfile_conns_vol.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"randomFlag"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
     for i in range(0,ncell_conns_vol):
         RF = RF_vtk[i]
         vtkfile_conns_vol.write('%11.8e'%RF+'\n')
+    vtkfile_conns_vol.write('</DataArray>'+'\n')
+    # add precrack visualization
+    vtkfile_conns_vol.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"precrackFlag"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
+    for i in range(0,ncell_conns_vol):
+        PC = precrack_vtk[i]
+        vtkfile_conns_vol.write('%11.8e'%PC+'\n')
     vtkfile_conns_vol.write('</DataArray>'+'\n')
 
     vtkfile_conns_vol.write('</CellData>'+'\n')
@@ -3648,7 +3664,7 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
                timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
                x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
                nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
-               precrackFlag='off',precrack_elem=[]):
+               precrackFlag,precrack_elem):
 
     # Beam
     nelnode = NURBS_degree + 1

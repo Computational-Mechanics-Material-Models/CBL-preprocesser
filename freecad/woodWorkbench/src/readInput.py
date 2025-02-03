@@ -33,8 +33,8 @@ def readInput(self):
             elif "random_noise" in line:
                 random_noise = line.split("=")[1].strip()
 
-            # elif "iter_max" in line:
-            #     iter_max = line.split("=")[1].strip()
+            elif "iter_max" in line:
+                iter_max = line.split("=")[1].strip()
             elif "box_shape" in line:
                 box_shape = line.split("=")[1].strip()
             elif "box_center" in line:
@@ -115,7 +115,7 @@ def readInput(self):
 
         self.form[0].skeleton_density.setText(skeleton_density)
 
-        # self.form[0].iter_max.setText(iter_max)
+        self.form[0].iter_max.setText(iter_max)
 
         self.form[0].box_shape.setCurrentText(box_shape)
         self.form[0].box_center.setText(box_center)

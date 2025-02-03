@@ -105,7 +105,7 @@ def inputParams(form):
         randomFlag = 'Off'
         x_notch_size = box_size*0.1 # depth of notch
         y_notch_size = box_size*0.1 # width of notch
-        precrack_size = box_size*0.01
+        precrack_size = box_size*0.1
 
     return geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \

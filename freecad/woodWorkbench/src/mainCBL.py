@@ -298,7 +298,6 @@ def main(self):
         
     # plt.show()
     
-    plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
 
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
@@ -366,7 +365,7 @@ def main(self):
     # ===============================================
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
-        
+
         x_notch = x_min + x_notch_size
         # y_notch_min = box_center[1] - y_notch_size/2
         # y_notch_max = box_center[1] + y_notch_size/2
@@ -376,9 +375,7 @@ def main(self):
         precrack_nodes = np.array([[x_notch, y_precrack, x_precrack, y_precrack]])
 
         [precrack_elem,nconnector_t_precrack,nconnector_l_precrack] = \
-            WoodMeshGen.insert_precracks(all_pts_2D,all_ridges,nridge,npt_per_layer,\
-                                    npt_per_layer_normal,npt_per_layer_vtk,\
-                                    nlayers,precrack_nodes,precrack_size,\
+            WoodMeshGen.insert_precracks(all_pts_2D,all_ridges,nridge,precrack_nodes,\
                                     cellsize_early,nsegments)
     else:
         precrack_nodes = []
@@ -397,7 +394,7 @@ def main(self):
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                    randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D)
+                    randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem)
 
     # ===============================================
     # Calculate model properties
@@ -492,7 +489,8 @@ def main(self):
     # Generate Paraview visulization files
     if visFlag in ['on','On','Y','y','Yes','yes']:
         
-        # plt.show()
+        plt.show()
+        plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
         
         WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                        nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
