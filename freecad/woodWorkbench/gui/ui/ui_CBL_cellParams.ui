@@ -1294,16 +1294,16 @@
             </size>
            </property>
            <property name="currentIndex">
-            <number>1</number>
+            <number>0</number>
            </property>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
           </widget>
@@ -1355,7 +1355,7 @@
               </size>
              </property>
              <property name="text">
-              <string>0.015</string>
+              <string>1e-5</string>
              </property>
              <property name="placeholderText">
               <string>0.015</string>
@@ -1390,16 +1390,16 @@
             </size>
            </property>
            <property name="currentIndex">
-            <number>1</number>
+            <number>0</number>
            </property>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
           </widget>

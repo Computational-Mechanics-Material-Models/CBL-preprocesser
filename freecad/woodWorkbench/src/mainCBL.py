@@ -59,7 +59,7 @@ def main(self):
         boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
-        skeleton_density, merge_operation, merge_tol, precrackFlag, \
+        skeleton_density, mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams]\
             = inputParams(self.form)
@@ -107,7 +107,7 @@ def main(self):
         boundaryFlag, box_shape, box_center, box_height, \
         nsegments, theta_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
-        skeleton_density, merge_operation, merge_tol, precrackFlag, \
+        skeleton_density, mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, box_width, box_depth, visFlag, \
         knotFlag, knotParams, randomFlag, randomParams)
         
@@ -136,6 +136,11 @@ def main(self):
         material_object.Material = mat
         analysis_object.addObject(material_object)
 
+    # Start figure
+    plt.figure()
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+
     # ==================================================================
     self.form[1].progressBar.setValue(20) 
     self.form[1].statusWindow.setText("Status: Placing Cells.") 
@@ -152,10 +157,9 @@ def main(self):
     elif radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
-        sites,radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(geoName,outDir,generation_center,r_max,r_min,\
-                                                    nrings,width_heart,width_early,width_late,\
+        sites,radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
-                                                    print_interval)            
+                                                    mergeFlag,omega=10)            
     elif radial_growth_rule == 'regular_hexagonal':
         # ----------------------------------
         # hexagonal honeycomb-like geometry
@@ -202,34 +206,41 @@ def main(self):
     boundary_region = np.array([[box_center[0],box_center[1],1,0]])
 
     # ---------------------------------------------
-    # # Build Delauney (flow) mesh             
+    # # Delaunay triangulation             
+
     # based on new centroid points       
     delaunay_vertices = np.concatenate((boundary_points_original,np.array(sites_centroid))) # important the boundary points are listed first for index reasons
     tri_inp = {'vertices': delaunay_vertices,'segments':boundary_segments,'regions':boundary_region}
     conforming_delaunay = tr.triangulate(tri_inp, 'peAq0D') # peAq0c where the c encloses notches etc, needs to be fixed
-    flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries)
-
-    # ---------------------------------------------
-    # # Build mechanical mesh 
+    
     # based on old sites to get vor
     delaunay_vertices_old = np.concatenate((boundary_points_original,np.array(sites_vor))) 
     # important the boundary points are listed first for region index reasons, and thus not included in tessellation
     tri_inp = {'vertices': delaunay_vertices_old,'segments':boundary_segments,'regions':boundary_region}
     conforming_delaunay_old = tr.triangulate(tri_inp, 'peAq0D') 
+    
+    # ---------------------------------------------
+    # # Build flow mesh
+    flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max, \
+                                                       boundaries,conforming_delaunay_old)
+    # flow_nodes are conforming_delaunay vertices layered with z-value added, but volume is calculated based on old sites to match 
+    # mechanical cell shapes
+
+    # ---------------------------------------------
+    # # Build mechanical mesh 
     vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay_old.get('vertices'))
 
-    plt.figure()
-    ax = plt.gca()
-    ax.set_aspect('equal', adjustable='box')
+    # ---------------------------------------------
+    # # Visualize the meshes
 
-    # # flow points
+    # flow points
     # vertsD = np.array(conforming_delaunay['vertices'])
     # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
-    # # vertsC = np.array(conforming_delaunay_old['vertices'])
-    # # ax.triplot(vertsC[:, 0], vertsC[:, 1], conforming_delaunay_old['triangles'], 'r^-',markersize=3.,linewidth=0.5)
-    # # voronoi vertices
-    # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'ko',markersize=2.)
-    # # plt.show()
+    # vertsC = np.array(conforming_delaunay_old['vertices'])
+    # ax.triplot(vertsC[:, 0], vertsC[:, 1], conforming_delaunay_old['triangles'], 'r^-',markersize=3.,linewidth=0.5)
+    # voronoi vertices
+    ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
+    # plt.show()
 
     voronoiTime = time.time() 
     # print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
@@ -240,24 +251,11 @@ def main(self):
     # ==================================================================
     # Rebuild the Voronoi mesh
 
-    if merge_operation in ['on','On','Y','y','Yes','yes']:
-        # [voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-        # boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        #     nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge] = \
-        [voronoi_vertices,boundary_points,finite_ridges_new,\
-        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,voronoi_ridges,nridge] = \
-            WoodMeshGen.RebuildVoronoi_ConformingDelaunay_mergeNew(vor_vertices,vor_edges,ray_origins,ray_directions,\
-                                                                boundaries,merge_tol,boundaryFlag)
-        
-        RebuildvorTime = time.time() 
-        # print('Voronoi tessellation rebuilt and merged in {:.3f} seconds'.format(RebuildvorTime - voronoiTime))
-    else:
-            [voronoi_vertices,boundary_points,finite_ridges_new,\
+    [voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,voronoi_ridges,nridge,infinite_ridges_new] = \
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
-                                                        boundaries,boundaryFlag,boundary_points_original) #*** added rveflag, clean up
+                                                        boundaries,boundaryFlag,boundary_points_original,mergeFlag,merge_tol)
 
     RebuildvorTime = time.time()
 
@@ -267,8 +265,8 @@ def main(self):
     ax = plt.gca()
 
     # Flow
-    vertsD = np.array(conforming_delaunay['vertices'])
-    ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=1.,linewidth=0.5)
+    # vertsD = np.array(conforming_delaunay['vertices'])
+    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=1.,linewidth=0.5)
 
     # Main cells
     # for beg, end in boundary_ridges_new.astype(int):
@@ -296,7 +294,7 @@ def main(self):
             [x0, x1],
             [y0, y1],'ko-',linewidth=1.0,markersize=2.)
         
-    # plt.show()
+    # # plt.show()
     
 
 
@@ -438,7 +436,7 @@ def main(self):
                         iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
                         timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
                         x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
-                        nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
+                        nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,mergeFlag,merge_tol,\
                         precrackFlag,precrack_elem)
     chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
     # if inpFlag in ['on','On','Y','y','Yes','yes']:
@@ -451,7 +449,7 @@ def main(self):
     #                     iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
     #                     timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
     #                     x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
-    #                     nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,merge_operation,merge_tol,\
+    #                     nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,mergeFlag,merge_tol,\
     #                     precrackFlag,precrack_elem)
     #     elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
     #         # chronoInput(self.form)
@@ -475,7 +473,7 @@ def main(self):
     WoodMeshGen.LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_early,width_late,\
             generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
             cellsize_early,cellsize_late,cellwallthickness_early,cellwallthickness_late,\
-            merge_operation,merge_tol,precrackFlag,precrack_widths,boundaryFlag,\
+            mergeFlag,merge_tol,precrackFlag,precrack_widths,boundaryFlag,\
             nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
             NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
             nParticles,nbeamElem,skeleton_density,mass,bulk_volume,bulk_density,porosity,\

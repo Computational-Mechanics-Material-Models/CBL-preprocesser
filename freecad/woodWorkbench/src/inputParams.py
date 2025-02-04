@@ -85,8 +85,8 @@ def inputParams(form):
 
     boundaryFlag = form[0].boundaryFlag.currentText()
 
-    merge_operation = form[0].merge_operation.currentText() 
-    merge_tol = float(form[0].merge_tol.text() or 0.015)
+    mergeFlag = form[0].merge_operation.currentText() 
+    merge_tol = float(form[0].merge_tol.text() or 1e-5)
 
     stlFlag = form[0].stlFlag.currentText()
     inpFlag = form[0].inpFlag.currentText()
@@ -102,10 +102,11 @@ def inputParams(form):
         box_size = box_width
         z_min = 0
         z_max = box_height #box_size # segment_length = (z_max - z_min) / nsegments
-        randomFlag = 'Off'
+        randomFlag = 'On'
         x_notch_size = box_size*0.1 # depth of notch
         y_notch_size = box_size*0.1 # width of notch
         precrack_size = box_size*0.1
+        merge_tol = 5e-5
 
     return geoName, radial_growth_rule, iter_max, print_interval, \
         r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
@@ -113,6 +114,6 @@ def inputParams(form):
         boundaryFlag, box_shape, box_center, box_size, box_height,\
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
-        skeleton_density, merge_operation, merge_tol, precrackFlag, \
+        skeleton_density, mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams
