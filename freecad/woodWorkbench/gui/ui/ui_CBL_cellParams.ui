@@ -1091,12 +1091,12 @@
            </property>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
           </widget>
@@ -1264,12 +1264,12 @@
            </property>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
           </widget>
@@ -1653,7 +1653,7 @@
             <number>-1</number>
            </property>
            <property name="currentIndex">
-            <number>1</number>
+            <number>0</number>
            </property>
            <item>
             <property name="text">

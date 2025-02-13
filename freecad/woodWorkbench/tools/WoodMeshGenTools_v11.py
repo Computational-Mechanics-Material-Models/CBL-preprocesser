@@ -23,6 +23,9 @@ import datetime
 import pkg_resources
 import time
 import FreeCAD as App # type: ignore
+import cProfile
+import pstats
+import os
 
 # from hexalattice.hexalattice import create_hex_grid # 
 
@@ -191,9 +194,12 @@ def find_intersect(p,normal,boundaries):
     for boundary in boundaries: # loop over boundary lines
         q = np.asarray(boundary[1][0])
         s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-        t = np.cross((q-p),s)/np.cross(normal,s)
-        u = np.cross((q-p),normal)/np.cross(normal,s)
-        
+        if np.cross(normal,s) == 0: # parallel
+            t = np.inf
+            u = np.inf
+        else:
+            t = np.cross((q-p),s)/np.cross(normal,s)
+            u = np.cross((q-p),normal)/np.cross(normal,s)
         if (u >= 0) and (u <= 1):
             if (t >= 0) and math.isfinite(t):
                 t_final = t
@@ -1272,8 +1278,9 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
         np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2D, fmt='%.16g', delimiter=' '\
             ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
-Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
-[xcoord ycoord nwings ridge1 ... ridgen farvertex1 ... farvertexn length1 ... lengthn width1 ... widthn angle1 ... anglen]', comments='')
+            Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
+            [xcoord ycoord nwings ridge1 ... ridgen farvertex1 ... farvertexn length1 ... lengthn width1 ... widthn angle1 ... anglen]', comments='')
+        
     elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
         for i in range(0,npt_per_layer):
             nwings = all_vertices_info_2D[i][0]
@@ -1287,8 +1294,8 @@ Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one verte
         all_vertices_2Dchrono = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
         np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono, fmt='%.16g', delimiter=' '\
             ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
-Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
-[xcoord ycoord nwings ridge1 farvertex1 length1 width1 angle1 ... ridgen farvertexn lengthn widthn anglen]', comments='')
+            Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
+            [xcoord ycoord nwings ridge1 farvertex1 length1 width1 angle1 ... ridgen farvertexn lengthn widthn anglen]', comments='')
         
         # not used - SA
     #     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-ridge.mesh'), all_ridges, fmt='%d', delimiter=' '\
@@ -1571,15 +1578,22 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     
     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName+'-mesh.txt'), Meshdata, fmt='%.16g', delimiter=' '\
     ,header='# Connector Data Generated with RingsPy Mesh Generation Tool\n\
-Number of bot connectors\n'+ str(nel_con_tbot) +
-'\n\
-Number of reg connectors\n'+ str(nel_con_treg) +
-'\n\
-Number of top connectors\n'+ str(nel_con_ttop) +
-'\n\
-Number of long connectors\n'+ str(nel_con_l) +
-'\n\
-[inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag 0]', comments='')  
+    Number of bot connectors\n'+ str(nel_con_tbot) +
+    '\n\
+    Number of reg connectors\n'+ str(nel_con_treg) +
+    '\n\
+    Number of top connectors\n'+ str(nel_con_ttop) +
+    '\n\
+    Number of long connectors\n'+ str(nel_con_l) +
+    '\n\
+    [inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag 0]', comments='')  
+
+
+    # pr.disable()
+    # loc = os.path.join(r"C:\Users\SusanAlexisBrown\woodWorkbench", geoName, 'profile.cProf')
+    # pr.dump_stats(loc)
+    # p = pstats.Stats(loc)
+    # p.strip_dirs().sort_stats('cumulative').print_stats(10)
 
     return Meshdata,conn_l_tangents,height_connector_t
 
