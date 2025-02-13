@@ -81,86 +81,6 @@ def check_isinside_boundcircle(circC,generation_center,rmin,rmax):
     
     return within
 
-def check_isinside_boundTriangle2D(circC,boundaries):
-    """ 
-    A function to check whether point P(x, y)
-    lies inside the triangle formed by
-    A(x1, y1), B(x2, y2) and C(x3, y3)
-    credit to: https://www.geeksforgeeks.org/check-whether-a-given-point-lies-inside-a-triangle-or-not/
-    """
-    x = circC[0]
-    y = circC[1]
-    w = circC[2]
-    
-    x1 = boundaries[0][1][0][0]
-    y1 = boundaries[0][1][0][1]
-    x2 = boundaries[1][1][0][0]
-    y2 = boundaries[1][1][0][1]
-    x3 = boundaries[2][1][0][0]
-    y3 = boundaries[2][1][0][1]
-    
-    # Calculate area of triangle ABC
-    A = TriangleArea2D(x1, y1, x2, y2, x3, y3)
- 
-    # Calculate area of triangle PBC
-    A1 = TriangleArea2D(x, y, x2, y2, x3, y3)
-     
-    # Calculate area of triangle PAC
-    A2 = TriangleArea2D(x1, y1, x, y, x3, y3)
-     
-    # Calculate area of triangle PAB
-    A3 = TriangleArea2D(x1, y1, x2, y2, x, y)
-     
-    # Check if sum of A1, A2 and A3 is same as A
-    # within = (A == A1 + A2 + A3)
-    # with tolerance
-    within = (np.abs(A - (A1 + A2 + A3)) <= A*1e-3)
-
-    return within
-
-def check_isinside_boundbox2D(circC,x_min,x_max,y_min,y_max):
-    """ Make sure this circle does not protrude outside the bounding box """
-    x = circC[0]
-    y = circC[1]
-    w = circC[2]
-    within = ( x > x_min+w ) and ( x < x_max-w ) and ( y > y_min+w ) and ( y < y_max-w )
-    
-    return within
-
-def check_isinside_boundbox2Dnotched(circC,x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max):
-    """ Make sure this circle does not protrude outside the notched bounding box """
-    x = circC[0]
-    y = circC[1]
-    w = circC[2]
-    within = ( x > x_min+w ) and ( x < x_max-w ) and ( y > y_min+w ) and ( y < y_max-w )
-    within_notch = ( x > x_min+w ) and ( x < x_notch-w ) and ( y > y_notch_min+w ) and ( y < y_notch_max-w )
-    within = np.subtract(within,within_notch,dtype=np.float32)
-    return within
-
-def check_isinside_boundbox2Dprecrack(circC,x_min,x_max,y_min,y_max,x_notch,y_notch,x_precrack,y_precrack):
-    """ Make sure this circle does not protrude outside the ring's bounding box """
-# Neither/nor set operation, ref:https://math.stackexchange.com/questions/1257097/how-to-represent-a-neither-nor-set-operation
-    x = circC[0]
-    y = circC[1]
-    w = circC[2]
-    within = ( x > x_min+w ) and ( x < x_max-w ) and ( y > y_min+w ) and ( y < y_max-w )
-    within_notch = ( x > x_min+w ) and ( x < x_notch-w ) and ( y > -y_notch+w ) and ( y < y_notch-w )
-    within_precrack = ( x > x_notch+w ) and ( x < x_precrack-w ) and ( y > -y_precrack+w ) and ( y < y_precrack-w )
-    within_both = within_notch or within_precrack
-    within = np.subtract(within,within_both,dtype=np.float32)
-    return within
-
-def check_isinside_boundHexagon2D(circC,L,box_center):
-    """ Make sure this circle does not protrude outside the bounding hexagon 
-    credit to: http://www.playchilla.com/how-to-check-if-a-point-is-inside-a-hexagon
-    """
-    x = np.abs(circC[0] - box_center[0])
-    y = np.abs(circC[1] - box_center[1])
-    v = L/2
-    h = L/np.sqrt(3)/2
-    within = ( x < 2*h ) and ( y < v ) and ((2*v*h - x*v - h*y) > 0)
-    return within
-
 def check_overlap(circles,circC):
     """ Make sure the distance between the current circle's center and all
         other circle centers is greater than or equal to the circle's perimeter (2r)
@@ -201,11 +121,6 @@ def check_iscollinear(p1,p2,boundaries):
                 collinear += 1
                 
     return collinear
-
-def check_collinear(p0, p1, p2):
-    x1, y1 = p1[0] - p0[0], p1[1] - p0[1]
-    x2, y2 = p2[0] - p0[0], p2[1] - p0[1]
-    return abs(x1 * y2 - x2 * y1) < 1e-12
 
 def rotate_around_point_highperf(xy, radians, origin=(0, 0)):
     """Rotate a point around a given point.
@@ -804,303 +719,6 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     return delaun_nodes, delaun_elems
 
 
-def RebuildVoronoi(vor,circles,boundaries,generation_center,x_min,x_max,y_min,y_max,box_center,box_shape,boundaryFlag):
-    """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh"""
-    # Store indices of Voronoi vertices for each finite ridge
-    finite_ridges = []
-    finite_ridges_pointid = []
-    infinite_ridges = []
-    infinite_ridges_pointid = []
-    boundary_points = []
-    
-    # Form two new Voronoi vertices lists with and without out-of-bound vertices
-    voronoi_vertices_in = []
-    voronoi_vertices_out = []
-    
-    if box_shape in ['triangle','Triangle','TRIANGLE','triangular','Triangular','TRIANGULAR','tri','Tri','TRI','^']:
-        for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
-            simplex = np.asarray(simplex)
-            simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundTriangle2D(np.append(vor.vertices[simplex[0]],0),boundaries) and check_isinside_boundTriangle2D(np.append(vor.vertices[simplex[1]],0),boundaries):
-                voronoi_vertices_in.append(vor.vertices[simplex[0]])
-                voronoi_vertices_in.append(vor.vertices[simplex[1]])
-                finite_ridges.append(simplex)
-                finite_ridges_pointid.append(pointidx)
-                plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-',linewidth=1)
-            else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                if np.all(simplex >= 0) and (check_isinside_boundTriangle2D(np.append(vor.vertices[simplex[0]],0),boundaries) or check_isinside_boundTriangle2D(np.append(vor.vertices[simplex[1]],0),boundaries)): # finite Voronoi ridge but one vertex is far
-        
-                    if (check_isinside_boundTriangle2D(np.append(vor.vertices[simplex[0]],0),boundaries) == 0):# if vertex is out-of-bound, inverse its index
-                        voronoi_vertices_out.append(vor.vertices[simplex[0]])
-                        if simplex[0] == 0:
-                            simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[0] = -simplex[0]
-                    elif (check_isinside_boundTriangle2D(np.append(vor.vertices[simplex[1]],0),boundaries) == 0):
-                        voronoi_vertices_out.append(vor.vertices[simplex[1]])
-                        if simplex[1] == 0:
-                            simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[1] = -simplex[1]
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundTriangle2D(np.append(vor.vertices[simplex[simplex >= 0][0]],0),boundaries): # index of finite end Voronoi vertex of the infinite ridge
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-    elif box_shape in ['square','Square','SQUARE','rectangle','Rectangle','RECTANGLE','cube','Cube','CUBE','s']:
-        for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
-            simplex = np.asarray(simplex)
-            simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) and check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max):
-                voronoi_vertices_in.append(vor.vertices[simplex[0]])
-                voronoi_vertices_in.append(vor.vertices[simplex[1]])
-                finite_ridges.append(simplex)
-                finite_ridges_pointid.append(pointidx)
-                plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-',linewidth=1)
-            else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                if np.all(simplex >= 0) and (check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) or check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max)): # finite Voronoi ridge but one vertex is far
-        
-                    if (check_isinside_boundbox2D(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max) == 0):# if vertex is out-of-bound, inverse its index
-                        voronoi_vertices_out.append(vor.vertices[simplex[0]])
-                        if simplex[0] == 0:
-                            simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[0] = -simplex[0]
-                    elif (check_isinside_boundbox2D(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max) == 0):
-                        voronoi_vertices_out.append(vor.vertices[simplex[1]])
-                        if simplex[1] == 0:
-                            simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[1] = -simplex[1]
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundbox2D(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max): # index of finite end Voronoi vertex of the infinite ridge
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-    elif box_shape in ['hexagon','Hexagon','HEXAGON','hexagonal','Hexagonal','HEXAGONAL','hex','Hex','HEX','h']:
-        L = y_max - y_min
-        box_center = generation_center
-        for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
-            simplex = np.asarray(simplex)
-            simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundHexagon2D(np.append(vor.vertices[simplex[0]],0),L,box_center) and check_isinside_boundHexagon2D(np.append(vor.vertices[simplex[1]],0),L,box_center):
-                voronoi_vertices_in.append(vor.vertices[simplex[0]])
-                voronoi_vertices_in.append(vor.vertices[simplex[1]])
-                
-                finite_ridges.append(simplex)
-                finite_ridges_pointid.append(pointidx)
-                plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-',linewidth=1)
-            else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                
-                if np.all(simplex >= 0) and (check_isinside_boundHexagon2D(np.append(vor.vertices[simplex[0]],0),L,box_center) or check_isinside_boundHexagon2D(np.append(vor.vertices[simplex[1]],0),L,box_center)): # finite Voronoi ridge but one vertex is far
-        
-                    if (check_isinside_boundHexagon2D(np.append(vor.vertices[simplex[0]],0),L,box_center) == 0):# if vertex is out-of-bound, inverse its index
-                        voronoi_vertices_out.append(vor.vertices[simplex[0]])
-                        if simplex[0] == 0:
-                            simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[0] = -simplex[0]
-                    elif (check_isinside_boundHexagon2D(np.append(vor.vertices[simplex[1]],0),L,box_center) == 0):
-                        voronoi_vertices_out.append(vor.vertices[simplex[1]])
-                        if simplex[1] == 0:
-                            simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[1] = -simplex[1]
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundHexagon2D(np.append(vor.vertices[simplex[simplex >= 0][0]],0),L,box_center): # index of finite end Voronoi vertex of the infinite ridge
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-    elif box_shape == 'notched_square': # notched
-        x_min = boundaries[0][1][0][0]
-        x_max = boundaries[1][1][0][0]
-        y_min = boundaries[0][1][0][1]
-        y_max = boundaries[2][1][0][1]
-        x_notch = boundaries[5][1][0][0]
-        y_notch_min = boundaries[6][1][0][1]
-        y_notch_max = boundaries[4][1][0][1]
-        
-        
-        for pointidx, simplex in zip(vor.ridge_points, vor.ridge_vertices):
-            simplex = np.asarray(simplex)
-            simplex = np.where(simplex == -1, -9999999999, simplex) # use a large negative number instead of -1 to represent the infinite ridge vertices 
-            if np.all(simplex >= 0) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) and check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max):
-                voronoi_vertices_in.append(vor.vertices[simplex[0]])
-                voronoi_vertices_in.append(vor.vertices[simplex[1]])
-                finite_ridges.append(simplex)
-                finite_ridges_pointid.append(pointidx)
-                plt.plot(vor.vertices[simplex, 0], vor.vertices[simplex, 1], 'k-')
-            else: # infinite Voronoi ridges and finite ridges with out-of-bound vetices
-                if np.all(simplex >= 0) and (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) or check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max)): # finite Voronoi ridge but one vertex is far
-
-                    if (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):# if vertex is out-of-bound, inverse its index
-                        voronoi_vertices_out.append(vor.vertices[simplex[0]])
-                        if simplex[0] == 0:
-                            simplex[0] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[0] = -simplex[0]
-                    elif (check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[1]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max) == 0):
-                        voronoi_vertices_out.append(vor.vertices[simplex[1]])
-                        if simplex[1] == 0:
-                            simplex[1] = -9999999998 # since inverse of 0 is still zero, we use another large number to represent -0
-                        else:
-                            simplex[1] = -simplex[1]
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-                elif check_isinside_boundbox2Dnotched(np.append(vor.vertices[simplex[simplex >= 0][0]],0),x_min,x_max,y_min,y_max,x_notch,y_notch_min,y_notch_max): # index of finite end Voronoi vertex of the infinite ridge
-                    infinite_ridges.append(simplex)
-                    infinite_ridges_pointid.append(pointidx) 
-    else:
-        return
-                    
-    voronoi_vertices_in = np.unique(voronoi_vertices_in,axis=0)
-    voronoi_vertices_out = np.unique(voronoi_vertices_out,axis=0)
-    # plt.plot(voronoi_vertices_in[:, 0], voronoi_vertices_in[:, 1], 'ro')
-    
-    
-            
-    # Find the intersect point of infinite ridges (rays) with the boundary lines
-    # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
-    for pointidx, simplex in zip(infinite_ridges_pointid, infinite_ridges):
-        simplex = np.asarray(simplex)
-            
-        i = simplex[simplex >= 0][0] # index of finite end Voronoi vertex of the infinite ridge
-        p = vor.vertices[i]
-        s = circles[pointidx[1],0:2] - circles[pointidx[0],0:2]
-        if simplex[simplex < 0][0] == -9999999999:
-            tangent = s / np.linalg.norm(s)
-            normal = np.array([-tangent[1], tangent[0]]) # normal
-            midpoint = circles[:,0:2][pointidx].mean(axis=0) # midpoint between site points
-            for boundary in boundaries: # loop over boundary lines
-                q = np.asarray(boundary[1][0])
-                s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-                t = np.cross((q-p),s)/np.cross(normal,s)
-                u = np.cross((q-p),normal)/np.cross(normal,s)
-                
-                if (u >= 0) and (u <= 1):
-                    if np.sign(np.dot(midpoint - generation_center, normal)) == 1: # facing outwards
-                        if (t >= 0) and math.isfinite(t):
-                            t_final = t
-                    elif np.sign(np.dot(midpoint - generation_center, normal)) == -1: # facing inwards
-                        if (t < 0) and math.isfinite(t):
-                            t_final = t
-                            
-        elif simplex[simplex < 0][0] == -9999999998:
-            t_final = np.inf
-            normal = (vor.vertices[0] - p)/np.linalg.norm(vor.vertices[0] - p)
-            for boundary in boundaries: # loop over boundary lines
-                q = np.asarray(boundary[1][0])
-                s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-                t = np.cross((q-p),s)/np.cross(normal,s)
-                u = np.cross((q-p),normal)/np.cross(normal,s)
-                
-                if (u >= 0) and (u <= 1):
-                    if (t >= 0) and (t < t_final):
-                        t_final = t
-        else:
-            t_final = np.inf
-            normal = (vor.vertices[-simplex[simplex < 0][0]] - p)/np.linalg.norm(vor.vertices[-simplex[simplex < 0][0]] - p)
-            for boundary in boundaries: # loop over boundary lines
-                q = np.asarray(boundary[1][0])
-                s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
-                t = np.cross((q-p),s)/np.cross(normal,s)
-                u = np.cross((q-p),normal)/np.cross(normal,s)
-                
-                if (u >= 0) and (u <= 1):
-                    if (t >= 0) and (t < t_final):
-                        t_final = t
-                            
-        intersect_point = p + normal * t_final
-        boundary_points.append(intersect_point)
-        
-        plt.plot([vor.vertices[i,0], intersect_point[0]], [vor.vertices[i,1], intersect_point[1]], 'k-',linewidth=1)
-            
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-        boundary_points = np.asarray(boundary_points)
-        boundary_points_featured = [x[1][0] for x in boundaries]
-        boundary_points_featured = np.reshape(np.asarray(boundary_points_featured),(-1,2))
-        nboundary_pts_featured = boundary_points_featured.shape[0]
-        boundary_points = np.vstack((boundary_points,boundary_points_featured))
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
-        infinite_ridges = np.asarray(infinite_ridges)
-        ninfinite_ridge = infinite_ridges.shape[0]
-           
-    else:
-        boundary_points = np.asarray(boundary_points)
-        nboundary_pts_featured = 0
-        nvertices_in = voronoi_vertices_in.shape[0]
-        nboundary_pts = boundary_points.shape[0]
-        finite_ridges = np.asarray(finite_ridges)
-        nfinite_ridge = finite_ridges.shape[0]
-        infinite_ridges = np.asarray(infinite_ridges)
-        ninfinite_ridge = infinite_ridges.shape[0]
-           
-    # reconstruct the connectivity for ridges since the unique operation rearrange the order of vertices (need to find a more efficient way like vectorize)
-    finite_ridges_new = np.copy(finite_ridges)
-    for i in range(0,nfinite_ridge): # loop over voronoi ridges in original finite_ridge list 
-        ii = np.where(np.all(voronoi_vertices_in==vor.vertices[finite_ridges[i,0]],axis=1))[0][0]  # index of first vertex in voronoi_vertices_in array
-        jj = np.where(np.all(voronoi_vertices_in==vor.vertices[finite_ridges[i,1]],axis=1))[0][0]  # index of second vertex in voronoi_vertices_in array
-        finite_ridges_new[i,:] = [ii,jj]
-            
-    infinite_ridges_new = np.copy(infinite_ridges)
-    for i in range(0,ninfinite_ridge): # loop over voronoi ridges in original infinite_ridge list
-        if (infinite_ridges[i,:] < 0).argmax(axis=0) == 0: # first vertex is of negative index
-            ii = nvertices_in + i
-            jj = np.where(np.all(voronoi_vertices_in==vor.vertices[infinite_ridges[i,1]],axis=1))[0][0]  # index of finite vertex in voronoi_vertices_in array
-        else:
-            ii = np.where(np.all(voronoi_vertices_in==vor.vertices[infinite_ridges[i,0]],axis=1))[0][0]  # index of finite vertex in voronoi_vertices_in array
-            jj = nvertices_in + i
-        infinite_ridges_new[i,:] = [ii,jj]
-    
-    if boundaryFlag in ['on','On','Y','y','Yes','yes']:
-        # construct the connectivity for a line path consisting of the boundary points
-        boundary_ridges_new = np.zeros(boundary_points.shape)
-        boundary_points_new = np.copy(boundary_points) 
-        next_point = np.copy(boundary_points_new[0])  # get first point
-        boundary_points_new[0] = [np.inf,np.inf]
-        
-        for i in range(0,boundary_points_new.shape[0]-1):
-            next_point_id = cdist([next_point], boundary_points_new).argmin()
-            if check_iscollinear(next_point,boundary_points_new[next_point_id],boundaries) > 0: # check if the new line segment is collinear with any boundary line segment
-                boundary_ridges_new[i,1] = next_point_id
-                boundary_ridges_new[i+1,0] = next_point_id
-                next_point = np.copy(boundary_points_new[next_point_id])
-                boundary_points_new[next_point_id] = [np.inf,np.inf]
-            else:
-                boundary_points_new_check = np.copy(boundary_points_new)
-                while check_iscollinear(next_point,boundary_points_new_check[next_point_id],boundaries) == 0:
-                    boundary_points_new_check[next_point_id] = [np.inf,np.inf]
-                    next_point_id = cdist([next_point], boundary_points_new_check).argmin()
-                    
-                boundary_ridges_new[i,1] = next_point_id
-                boundary_ridges_new[i+1,0] = next_point_id
-                next_point = np.copy(boundary_points_new[next_point_id])
-                boundary_points_new[next_point_id] = [np.inf,np.inf]
-                
-        boundary_ridges_new = (boundary_ridges_new+nvertices_in).astype(int) # shift the indices with "nvertices_in"
-        
-        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-        nvertex = voronoi_vertices.shape[0]
-        boundary_ridges_new = np.vstack((infinite_ridges_new,boundary_ridges_new))
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
-    else:
-        voronoi_vertices = np.vstack((voronoi_vertices_in,boundary_points)) # vertical stack "in" vetices and "cross" boundary points
-        nvertex = voronoi_vertices.shape[0]
-        boundary_ridges_new = np.copy(infinite_ridges_new)
-        nboundary_ridge = boundary_ridges_new.shape[0]
-        voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
-        nridge = voronoi_ridges.shape[0]
-    
-    return voronoi_vertices,finite_ridges,boundary_points,finite_ridges_new,\
-        boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-            nboundary_pts,nboundary_pts_featured,voronoi_ridges,nridge
-
-
 def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
                                       boundaries,boundaryFlag,boundary_points_original,mergeFlag,merge_tol):
     """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh
@@ -1200,7 +818,6 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     nboundary_pts = len(boundary_points)
     boundary_points = np.reshape(boundary_points,(nboundary_pts,2)) # need to reshape because extra second dimension for some reason
     
-
 
     if boundaryFlag == 'On': # add the boundary points for homogenization 
         boundary_points = np.vstack((boundary_points,boundary_points_original)) # have to be at end for indexing
@@ -1581,7 +1198,7 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     # Calculate angles of all Voronoi ridges (angles measured counter-clock wise, x-axis --> (1,0), y-axis --> (0,1))
     all_ridge_angles = np.arctan2(vector[:,1],vector[:,0]) # np.arctan2(y, x) * 180 / np.pi = the angle
 
-#======== This part can be expanded to allow the smooth transition of cell wall thickness =========
+    #======== This part can be expanded to allow the smooth transition of cell wall thickness =========
     # Case 1: Abrupt transition of cell wall thickness between dense/sparse cells
     # thicknesses of all Voronoi vertices (here identical thickness for all wings belonging to the same vertex is assumed)
     vertex_cellwallthickness_2D = np.zeros(npt_per_layer)
@@ -1592,7 +1209,7 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
             vertex_cellwallthickness_2D[i] = cellwallthickness_sparse
         else: # if even, dense cells
             vertex_cellwallthickness_2D[i] = cellwallthickness_dense
-#==================================================================================================
+    #==================================================================================================
      
     # Generate a list containing info for each vertex
     all_vertices_info_2D = []
@@ -1670,11 +1287,11 @@ Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vert
 [xcoord ycoord nwings ridge1 farvertex1 length1 width1 angle1 ... ridgen farvertexn lengthn widthn anglen]', comments='')
         
         # not used - SA
-#     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-ridge.mesh'), all_ridges, fmt='%d', delimiter=' '\
-#         ,header='Ridge Data Generated with RingsPy Mesh Generation Tool\n\
-# Number of ridges\n'+ str(nridge) +
-#     '\n\
-# [vertex1 vertex2 midpt1 midpt2 qrtrpt1 qrtrpt2]', comments='')
+    #     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-ridge.mesh'), all_ridges, fmt='%d', delimiter=' '\
+    #         ,header='Ridge Data Generated with RingsPy Mesh Generation Tool\n\
+    # Number of ridges\n'+ str(nridge) +
+    #     '\n\
+    # [vertex1 vertex2 midpt1 midpt2 qrtrpt1 qrtrpt2]', comments='')
     
     return all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges
 
@@ -1814,7 +1431,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     a2 = knotParams.get('a2')
     Uinf = knotParams.get('Uinf')
 
-######### txt File stores the connector data for Abaqus analyses ##############
+    ######### txt File stores the connector data for Abaqus analyses ##############
     nel_con_tbot = connector_t_bot_connectivity.shape[0]
     nel_con_treg = connector_t_reg_connectivity.shape[0]
     nel_con_ttop = connector_t_top_connectivity.shape[0]

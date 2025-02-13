@@ -69,14 +69,6 @@ def main(self):
             = inputParams(self.form)
     
     precrack_widths = 0 # for future use
-
-    # for future implementation - SA
-    # grain_length = 5 # mm
-    # height = z_max-z_min
-    # nsegments = int(height/grain_length)
-    # z_max = 100
-
-    # print(x_notch_size, y_notch_size)
     
 
     # ==================================================================
@@ -163,7 +155,7 @@ def main(self):
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
         sites,radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
-                                                    mergeFlag,omega=10)            
+                                                    mergeFlag,omega=10)
     elif radial_growth_rule == 'regular_hexagonal':
         # ----------------------------------
         # hexagonal honeycomb-like geometry
@@ -234,18 +226,6 @@ def main(self):
     # # Build mechanical mesh 
     vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay_old.get('vertices'))
 
-    # ---------------------------------------------
-    # # Visualize the meshes
-
-    # flow points
-    # vertsD = np.array(conforming_delaunay['vertices'])
-    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
-    # vertsC = np.array(conforming_delaunay_old['vertices'])
-    # ax.triplot(vertsC[:, 0], vertsC[:, 1], conforming_delaunay_old['triangles'], 'r^-',markersize=3.,linewidth=0.5)
-    # voronoi vertices
-    ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
-    # plt.show()
-
     voronoiTime = time.time() 
     # print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
 
@@ -261,45 +241,7 @@ def main(self):
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
                                                         boundaries,boundaryFlag,boundary_points_original,mergeFlag,merge_tol)
 
-    RebuildvorTime = time.time()
-
-    # ---------------------------------------------
-    # Visualize the mesh
-
-    ax = plt.gca()
-
-    # Flow
-    # vertsD = np.array(conforming_delaunay['vertices'])
-    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=1.,linewidth=0.5)
-
-    # Main cells
-    # for beg, end in boundary_ridges_new.astype(int):
-    #     x0, y0 = voronoi_vertices[beg, :]
-    #     x1, y1 = voronoi_vertices[end, :]
-    #     ax.plot(
-    #         [x0, x1],
-    #         [y0, y1],'go-',linewidth=1.0,markersize=2.)
-    # for beg, end in infinite_ridges_new.astype(int):
-    #     x0, y0 = voronoi_vertices[beg, :]
-    #     x1, y1 = voronoi_vertices[end, :]
-    #     ax.plot(
-    #         [x0, x1],
-    #         [y0, y1],'ro-',linewidth=1.0,markersize=2.)
-    # for beg, end in finite_ridges_new.astype(int):
-    #     x0, y0 = voronoi_vertices[beg, :]
-    #     x1, y1 = voronoi_vertices[end, :]
-    #     ax.plot(
-    #         [x0, x1],
-    #         [y0, y1],'ko-',linewidth=1.0,markersize=2.)
-    for beg, end in voronoi_ridges.astype(int):
-        x0, y0 = voronoi_vertices[beg, :]
-        x1, y1 = voronoi_vertices[end, :]
-        ax.plot(
-            [x0, x1],
-            [y0, y1],'ko-',linewidth=1.0,markersize=2.)
-        
-    # # plt.show()
-    
+    RebuildvorTime = time.time()    
 
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
@@ -377,7 +319,7 @@ def main(self):
         precrack_nodes = np.array([[x_notch, y_precrack, x_precrack, y_precrack]])
 
         [precrack_elem,nconnector_t_precrack,nconnector_l_precrack] = \
-            WoodMeshGen.insert_precracks(all_pts_2D,all_ridges,nridge,precrack_nodes,\
+            WoodMeshGen.InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
                                     cellsize_early,nsegments)
     else:
         precrack_nodes = []
@@ -491,8 +433,44 @@ def main(self):
     # Generate Paraview visulization files
     if visFlag in ['on','On','Y','y','Yes','yes']:
         
-        plt.show()
+        # ---------------------------------------------
+        # # Visualize the meshes
+
+        # flow points
+        # vertsD = np.array(conforming_delaunay['vertices'])
+        # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
+        # vertsC = np.array(conforming_delaunay_old['vertices'])
+        # ax.triplot(vertsC[:, 0], vertsC[:, 1], conforming_delaunay_old['triangles'], 'r^-',markersize=3.,linewidth=0.5)
+        # voronoi vertices
+        ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
+
+        # Main cells
+        for beg, end in voronoi_ridges.astype(int):
+            x0, y0 = voronoi_vertices[beg, :]
+            x1, y1 = voronoi_vertices[end, :]
+            ax.plot(
+                [x0, x1],
+                [y0, y1],'ko-',linewidth=1,markersize=2.)
+            
+        # Flow
+        # vertsD = np.array(conforming_delaunay['vertices'])
+        # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=1)
+        for el in flow_elems:
+            beg = int(el[0])
+            end = int(el[1])
+            x0,y0 = flow_nodes[beg,1:3]
+            x1,y1 = flow_nodes[end,1:3]
+            ax.plot(
+                [x0, x1],
+                [y0, y1],'ro-',linewidth=2,markersize=3.)
+        # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=2.)
+
+        # plt.show()
         plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
+
+        
+        # ---------------------------------------------
+        # # Create visualization files
         
         WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                        nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
@@ -546,7 +524,6 @@ def main(self):
         FemGui.setActiveAnalysis(App.activeDocument().getObject(analysisName))
 
         # Set view
-        docGui.activeView().viewAxonometric()
         Gui.SendMsgToActiveView("ViewFit")
         docGui.activeView().viewIsometric()
         Gui.runCommand('Std_ViewGroup',0)
