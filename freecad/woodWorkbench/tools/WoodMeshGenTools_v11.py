@@ -48,21 +48,13 @@ def calc_knotstream(y,z,m1,m2,a1,a2,Uinf):
 
 def sort_coordinates(coords):
     # from https://pavcreations.com/clockwise-and-counterclockwise-sorting-of-coordinates/
-    x = coords[0,:]
-    y = coords[1,:]
+    x = coords[:,0]
+    y = coords[:,1]
     cx = np.mean(x)
     cy = np.mean(y)
     angles = np.arctan2(x-cx, y-cy)
     indices = np.argsort(angles)
-    return coords[:,indices]
-
-def intersect2D(a, b):
-  """
-  Find row intersection between 2D numpy arrays, a and b.
-  Returns another numpy array with shared rows
-  credit to: https://gist.github.com/Robaina/b742f44f489a07cd26b49222f6063ef7
-  """
-  return np.array([x for x in set(tuple(x) for x in a) & set(tuple(x) for x in b)])
+    return coords[indices,:]
 
 def TriangleArea2D(x1, y1, x2, y2, x3, y3):
     """
@@ -527,10 +519,10 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     radii = np.concatenate(([0],np.cumsum(radii)))
 
     # generate point at center    
-    sites = np.array([[0,0.0125],[-0.007,-0.007],[0.007,-0.007]])
-    # sites = np.array([[-0.008,0.008],[0.008,-0.008]])
-    # sites = np.array([[-0.0125,0.0125],[0.0125,-0.0125],[0.0125,0.0125],[-0.0125,-0.0125]])
-    # sites = np.array([[0.0,0.0]])
+    # sites = np.array([[0,0.015],[-0.015,-0.015],[0.015,-0.015]])
+    # sites = np.array([[-0.01,0.01],[0.01,-0.01]])
+    sites = np.array([[0.001,0.015],[0.001,-0.01],[0.011,0.001],[-0.013,-0.001]])
+    # sites = np.array([[0.1,0.1]])
 
     return sites, radii
 
@@ -565,9 +557,9 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     nels_long = npts*(nsegments+1)
     nels_trans = nrdgs*nsegments
     nels = nels_long + nels_trans
-    delaun_elems_long = np.zeros((nels_long,6)) 
-    delaun_elems_trans = np.zeros((nels_trans,6)) # empty arrays for flow info
-    # n1, n2, length, area, volume, element type, v1, v2 ... vn
+    delaun_elems_long = np.zeros((nels_long,7)) 
+    delaun_elems_trans = np.zeros((nels_trans,7)) # empty arrays for flow info
+    # n1, n2, l1, l2, area, volume, element type, v1, v2 ... vn
 
     segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
     connector_l_length = segment_length*long_connector_ratio
@@ -593,20 +585,21 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     # longitudinal elements
     for l in range(0,nsegments+1):
         # get layer properties
-        if (l == 0) or (l == nsegments): # the first or last layer
+        if (l == 0) or (l == nsegments): # first or last layer
             typeFlag = 1
-            el_len = segment_length/2
+            el_len1 = segment_length
+            el_len2 = 0
             ni = 1
         else:
             typeFlag = 0
-            el_len = segment_length + connector_l_length
+            el_len1 = (segment_length + connector_l_length)/2
+            el_len2 = el_len1 # for longitudinal elements they are always half and half, won't work for curved beams though -SA
             ni = 3
         # for each element in layer
+        el_len = el_len1 + el_len2 # in long direction, total length is just sum of lengths due to purely vertical direction
         for p in range(0,npts):
             nel_l = p + l*npts # element index
             nd = [p + l*npts, p + (l+ni)*npts] # manual calculation of 3D node numbers
-            delaun_elems_long[nel_l,0:2] = nd # element connectivity
-            delaun_elems_long[nel_l,2] =  el_len
 
             pr = vorsci.point_region[p] # index of voronoi region
             pv = vorsci.regions[pr] # vertices of voronoi region
@@ -660,8 +653,6 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
                         coords_out = np.vstack([coords_out,int_pts])
 
                 coords = np.vstack([coords_int,coords_out])    # combine interior with exterior nodes     
-                # flow_area = 0.5*np.abs(np.dot(coords[:,0],np.roll(coords[:,1],1))-np.dot(coords[:,1],np.roll(coords[:,0],1))) 
-                # el_vol = el_len*flow_area/3 # element volume
             else:
                 coords = vorsci.vertices[pv] # coordinates of voronoi vertices
 
@@ -669,30 +660,36 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
             coords_sort = sort_coordinates(coords)
             flow_area = 0.5*np.abs(np.dot(coords_sort[:,0],np.roll(coords_sort[:,1],1))-np.dot(coords_sort[:,1],np.roll(coords_sort[:,0],1))) 
             el_vol = el_len*flow_area/3 # element volume
-            delaun_elems_long[nel_l,3] = flow_area
-            delaun_elems_long[nel_l,4] =  el_vol
-            # if el_vol == 0: # corner elements
-            #     print('vol',nel_l,pv,coords)
-            delaun_elems_long[nel_l,5] = typeFlag
-            # delaun_elems_long[nel_l,6:len(pv)+6] =  pv
+            if el_vol != 0:
+                delaun_elems_long[nel_l,0:2] = nd # element connectivity
+                delaun_elems_long[nel_l,2] =  el_len1
+                delaun_elems_long[nel_l,3] =  el_len2
+                delaun_elems_long[nel_l,4] = flow_area
+                delaun_elems_long[nel_l,5] =  el_vol
+                delaun_elems_long[nel_l,6] = typeFlag
 
     # transverse elements
     for l in range(0,nsegments): # each segment
         el_h = segment_length + connector_l_length # element height 
         typeFlag = 2
+        # print('num ridges',nrdgs)
         for r in range(0,nrdgs):
             nel_t = r + l*nrdgs # element index
 
             pd = vorsci.ridge_points[r] # 2D flow index for ridge
             coordsd = delaunay_pts[pd] # 2D flow coords
             nd = pd + (2*l+1)*npts # translate 2D flow index to 3D flow index
-            delaun_elems_trans[nel_t,0:2] = nd # element connectivity
             el_len = np.linalg.norm((coordsd[0,:]-coordsd[1,:])) # distance bewteen flow nodes (element length)
-            delaun_elems_trans[nel_t,2] =  el_len
 
             pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
             coordsv = vorsci.vertices[pv] # 2D vor coords
-            # unsure if this is fully correct
+
+            # calculate each length of the element
+            coordc = (coordsv[0,:]+coordsv[1,:])/2 # average vor coords to get center of ridge
+            el_len1 = np.linalg.norm((coordsd[0,:]-coordc)) # distance between flow node and center of ridge
+            el_len2 = np.linalg.norm((coordsd[1,:]-coordc))
+
+            # unsure if this is fully correct, checks out on debugs -SA
             if (check_iscollinear(coordsd[0,:],coordsd[1,:],boundaries) > 0): # check if the flow element is collinear with boundaries
                 # no flow volume on boundary
                 vor_len = 0
@@ -700,21 +697,28 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
             else:
                 vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
                 flow_area = vor_len*el_h # flux area
-            delaun_elems_trans[nel_t,3] = flow_area 
-            el_vol = el_len*flow_area/3 # element volume
-            delaun_elems_trans[nel_t,4] = el_vol
-            delaun_elems_trans[nel_t,5] = typeFlag # element type
+            el_vol = el_len*flow_area/3 # element volume (2D area*length*1/3*2 for two pyramids) 
+            if el_vol != 0:
+                delaun_elems_trans[nel_t,0:2] = nd # element connectivity
+                delaun_elems_trans[nel_t,2] =  el_len1
+                delaun_elems_trans[nel_t,3] =  el_len2
+                delaun_elems_trans[nel_t,4] = flow_area 
+                delaun_elems_trans[nel_t,5] = el_vol
+                delaun_elems_trans[nel_t,6] = typeFlag # element type
 
-            # delaun_elems_trans[nel_t,6:8] = pv # mark relevant 2D voronoi ridge for possible reference
+            # delaun_elems_trans[nel_t,7:9] = pv # mark relevant 2D voronoi ridge for possible reference
     
-    # print(nels_long,nel_l,nels_trans,nel_t,nels)
+    # remove zero volume rows
+    delaun_elems_long = delaun_elems_long[~np.all(delaun_elems_long == 0, axis=1)]
+    delaun_elems_trans = delaun_elems_trans[~np.all(delaun_elems_trans == 0, axis=1)]
     delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
+    nels = np.shape(delaun_elems)[0]
 
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
         ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
     
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%d']\
-        ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l A V type v1 v2 ... vn]')
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%0.8f','%d']\
+        ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l1 l2 A V type v1 v2 ... vn]')
     
     return delaun_nodes, delaun_elems
 
@@ -1374,7 +1378,7 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
     nconnector_t,nconnector_l,connector_l_vertex_dict
 
 
-def insert_precracks(all_pts_2D,all_ridges,nridge,precrack_nodes,\
+def InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
                      cellsize_early,nsegments):
 
     precrack_midpts = (precrack_nodes[:,0:2]+precrack_nodes[:,2:4])/2.0
