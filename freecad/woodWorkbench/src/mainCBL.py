@@ -20,6 +20,8 @@ import matplotlib.tri as mtri
 from pylab import *
 import os
 import time
+import cProfile
+import pstats
 
 from pathlib import Path
 import triangle as tr
@@ -42,11 +44,13 @@ from freecad.woodWorkbench.src.chronoInput import chronoAux
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 from freecad.woodWorkbench.tools.rf_generator import RandomField
 
-
+# cProfile.run("",sort='ncalls')
 def main(self):
 
     # performance check only
     startTime = time.time()
+    pr = cProfile.Profile()
+    pr.enable()
 
     # ==================================================================
     self.form[1].progressBar.setValue(10) 
@@ -536,9 +540,7 @@ def main(self):
         self.form[1].statusWindow.setText("Status: Complete.") 
         # ==================================================================
 
-        # Switch to FEM GUI
         App.ActiveDocument.recompute()
-
         Gui.Control.closeDialog()
         # Gui.activateWorkbench("FemWorkbench")
         FemGui.setActiveAnalysis(App.activeDocument().getObject(analysisName))
@@ -546,8 +548,8 @@ def main(self):
         # Set view
         docGui.activeView().viewAxonometric()
         Gui.SendMsgToActiveView("ViewFit")
-        Gui.runCommand('Std_DrawStyle',6)
-        Gui.runCommand('Std_PerspectiveCamera',1)
+        docGui.activeView().viewIsometric()
+        Gui.runCommand('Std_ViewGroup',0)
     
     else:
 
@@ -556,10 +558,16 @@ def main(self):
         self.form[1].statusWindow.setText("Status: Complete.") 
         # ==================================================================
         
-        # Switch to FEM GUI
         App.ActiveDocument.recompute()
         Gui.Control.closeDialog()
+
+    pr.disable()
+    loc = os.path.join(outDir, geoName, 'profile.cProf')
+    pr.dump_stats(loc)
+    p = pstats.Stats(loc)
+    p.strip_dirs().sort_stats('cumulative').print_stats(10)
 
 
 if __name__ == '__main__':
     main()
+    
