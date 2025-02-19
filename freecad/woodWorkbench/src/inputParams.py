@@ -14,7 +14,7 @@
 
 def inputParams(form):
 
-    geoName = (form[0].geoName.text() or 'cube_debug')
+    geoName = (form[0].geoName.text() or 'cube')
 
     # Cell Growth Parameters
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  #
@@ -102,11 +102,11 @@ def inputParams(form):
         box_size = box_width
         z_min = 0
         z_max = box_height #box_size # segment_length = (z_max - z_min) / nsegments
-        randomFlag = 'On'
+        randomFlag = 'Off'
         x_notch_size = box_size*0.1 # depth of notch
         y_notch_size = box_size*0.1 # width of notch
         precrack_size = box_size*0.1
-        mergeFlag = 'Off'
+        mergeFlag = 'On'
         merge_tol = 5e-5
         boundaryFlag = 'Off'
 

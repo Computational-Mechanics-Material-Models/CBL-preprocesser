@@ -643,6 +643,8 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
                             intpts = find_intersect(coord,normal,boundaries)
                             if intpts.any():
                                 int_pts[i,:] = intpts
+                            else:
+                                print('(flow)')
                         coords_out = np.vstack([coords_out,int_pts])
                 else: # side element, may or may not be touching a corner
 
@@ -660,6 +662,8 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
                             intpts = find_intersect(coord,normal,boundaries)
                             if intpts.any():
                                 int_pts[i,:] = intpts
+                            else:
+                                print('(flow)')
                         if np.size(inds) > 1:
                             index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
                             int_pts = int_pts[index,:]
@@ -830,8 +834,9 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
                 boundary_points.append(intpt)
             # plt.quiver(p[0,0],p[0,1],normal[0],normal[1],color='b')
         else:
-            print('no intersect found (voronoi)')
-    print(n,'points merged with the boundary')
+            print('(voronoi)')
+    if mergeFlag == 'On':
+        print(n,'points merged with the boundary')
     nboundary_pts = len(boundary_points)
     boundary_points = np.reshape(boundary_points,(nboundary_pts,2)) # need to reshape because extra second dimension for some reason
     
@@ -891,12 +896,12 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
     nridge = voronoi_ridges.shape[0]
 
-    # print(voronoi_ridges)
+    # Calculate minimum ridge length for reference
     ridge_lengths = voronoi_vertices[voronoi_ridges[:,0]] - voronoi_vertices[voronoi_ridges[:,1]]
     ridge_lengths = np.linalg.norm(ridge_lengths,axis=1)
     # get ridge lengths not equal to zero
     ridge_lengths = ridge_lengths[ridge_lengths >= 1e-13]
-    print(min(ridge_lengths))
+    print('The minimum ridge distance is', float('{:.2E}'.format(min(ridge_lengths))))
     
     return voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertices,nvertices_in,nfinite_ridge,nboundary_ridge,\

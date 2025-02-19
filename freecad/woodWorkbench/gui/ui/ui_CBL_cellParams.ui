@@ -1159,7 +1159,7 @@
             </size>
            </property>
            <property name="text">
-            <string>1.,0.05,0</string>
+            <string>1.,0.01,0</string>
            </property>
            <property name="placeholderText">
             <string>1.,0.05,0</string>

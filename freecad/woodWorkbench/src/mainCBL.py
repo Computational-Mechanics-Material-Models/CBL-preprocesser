@@ -141,6 +141,8 @@ def main(self):
     ax = plt.gca()
     ax.set_aspect('equal', adjustable='box')
 
+    print('\n')
+    print(geoName,':')
     # ==================================================================
     self.form[1].progressBar.setValue(20) 
     self.form[1].statusWindow.setText("Status: Placing Cells.") 
@@ -194,7 +196,7 @@ def main(self):
     sites_vor = sites
     placementTime = time.time()
     nParticles = len(sites)
-    print('{:d} particles/cells placed in {:.3f} seconds'.format(nParticles, (placementTime - startTime)))
+    print(int(nParticles), 'particles placed')
 
     # ==================================================================
     self.form[1].progressBar.setValue(30) 
@@ -307,7 +309,7 @@ def main(self):
                         nconnector_t_per_beam,nconnector_t_per_grain)
 
     BeamTime = time.time() 
-    print('{:d} beam elements generated in {:.3f} seconds'.format(nbeamElem, (BeamTime - RebuildvorTime)))
+    print(nbeamElem,'beam elements generated')
 
 
     # ===============================================
