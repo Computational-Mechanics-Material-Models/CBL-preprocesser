@@ -67,10 +67,10 @@ We recommend pulling the GitHub directly into the FreeCAD workbench directory. O
 
 <summary>Step 4: Supporting Packages</summary>
 
-The Wood Workbench also requires the Triangle python package installed to the FreeCAD environment. 
+The Wood Workbench also requires the Triangle and Shapely python packages installed to the FreeCAD environment. 
 
 * Navigate to **C:\Program Files\FreeCAD 0.21\bin** and open a terminal at this location.
-* Run ``.\python.exe -m pip install triangle``
+* Run ``.\python.exe -m pip install triangle shapely``
 
 </details>
 
