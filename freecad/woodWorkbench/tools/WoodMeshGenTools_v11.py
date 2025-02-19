@@ -26,15 +26,17 @@ import FreeCAD as App # type: ignore
 import cProfile
 import pstats
 import os
+import line_profiler 
+
 
 # from hexalattice.hexalattice import create_hex_grid # 
 
 def calc_knotflow(y,z,m1,m2,a1,a2,Uinf,yc):
 
-    dy1 = -m1/2/math.pi*(y-yc)/((z-a1)**2+(y-yc)**2)
-    dz1 = -m1/2/math.pi*(z-a1)/((z-a1)**2+(y-yc)**2)    
-    dy2 = m2/2/math.pi*(y-yc)/((z-a2)**2+(y-yc)**2)
-    dz2 = m2/2/math.pi*(z-a2)/((z-a2)**2+(y-yc)**2)
+    dy1 = -m1/2/np.pi*(y-yc)/((z-a1)**2+(y-yc)**2)
+    dz1 = -m1/2/np.pi*(z-a1)/((z-a1)**2+(y-yc)**2)    
+    dy2 = m2/2/np.pi*(y-yc)/((z-a2)**2+(y-yc)**2)
+    dz2 = m2/2/np.pi*(z-a2)/((z-a2)**2+(y-yc)**2)
 
     dydz = (dy1+dy2)/(Uinf + dz1 + dz2)
     return dydz
@@ -42,8 +44,8 @@ def calc_knotflow(y,z,m1,m2,a1,a2,Uinf,yc):
 def calc_knotstream(y,z,m1,m2,a1,a2,Uinf):
 
     psi_frstr = Uinf*y
-    psi_snk = -m1/(2*math.pi)*np.arctan2((y),(z-a1))
-    psi_src = m2/(2*math.pi)*np.arctan2((y),(z-a2))
+    psi_snk = -m1/(2*np.pi)*np.arctan2((y),(z-a1))
+    psi_src = m2/(2*np.pi)*np.arctan2((y),(z-a2))
 
     psi = psi_frstr + psi_src + psi_snk
 
@@ -1439,7 +1441,9 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                       nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
                       randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem):
-   
+    # pr = cProfile.Profile()
+    # pr.enable()
+
     # Uncompress paramters for knot flow
     m1 = knotParams.get('m1')
     m2 = knotParams.get('m2')
@@ -1467,9 +1471,11 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     conn_l_lengths = np.tile(conn_l_lengths_2D,nlayers_conn_l)
     conn_l_angles = np.tile(conn_l_angles_2D,nlayers_conn_l)
     
-    for i in range(0,nlayers_conn_l):
-        conn_l_angles[i*2*nridge:(i+1)*2*nridge] = conn_l_angles[i*2*nridge:(i+1)*2*nridge] - theta[(i+1)*nctrlpt_per_beam]
-        
+    # for i in range(0,nlayers_conn_l):
+    #     conn_l_angles[i*2*nridge:(i+1)*2*nridge] = conn_l_angles[i*2*nridge:(i+1)*2*nridge] - theta[(i+1)*nctrlpt_per_beam]
+    indices = np.arange(nlayers_conn_l)[:, None] * 2 * nridge
+    conn_l_angles[indices] -= theta[(indices // (2 * nridge) + 1) * nctrlpt_per_beam]
+
     rot = np.array([[np.cos(conn_l_angles), -np.sin(conn_l_angles)], [np.sin(conn_l_angles), np.cos(conn_l_angles)]]).T
     rot = np.hstack((rot[:,0,:],np.zeros(len(conn_l_angles))[:, np.newaxis])) # convert to 3D rotation matrix, assumes rotation remains still in-plane
     conn_l_tangents = rot
@@ -1490,56 +1496,49 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     else:
         ktol = 0.0
     
+    IGAcopy = np.copy(IGAvertices) # to protect reference, not sure if necessary. removed copy for efficiency -SA
     # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for long)
     for i in range(0,nel_con_tbot): # transverse bottom of beam
-        Meshdata[i,0:3] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,0]-1,:] # xyzz coords of first half
-        Meshdata[i,3:6] = np.copy(IGAvertices)[connector_t_bot_connectivity[i,1]-1,:] # xyz coords of second half
+        Meshdata[i,0:3] = IGAcopy[connector_t_bot_connectivity[i,0]-1,:] # xyzz coords of first half
+        Meshdata[i,3:6] = IGAcopy[connector_t_bot_connectivity[i,1]-1,:] # xyz coords of second half
         Meshdata[i,22] = height_connector_t # connector length
         Meshdata[i,24] = 1 # connector type
-        psi = calc_knotstream(Meshdata[i,1]-box_center[1],Meshdata[i,2],m1,m2,a1,a2,Uinf) # check if in knot 
-        if abs(psi) < ktol:
-            Meshdata[i,25] = 1
         if i in precrack_elem: # 
             Meshdata[i,26] = 1 # precrack flag
+    offset = nel_con_tbot
     for i in range(0,nel_con_treg): # transverse mid beam
-        offset = nel_con_tbot
-        Meshdata[i+offset,0:3] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,0]-1,:]
-        Meshdata[i+offset,3:6] = np.copy(IGAvertices)[connector_t_reg_connectivity[i,1]-1,:]
+        Meshdata[i+offset,0:3] = IGAcopy[connector_t_reg_connectivity[i,0]-1,:]
+        Meshdata[i+offset,3:6] = IGAcopy[connector_t_reg_connectivity[i,1]-1,:]
         Meshdata[i+offset,22] = height_connector_t*2
         Meshdata[i+offset,24] = 2
-        psi = calc_knotstream(Meshdata[i+offset,1]-box_center[1],Meshdata[i+offset,2],m1,m2,a1,a2,Uinf)
-        if abs(psi) < ktol:
-            Meshdata[i+offset,25] = 1
         if i in precrack_elem:
             Meshdata[i+offset,26] = 1 # precrack flag
+    offset = nel_con_tbot+nel_con_treg
     for i in range(0,nel_con_ttop): # transverse top of beam
-        offset = nel_con_tbot+nel_con_treg
-        Meshdata[i+offset,0:3] = np.copy(IGAvertices)[connector_t_top_connectivity[i,0]-1,:]
-        Meshdata[i+offset,3:6] = np.copy(IGAvertices)[connector_t_top_connectivity[i,1]-1,:]
+        Meshdata[i+offset,0:3] = IGAcopy[connector_t_top_connectivity[i,0]-1,:]
+        Meshdata[i+offset,3:6] = IGAcopy[connector_t_top_connectivity[i,1]-1,:]
         Meshdata[i+offset,22] = height_connector_t
         Meshdata[i+offset,24] = 3
-        psi = calc_knotstream(Meshdata[i+offset,1]-box_center[1],Meshdata[i+offset,2],m1,m2,a1,a2,Uinf)
-        if abs(psi) < ktol:
-            Meshdata[i+offset,25] = 1
         if i in precrack_elem:
             Meshdata[i+offset,26] = 1 # precrack flag
+    offset = nel_con_tbot+nel_con_treg+nel_con_ttop
     for i in range(0,nel_con_l): # longitudinal
-        offset = nel_con_tbot+nel_con_treg+nel_con_ttop
-        Meshdata[i+offset,0:3] = np.copy(IGAvertices)[connector_l_connectivity[i,0]-1,:]
-        Meshdata[i+offset,3:6] = np.copy(IGAvertices)[connector_l_connectivity[i,1]-1,:]
+        Meshdata[i+offset,0:3] = IGAcopy[connector_l_connectivity[i,0]-1,:]
+        Meshdata[i+offset,3:6] = IGAcopy[connector_l_connectivity[i,1]-1,:]
         Meshdata[i+offset,22] = conn_l_lengths[i]
         Meshdata[i+offset,24] = 4
         # calculate random field per connector
-        # inefficient to loop, need to make one operation but x3 -SA
+        # inefficient to loop, need to make one operation! -SA
         if randomFlag in ['on','On','Y','y','Yes','yes']:
-            rf_ind = np.where((voronoi_vertices_2D==Meshdata[i+offset,0:2]).all(axis=1))[0]
+            rf_ind = np.where((voronoi_vertices_2D==Meshdata[i,0:2]).all(axis=1))[0]
             rf_array = random_field.getFieldEOLE(np.array([[Meshdata[i+offset,2],0,0]]),rf_ind)
-            Meshdata[i+offset,23] =  rf_array[:,:,0] # EOLE projection with z value
         else:
             Meshdata[i+offset,23] = 1
-        psi = calc_knotstream(Meshdata[i+offset,1]-box_center[1],Meshdata[i+offset,2],m1,m2,a1,a2,Uinf)
-        if abs(psi) < ktol:
-            Meshdata[i+offset,25] = 1
+    if randomFlag in ['on','On','Y','y','Yes','yes']:
+        Meshdata[offset:,23] =  rf_array[:,:,0] # EOLE projection with z value
+    psi_values = calc_knotstream(Meshdata[:,1]-box_center[1],Meshdata[:,2],m1,m2,a1,a2,Uinf) # check if in knot 
+    inds = np.where(np.abs(psi_values) < ktol)
+    Meshdata[inds,25] = 1
     
     # Calculate connector center    
     Meshdata[:,6:9] = (Meshdata[:,0:3] + Meshdata[:,3:6])/2
@@ -1551,7 +1550,9 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
 
     # Calculate unit t vector
     tvects = np.zeros((nel_con,3))
-    tvects[:,0:3] = (Meshdata[:,0:3] - Meshdata[:,3:6])/np.linalg.norm((Meshdata[:,0:3] - Meshdata[:,3:6])) #n1 - n2 = t
+    diff = Meshdata[:,0:3] - Meshdata[:,3:6]
+    tvects[:,0:3] = diff / np.linalg.norm(diff, axis=1, keepdims=True) #n1 - n2 = t
+    # tvects[:,0:3] = (Meshdata[:,0:3] - Meshdata[:,3:6])/np.linalg.norm((Meshdata[:,0:3] - Meshdata[:,3:6])) #n1 - n2 = t
     # Calculate cross product with z axis (*** temporary until full connector rotation is added - SA)
     zvects = np.zeros((nel_con,3))
     zvects[:nel_con-nel_con_l,2] = 1
@@ -1595,7 +1596,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
 
 
     # pr.disable()
-    # loc = os.path.join(r"C:\Users\SusanAlexisBrown\woodWorkbench", geoName, 'profile.cProf')
+    # loc = os.path.join(r"C:\Users\SusanAlexisBrown\woodWorkbench", geoName, 'connProfile.cProf')
     # pr.dump_stats(loc)
     # p = pstats.Stats(loc)
     # p.strip_dirs().sort_stats('cumulative').print_stats(10)
@@ -1607,7 +1608,9 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
                        nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
                        nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
                        conn_l_tangents,all_vertices_2D, delaun_nodes, delaun_elems):
-    
+    # pr = cProfile.Profile()
+    # pr.enable()
+
     # Calculate model parameters
     ngrain = nvertex
     ninterval_per_beam_vtk = int((nctrlpt_per_beam-1)/2) # 2 layers ----> 1 interval
@@ -2161,6 +2164,12 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     
     vtkfile_conns_vol.close()
     
+    # pr.disable()
+    # loc = os.path.join(r"C:\Users\SusanAlexisBrown\woodWorkbench", geoName, 'connProfile.cProf')
+    # pr.dump_stats(loc)
+    # p = pstats.Stats(loc)
+    # p.strip_dirs().sort_stats('cumulative').print_stats(10)
+
     
 def BezierExtraction(NURBS_degree,nbeam_total):
     nctrlpt_per_beam = 2*NURBS_degree + 1

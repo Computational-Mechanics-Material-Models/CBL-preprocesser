@@ -22,6 +22,7 @@ import os
 import time
 import cProfile
 import pstats
+from line_profiler import LineProfiler
 
 from pathlib import Path
 import triangle as tr
@@ -45,12 +46,15 @@ import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 from freecad.woodWorkbench.tools.rf_generator import RandomField
 
 # cProfile.run("",sort='ncalls')
+
 def main(self):
 
     # performance check only
     startTime = time.time()
     pr = cProfile.Profile()
     pr.enable()
+    
+    # profiler = LineProfiler()
 
     # ==================================================================
     self.form[1].progressBar.setValue(10) 
@@ -332,6 +336,16 @@ def main(self):
     self.form[1].statusWindow.setText("Status: Calculating Mesh Info.") 
     # ==================================================================
     # Calculate mesh info
+
+    # lp = LineProfiler()
+    # lp_wrapper = lp(WoodMeshGen.ConnectorMeshFile)
+    # [ConnMeshData,conn_l_tangents,height_connector_t] = lp_wrapper(geoName,IGAvertices,connector_t_bot_connectivity,\
+    #                 connector_t_reg_connectivity,connector_t_top_connectivity,\
+    #                 connector_l_connectivity,all_vertices_2D,\
+    #                 max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
+    #                 nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
+    #                 randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem)
+    # lp.print_stats()
     [ConnMeshData,conn_l_tangents,height_connector_t] = \
         WoodMeshGen.ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                     connector_t_reg_connectivity,connector_t_top_connectivity,\
@@ -436,13 +450,8 @@ def main(self):
         # ---------------------------------------------
         # # Visualize the meshes
 
-        # flow points
-        # vertsD = np.array(conforming_delaunay['vertices'])
-        # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'bo-',markersize=3.,linewidth=0.5)
-        # vertsC = np.array(conforming_delaunay_old['vertices'])
-        # ax.triplot(vertsC[:, 0], vertsC[:, 1], conforming_delaunay_old['triangles'], 'r^-',markersize=3.,linewidth=0.5)
-        # voronoi vertices
-        ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
+        # Original points
+        # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
 
         # Main cells
         for beg, end in voronoi_ridges.astype(int):
@@ -450,19 +459,19 @@ def main(self):
             x1, y1 = voronoi_vertices[end, :]
             ax.plot(
                 [x0, x1],
-                [y0, y1],'ko-',linewidth=1,markersize=2.)
+                [y0, y1],'ko-',linewidth=0.5,markersize=1.)
             
         # Flow
         # vertsD = np.array(conforming_delaunay['vertices'])
         # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=1)
-        for el in flow_elems:
-            beg = int(el[0])
-            end = int(el[1])
-            x0,y0 = flow_nodes[beg,1:3]
-            x1,y1 = flow_nodes[end,1:3]
-            ax.plot(
-                [x0, x1],
-                [y0, y1],'ro-',linewidth=2,markersize=3.)
+        # for el in flow_elems:
+        #     beg = int(el[0])
+        #     end = int(el[1])
+        #     x0,y0 = flow_nodes[beg,1:3]
+        #     x1,y1 = flow_nodes[end,1:3]
+        #     ax.plot(
+        #         [x0, x1],
+        #         [y0, y1],'ro-',linewidth=0.5,markersize=3.)
         # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=2.)
 
         # plt.show()
@@ -471,7 +480,13 @@ def main(self):
         
         # ---------------------------------------------
         # # Create visualization files
-        
+        # lp = LineProfiler()
+        # lp_wrapper = lp(WoodMeshGen.VisualizationFiles)
+        # lp_wrapper(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
+        #                nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
+        #                nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
+        #                conn_l_tangents,all_vertices_2D, flow_nodes, flow_elems)
+        # lp.print_stats()
         WoodMeshGen.VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
                        nsegments,nridge,voronoi_ridges,all_ridges,nvertex,\
                        nconnector_t,nconnector_l,nctrlpt_per_beam,ConnMeshData,\
@@ -539,10 +554,10 @@ def main(self):
         Gui.Control.closeDialog()
 
     pr.disable()
-    loc = os.path.join(outDir, geoName, 'profile.cProf')
-    pr.dump_stats(loc)
-    p = pstats.Stats(loc)
-    p.strip_dirs().sort_stats('cumulative').print_stats(10)
+    loc = os.path.join(outDir, geoName, 'fullProfile.cProf')
+    # pr.dump_stats(loc)
+    # p = pstats.Stats(loc)
+    # p.strip_dirs().sort_stats('cumulative').print_stats(10)
 
 
 if __name__ == '__main__':
