@@ -221,12 +221,17 @@ def main(self):
     tri_inp = {'vertices': delaunay_vertices_old,'segments':boundary_segments,'regions':boundary_region}
     conforming_delaunay_old = tr.triangulate(tri_inp, 'peAq0D') 
     
-    # ---------------------------------------------
-    # # Build flow mesh
-    flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max, \
-                                                       boundaries,boundary_points_original,conforming_delaunay_old)
-    # flow_nodes are conforming_delaunay vertices layered with z-value added, but volume is calculated based on old sites to match 
-    # mechanical cell shapes
+    flow = False
+    if flow == True:
+        # ---------------------------------------------
+        # # Build flow mesh
+        flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max, \
+                                                        boundaries,boundary_points_original,conforming_delaunay_old)
+        # flow_nodes are conforming_delaunay vertices layered with z-value added, but volume is calculated based on old sites to match 
+        # mechanical cell shapes
+    else:
+        flow_nodes = np.empty([0,3])
+        flow_elems = np.empty([0,2])
 
     # ---------------------------------------------
     # # Build mechanical mesh 

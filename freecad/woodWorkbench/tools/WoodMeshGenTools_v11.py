@@ -553,7 +553,7 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     npts = len(delaunay_pts)
 
     # different package to calculate voronoi region info because it produces output in different form
-    # however input sites are non-centroidal for new method
+    # however input sites are non-centroidal for new method *!!!
 
     # checked and within tolerance of each other -SA
     vorsci = Voronoi(conforming_delaunay['vertices']) # location of vor sites
