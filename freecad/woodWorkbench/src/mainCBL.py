@@ -143,6 +143,10 @@ def main(self):
     # ==================================================================
     # Place cells with a specific radial growth pattern
 
+    x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
+        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
+    
+
     # [sites,radii] = genSites(self.form)
     if radial_growth_rule == 'binary':
         # ---------------------------------------------
@@ -155,7 +159,7 @@ def main(self):
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
         sites,radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
-                                                    mergeFlag,omega=10)
+                                                    mergeFlag,boundary_points_original,omega=10)
     elif radial_growth_rule == 'regular_hexagonal':
         # ----------------------------------
         # hexagonal honeycomb-like geometry
@@ -182,6 +186,8 @@ def main(self):
         # print('Now exiting...')
         # # exit()
 
+    sites_centroid = new_sites
+    sites_vor = sites
     placementTime = time.time()
     nParticles = len(sites)
     print('{:d} particles/cells placed in {:.3f} seconds'.format(nParticles, (placementTime - startTime)))
@@ -190,13 +196,7 @@ def main(self):
     self.form[1].progressBar.setValue(30) 
     self.form[1].statusWindow.setText("Status: Defining Boundaries.") 
     # ==================================================================
-    # Clipping box (boundaries) of the centroidal delauney points
-    sites_centroid,x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
-        WoodMeshGen.Clipping_Box(new_sites,box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
-    # Clipping box of the original points for voronoi
-    sites_vor,x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
-        WoodMeshGen.Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
-    
+
     num_bound = np.shape(boundary_points_original)[0]  # create boundary segements to enforce boundaries 
     boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
     boundary_region = np.array([[box_center[0],box_center[1],1,0]])

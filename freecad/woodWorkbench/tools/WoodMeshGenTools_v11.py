@@ -249,71 +249,6 @@ def check_isinside(points,boundary_points):
     return path_in
 
 
-def Clipping_Box(sites,box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size):
-    """
-    clipping box for the delauney points (generated cell points)
-    TBD: adjust to general shape using polygon or similar
-    """
-
-    if box_shape in ['square','Square','SQUARE']: # square box
-        x_min = box_center[0] - box_size/2
-        x_max = box_center[0] + box_size/2 
-        y_min = box_center[1] - box_size/2
-        y_max = box_center[1] + box_size/2
-        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-
-        l0 = [(x_min, y_min), (x_max, y_min)]
-        l1 = [(x_max, y_min), (x_max, y_max)]
-        l2 = [(x_max, y_max), (x_min, y_max)]
-        l3 = [(x_min, y_max), (x_min, y_min)]
-        boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-        
-    if box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangular box
-        x_min = box_center[0] - box_width/2
-        x_max = box_center[0] + box_width/2 
-        y_min = box_center[1] - box_depth/2
-        y_max = box_center[1] + box_depth/2
-        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-        
-        l0 = [(x_min, y_min), (x_max, y_min)]
-        l1 = [(x_max, y_min), (x_max, y_max)]
-        l2 = [(x_max, y_max), (x_min, y_max)]
-        l3 = [(x_min, y_max), (x_min, y_min)]
-        boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
-
-    elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE']: # notched sqaure box
-        x_min = box_center[0] - box_size/2
-        x_max = box_center[0] + box_size/2
-        y_min = box_center[1] - box_size/2
-        y_max = box_center[1] + box_size/2
-        x_notch = x_min + x_notch_size
-        y_notch_min = box_center[1] - y_notch_size/2
-        y_notch_max = box_center[1] + y_notch_size/2
-        boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
-                            [x_notch,y_notch_min],[x_min,y_notch_min]])
-            
-        l0 = [(x_min, y_min), (x_max, y_min)]
-        l1 = [(x_max, y_min), (x_max, y_max)]
-        l2 = [(x_max, y_max), (x_min, y_max)]
-        l3 = [(x_min, y_max), (x_min, y_notch_max)]
-        l4 = [(x_min, y_notch_max), (x_notch, y_notch_max)]
-        l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
-        l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
-        l7 = [(x_min,y_notch_min), (x_min, y_min)]
-        boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
-        
-    else:
-        print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
-        print('Now exitting...')
-        exit()
-
-
-    path_in = check_isinside(sites,boundary_points) # checks sites inside boundary using path
-    sites_in = sites[path_in]
-        
-    return sites_in,x_min,x_max,y_min,y_max,boundaries,boundary_points
-
-
 def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
                          width_sparse,width_dense,cellsize_sparse,cellsize_dense,\
                          iter_max,print_interval):
@@ -374,7 +309,7 @@ def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
 
 def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
                                cellsize_sparse,cellsize_dense,iter_max,\
-                               mergeFlag,omega):
+                               mergeFlag,boundary_points,omega):
     """
     packing cells by firstly placing new cells and then performing Lloyd's relaxation in the generation rings
     """
@@ -473,6 +408,13 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     new_sites = relax_points(vor,1) # returns sites which are exact centroids of new vor based on relaxed old sites (new method)
     # relax_points return centroid with omega=1 means no relaxation = exact centroid
 
+    path_in_old = check_isinside(old_sites,boundary_points) # checks sites inside boundary using path
+    old_sites = old_sites[path_in_old]
+
+    path_in_new = check_isinside(new_sites,boundary_points) # checks sites inside boundary using path
+    new_sites = new_sites[path_in_new]
+
+
     return old_sites, radii, new_sites
 
 
@@ -533,7 +475,70 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     return sites, radii
 
 
-def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries,conforming_delaunay_old):
+def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size):
+    """
+    clipping box for the delauney points (generated cell points)
+    TBD: adjust to general shape using polygon or similar
+    """
+
+    if box_shape in ['square','Square','SQUARE']: # square box
+        x_min = box_center[0] - box_size/2
+        x_max = box_center[0] + box_size/2 
+        y_min = box_center[1] - box_size/2
+        y_max = box_center[1] + box_size/2
+        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+
+        # l0 = [(x_min, y_min), (x_max, y_min)]
+        # l1 = [(x_max, y_min), (x_max, y_max)]
+        # l2 = [(x_max, y_max), (x_min, y_max)]
+        # l3 = [(x_min, y_max), (x_min, y_min)]
+        # boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
+        
+    if box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangular box
+        x_min = box_center[0] - box_width/2
+        x_max = box_center[0] + box_width/2 
+        y_min = box_center[1] - box_depth/2
+        y_max = box_center[1] + box_depth/2
+        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+        
+        # l0 = [(x_min, y_min), (x_max, y_min)]
+        # l1 = [(x_max, y_min), (x_max, y_max)]
+        # l2 = [(x_max, y_max), (x_min, y_max)]
+        # l3 = [(x_min, y_max), (x_min, y_min)]
+        # boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
+
+    elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE']: # notched sqaure box
+        x_min = box_center[0] - box_size/2
+        x_max = box_center[0] + box_size/2
+        y_min = box_center[1] - box_size/2
+        y_max = box_center[1] + box_size/2
+        x_notch = x_min + x_notch_size
+        y_notch_min = box_center[1] - y_notch_size/2
+        y_notch_max = box_center[1] + y_notch_size/2
+        boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
+                            [x_notch,y_notch_min],[x_min,y_notch_min]])
+            
+        # l0 = [(x_min, y_min), (x_max, y_min)]
+        # l1 = [(x_max, y_min), (x_max, y_max)]
+        # l2 = [(x_max, y_max), (x_min, y_max)]
+        # l3 = [(x_min, y_max), (x_min, y_notch_max)]
+        # l4 = [(x_min, y_notch_max), (x_notch, y_notch_max)]
+        # l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
+        # l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
+        # l7 = [(x_min,y_notch_min), (x_min, y_min)]
+        # boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
+        
+    else:
+        print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
+        exit()
+
+    boundary_points = sort_coordinates(boundary_points)
+    boundaries = np.concatenate((np.expand_dims(boundary_points,axis=1),np.roll(np.expand_dims(boundary_points,axis=1),-1,axis=0)),axis=1)
+        
+    return x_min,x_max,y_min,y_max,boundaries,boundary_points
+
+
+def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries,boundary_points_original,conforming_delaunay_old):
 
 
     ''' 
