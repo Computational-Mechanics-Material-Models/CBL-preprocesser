@@ -890,6 +890,13 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     nboundary_ridge = boundary_ridges_new.shape[0]
     voronoi_ridges = np.vstack((finite_ridges_new,boundary_ridges_new))
     nridge = voronoi_ridges.shape[0]
+
+    # print(voronoi_ridges)
+    ridge_lengths = voronoi_vertices[voronoi_ridges[:,0]] - voronoi_vertices[voronoi_ridges[:,1]]
+    ridge_lengths = np.linalg.norm(ridge_lengths,axis=1)
+    # get ridge lengths not equal to zero
+    ridge_lengths = ridge_lengths[ridge_lengths >= 1e-13]
+    print(min(ridge_lengths))
     
     return voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertices,nvertices_in,nfinite_ridge,nboundary_ridge,\
@@ -1433,7 +1440,6 @@ def InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
     # print(precrack_elem)
 
     return precrack_elem, nconnector_t_precrack, nconnector_l_precrack
-
 
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\
