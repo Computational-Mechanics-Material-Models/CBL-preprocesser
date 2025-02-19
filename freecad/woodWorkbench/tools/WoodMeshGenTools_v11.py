@@ -97,8 +97,8 @@ def check_iscollinear(p1,p2,boundaries):
         k1 = (p2[1]-p1[1])/(p2[0]-p1[0]) # slope of the new line segment
         
     for boundary in boundaries: # loop over boundary lines
-        bp1 = boundary[1][0]
-        bp2 = boundary[1][1]
+        bp1 = boundary[0]
+        bp2 = boundary[1]
         
         if (bp2[0]-bp1[0]) == 0: # inf slope
             k2 = 99999999
@@ -192,8 +192,8 @@ def find_intersect(p,normal,boundaries):
 
     intersect_points = []
     for boundary in boundaries: # loop over boundary lines
-        q = np.asarray(boundary[1][0])
-        s = np.asarray(boundary[1][1]) - np.asarray(boundary[1][0])
+        q = np.asarray(boundary[0])
+        s = np.asarray(boundary[1]) - np.asarray(boundary[0])
         if np.cross(normal,s) == 0: # parallel
             t = np.inf
             u = np.inf

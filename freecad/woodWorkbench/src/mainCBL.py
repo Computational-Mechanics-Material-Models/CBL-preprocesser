@@ -218,7 +218,7 @@ def main(self):
     # ---------------------------------------------
     # # Build flow mesh
     flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max, \
-                                                       boundaries,conforming_delaunay_old)
+                                                       boundaries,boundary_points_original,conforming_delaunay_old)
     # flow_nodes are conforming_delaunay vertices layered with z-value added, but volume is calculated based on old sites to match 
     # mechanical cell shapes
 
