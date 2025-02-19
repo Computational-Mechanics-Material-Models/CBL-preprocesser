@@ -22,6 +22,8 @@ from pathlib import Path
 import datetime
 import pkg_resources
 import time
+import shapely.plotting
+import shapely as shp
 import FreeCAD as App # type: ignore
 import cProfile
 import pstats
@@ -398,11 +400,20 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
         lloyd_iter += 1
-
-    #check for too close points due to randomness of site generation
-    if mergeFlag == 'On': # if the merge operation is selected 
-        existing_sites = merge_close(existing_sites,cellsize_dense)
     # ax.plot(existing_sites[:,0],existing_sites[:,1],'bd',markersize=3.)
+
+    # check if sites are too close the the boundary and would thus create small elements
+    if mergeFlag == 'On':
+        pts = []
+        sitesP = shp.points(existing_sites)
+        boundL = shp.Polygon(boundary_points)
+        for p in range(0,len(existing_sites)):
+            point = sitesP[p]
+            dist = point.distance(boundL.boundary)
+            if dist < cellsize_dense/2:
+                pts.append(p)
+        existing_sites = np.delete(existing_sites,pts,0)
+        print(len(pts),'points removed due to boundary proximity')
 
     old_sites = existing_sites # centroids of relaxed voronoi tesselation become site of mech voronoi tesselation
     # old sites are thus not centroid of mechnical mesh, but normal dual of voronoi tesselation 
@@ -410,9 +421,9 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     new_sites = relax_points(vor,1) # returns sites which are exact centroids of new vor based on relaxed old sites (new method)
     # relax_points return centroid with omega=1 means no relaxation = exact centroid
 
+    # Clip sites to be inside boundary
     path_in_old = check_isinside(old_sites,boundary_points) # checks sites inside boundary using path
     old_sites = old_sites[path_in_old]
-
     path_in_new = check_isinside(new_sites,boundary_points) # checks sites inside boundary using path
     new_sites = new_sites[path_in_new]
 
@@ -473,6 +484,7 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     # sites = np.array([[-0.01,0.01],[0.01,-0.01]])
     sites = np.array([[0.001,0.015],[0.001,-0.01],[0.011,0.001],[-0.013,-0.001]])
     # sites = np.array([[0.1,0.1]])
+    
 
     return sites, radii
 
@@ -534,7 +546,7 @@ def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,
         print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
         exit()
 
-    boundary_points = sort_coordinates(boundary_points)
+    # Relies on boundary points to be defined in order (i.e. cannot only be clockwise for notch)
     boundaries = np.concatenate((np.expand_dims(boundary_points,axis=1),np.roll(np.expand_dims(boundary_points,axis=1),-1,axis=0)),axis=1)
         
     return x_min,x_max,y_min,y_max,boundaries,boundary_points
@@ -731,9 +743,11 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
     nels = np.shape(delaun_elems)[0]
 
+    # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.npy'), delaun_nodes)
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
         ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
     
+    # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.npy'), delaun_elems)
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%0.8f','%d']\
         ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l1 l2 A V type v1 v2 ... vn]')
     
@@ -814,7 +828,6 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     # Now find the intersect point of infinite ridges (rays) with the boundary lines
     # checks for points too close to boundary as well
     n = 0
-    merged_points = []
     for i in range(0,len(ray_origins)):
         p = vertices_in[ray_origins[i]]
         normal = ray_directions[i,:]/np.linalg.norm(ray_directions[i,:]) # normal                 
@@ -847,6 +860,13 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
         # sometimes there is a bug in the corner when using boundaries, not sure why, just remesh for now -SA
     # ax.plot(boundary_points[:,0],boundary_points[:,1],'b^',markersize=5)
 
+    # # print(boundary_points)
+    # points = sort_coordinates(boundary_points)
+    # print(points)
+    # pgon = shp.Polygon(points)
+    # print(pgon.area)
+    # ax = plt.gca()
+    # shapely.plotting.plot_polygon(pgon)
 
     # Construct the connectivity for a line path consisting of the boundary points to get beams along boundary
     # create boundary array with boundary points and false points along boundary for correct ridges
@@ -1295,6 +1315,7 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     all_vertices_2D = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
 
     if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
+        # np.save(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2D)
         np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2D, fmt='%.16g', delimiter=' '\
             ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
             Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
@@ -1311,6 +1332,7 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
                 all_vertices_info_2D_nparray[i,5+j*5] = all_vertices_info_2D[i][5][j]
         # Save info to txt files
         all_vertices_2Dchrono = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
+        # np.save(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono)
         np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono, fmt='%.16g', delimiter=' '\
             ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
             Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
@@ -1593,6 +1615,8 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     Meshdata = np.delete(Meshdata,[2,3,4,5],1)
 
     
+    # np.save(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName+'-mesh.txt'), Meshdata)
+
     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName+'-mesh.txt'), Meshdata, fmt='%.16g', delimiter=' '\
     ,header='# Connector Data Generated with RingsPy Mesh Generation Tool\n\
     Number of bot connectors\n'+ str(nel_con_tbot) +
