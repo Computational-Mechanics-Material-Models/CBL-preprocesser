@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>879</width>
-    <height>1491</height>
+    <height>1538</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -690,7 +690,7 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>2</string>
+            <string>1</string>
            </property>
           </widget>
          </item>
@@ -1091,12 +1091,12 @@
            </property>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
           </widget>
@@ -1298,12 +1298,12 @@
            </property>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
           </widget>
@@ -1687,7 +1687,7 @@
      <x>0</x>
      <y>0</y>
      <width>879</width>
-     <height>21</height>
+     <height>26</height>
     </rect>
    </property>
   </widget>

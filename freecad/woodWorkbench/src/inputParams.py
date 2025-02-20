@@ -47,7 +47,7 @@ def inputParams(form):
     box_size = box_width
 
     # longitudinal direction parameters
-    nsegments = int(form[0].nsegments.text() or 2) 
+    nsegments = int(form[0].nsegments.text() or 1) 
     theta_min = float(form[0].theta_min.text() or 0) # unit: radian
     theta_max = 0.00 # unit: radian
     z_min = 0
@@ -106,7 +106,7 @@ def inputParams(form):
         x_notch_size = box_size*0.1 # depth of notch
         y_notch_size = box_size*0.1 # width of notch
         precrack_size = box_size*0.1
-        mergeFlag = 'On'
+        mergeFlag = 'Off'
         merge_tol = 5e-5
         boundaryFlag = 'Off'
 

@@ -560,7 +560,7 @@ def main(self):
         App.ActiveDocument.recompute()
         Gui.Control.closeDialog()
 
-    pr.disable()
+    # pr.disable()
     # loc = os.path.join(outDir, geoName, 'fullProfile.cProf')
     # pr.dump_stats(loc)
     # p = pstats.Stats(loc)
