@@ -148,9 +148,7 @@ def relax_points(vor,omega):
     filtered_regions = []
     
     nonempty_regions = list(filter(None, vor.regions))
-    for region in nonempty_regions:
-        if not any(x < 0 for x in region): # non-infinite regions only
-            filtered_regions.append(region)
+    filtered_regions = [region for region in nonempty_regions if not any(x < 0 for x in region)]
     
     centroids = np.zeros((len(filtered_regions),2))
     for i in range(0,len(filtered_regions)):   
@@ -173,17 +171,20 @@ def find_centroid(vertices,omega):
     area = 0
     centroid_x = 0
     centroid_y = 0
-    for i in range(len(vertices)-1):
-      step = (vertices[i, 0] * vertices[i+1, 1]) - (vertices[i+1, 0] * vertices[i, 1])
-      
-      step = step*omega # omega -> relaxation factor (>1 for over-relaxation, faster convergence)
-      
-      area += step
-      centroid_x += (vertices[i, 0] + vertices[i+1, 0]) * step
-      centroid_y += (vertices[i, 1] + vertices[i+1, 1]) * step
+
+    # Vectorized calculation of step
+    steps = (vertices[:-1, 0] * vertices[1:, 1]) - (vertices[1:, 0] * vertices[:-1, 1])
+    steps *= omega  # Apply relaxation factor
+
+    # Sum up the area and centroid contributions
+    area = np.sum(steps)
+    centroid_x = np.sum((vertices[:-1, 0] + vertices[1:, 0]) * steps)
+    centroid_y = np.sum((vertices[:-1, 1] + vertices[1:, 1]) * steps)
+
     area /= 2
-    centroid_x = (1.0/(6.0*area)) * centroid_x
-    centroid_y = (1.0/(6.0*area)) * centroid_y
+    centroid_x /= (6.0 * area)
+    centroid_y /= (6.0 * area)
+
     return np.array([[centroid_x, centroid_y]])
 
 def find_intersect(p,normal,boundaries):
@@ -393,6 +394,9 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     
     
+    sites_bound = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path to minimize time on relaxation etc
+    existing_sites = existing_sites[sites_bound]
+
     # ax = plt.gca()
     # ax.plot(existing_sites[:,0],existing_sites[:,1],'rs',markersize=3.)
     lloyd_iter = 0
