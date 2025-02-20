@@ -28,7 +28,7 @@ import FreeCAD as App # type: ignore
 import cProfile
 import pstats
 import os
-import line_profiler 
+from line_profiler import LineProfiler
 
 
 # from hexalattice.hexalattice import create_hex_grid # 
@@ -168,6 +168,7 @@ def find_centroid(vertices,omega):
     @returns np.array a numpy array that defines the x, y coords
       of the centroid described by `vertices`
     """
+
     area = 0
     centroid_x = 0
     centroid_y = 0
@@ -318,6 +319,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     """
     packing cells by firstly placing new cells and then performing Lloyd's relaxation in the generation rings
     """
+
     # generate radii for rings
     radii = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
     noise = np.random.normal(1,0.25,len(radii))
@@ -403,21 +405,24 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     while lloyd_iter < iter_max:
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
+
         lloyd_iter += 1
     # ax.plot(existing_sites[:,0],existing_sites[:,1],'bd',markersize=3.)
 
     # check if sites are too close the the boundary and would thus create small elements
     if mergeFlag == 'On':
-        pts = []
-        sitesP = shp.points(existing_sites)
-        boundL = shp.Polygon(boundary_points)
-        for p in range(0,len(existing_sites)):
-            point = sitesP[p]
-            dist = point.distance(boundL.boundary)
-            if dist < cellsize_dense/2:
-                pts.append(p)
-        existing_sites = np.delete(existing_sites,pts,0)
-        print(len(pts),'points removed due to boundary proximity')
+        num_bound = np.shape(boundary_points)[0]  # create boundary segements to enforce boundaries 
+        boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
+        print(boundary_segments)
+        boundary_region = np.array([[0,0,1,0]])
+        tri_inp = {'vertices': existing_sites,'segments':boundary_segments,'regions':boundary_region}
+        boundary = shp.Polygon(boundary_points)
+        boundary = boundary.buffer(-1e-2)
+        conform = tr.triangulate(tri_inp, 'peAq0D')
+        conform_sites = conform['vertices']
+        points = shp.points(conform_sites)
+        existing_sites = [shp.get_coordinates(p) for p in points if shp.within(p,boundary)]
+        existing_sites = np.squeeze(existing_sites)
 
     old_sites = existing_sites # centroids of relaxed voronoi tesselation become site of mech voronoi tesselation
     # old sites are thus not centroid of mechnical mesh, but normal dual of voronoi tesselation 
@@ -425,7 +430,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     new_sites = relax_points(vor,1) # returns sites which are exact centroids of new vor based on relaxed old sites (new method)
     # relax_points return centroid with omega=1 means no relaxation = exact centroid
 
-    # Clip sites to be inside boundary
+    # Clip again sites to be inside boundary
     path_in_old = check_isinside(old_sites,boundary_points) # checks sites inside boundary using path
     old_sites = old_sites[path_in_old]
     path_in_new = check_isinside(new_sites,boundary_points) # checks sites inside boundary using path
@@ -488,7 +493,6 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     # sites = np.array([[-0.01,0.01],[0.01,-0.01]])
     sites = np.array([[0.001,0.015],[0.001,-0.01],[0.011,0.001],[-0.013,-0.001]])
     # sites = np.array([[0.1,0.1]])
-    
 
     return sites, radii
 
@@ -837,23 +841,23 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
         normal = ray_directions[i,:]/np.linalg.norm(ray_directions[i,:]) # normal                 
         intpt = find_intersect(p,normal,boundaries)
         if intpt.any(): # if an intersection is found (should be the case but some bugs rn)
-            if mergeFlag == 'On': # if the merge operation is selected 
-                dist = np.sum((p - intpt)**2,axis=1) # distance between ray origin and boundary
-                if dist < merge_tol: # if the origin is too close to the boundary
-                    n += 1
-                    voronoi_vertices_in[ray_origins[i]] = intpt # replace it with the boundary
-                    # this keeps the total number of voronoi points the same for connectivity
-                    boundary_points.append(intpt) # also add to array for boundary ridges
-                    # basically stretching cell to boundary
-                else: # add intersection point to boundary
-                    boundary_points.append(intpt)
-            else:
-                boundary_points.append(intpt)
+            # if mergeFlag == 'On': # if the merge operation is selected 
+            #     dist = np.sum((p - intpt)**2,axis=1) # distance between ray origin and boundary
+            #     if dist < merge_tol: # if the origin is too close to the boundary
+            #         n += 1
+            #         voronoi_vertices_in[ray_origins[i]] = intpt # replace it with the boundary
+            #         # this keeps the total number of voronoi points the same for connectivity
+            #         boundary_points.append(intpt) # also add to array for boundary ridges
+            #         # basically stretching cell to boundary
+            #     else: # add intersection point to boundary
+            #         boundary_points.append(intpt)
+            # else:
+            boundary_points.append(intpt)
             # plt.quiver(p[0,0],p[0,1],normal[0],normal[1],color='b')
         else:
             print('(voronoi)')
-    if mergeFlag == 'On':
-        print(n,'points merged with the boundary')
+    # if mergeFlag == 'On':
+    #     print(n,'points merged with the boundary')
     nboundary_pts = len(boundary_points)
     boundary_points = np.reshape(boundary_points,(nboundary_pts,2)) # need to reshape because extra second dimension for some reason
     
@@ -924,8 +928,11 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     ridge_lengths = voronoi_vertices[voronoi_ridges[:,0]] - voronoi_vertices[voronoi_ridges[:,1]]
     ridge_lengths = np.linalg.norm(ridge_lengths,axis=1)
     # get ridge lengths not equal to zero
-    ridge_lengths = ridge_lengths[ridge_lengths >= 1e-13]
+    ridge_lengths = ridge_lengths[ridge_lengths >= 1e-15]
+    # ridge_lengths = ridge_lengths[1e-2 >= ridge_lengths]
     print('The minimum ridge distance is', float('{:.2E}'.format(min(ridge_lengths))))
+
+    # plt.hist(ridge_lengths,bins=100)
     
     return voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertices,nvertices_in,nfinite_ridge,nboundary_ridge,\
@@ -1471,6 +1478,7 @@ def InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
     # print(precrack_elem)
 
     return precrack_elem, nconnector_t_precrack, nconnector_l_precrack
+
 
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\
