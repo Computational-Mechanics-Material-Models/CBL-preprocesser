@@ -323,7 +323,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     # generate radii for rings
     radii = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
     noise = np.random.normal(1,0.25,len(radii))
-    radii = np.multiply(radii,noise)
+    # radii = np.multiply(radii,noise)
     radii = np.concatenate(([0],np.cumsum(radii)))
 
     # generate perimeter points for heart region
