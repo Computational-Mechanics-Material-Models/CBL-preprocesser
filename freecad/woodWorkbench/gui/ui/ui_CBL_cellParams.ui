@@ -278,7 +278,7 @@
               <string/>
              </property>
              <property name="placeholderText">
-              <string>0.06</string>
+              <string>0.03</string>
              </property>
             </widget>
            </item>
@@ -317,7 +317,7 @@
               <string/>
              </property>
              <property name="placeholderText">
-              <string>0.03</string>
+              <string>0.02</string>
              </property>
             </widget>
            </item>
@@ -353,7 +353,7 @@
               <string/>
              </property>
              <property name="placeholderText">
-              <string>0.01</string>
+              <string>0.003</string>
              </property>
             </widget>
            </item>
@@ -1091,12 +1091,12 @@
            </property>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
           </widget>
@@ -1298,12 +1298,12 @@
            </property>
            <item>
             <property name="text">
-             <string>On</string>
+             <string>Off</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>Off</string>
+             <string>On</string>
             </property>
            </item>
           </widget>

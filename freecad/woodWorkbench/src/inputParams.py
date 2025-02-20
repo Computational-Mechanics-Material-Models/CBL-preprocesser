@@ -26,9 +26,9 @@ def inputParams(form):
     width_late = 0.15*(r_max-r_min)/nrings # ring width for rings with late cells
     generation_center = (0,0) # coordinates of generation domain center
 
-    cellsize_early = float(form[0].cellsize_early.text() or 0.06)
-    cellsize_late = float(form[0].cellsize_late.text() or 0.03)
-    cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.01)
+    cellsize_early = float(form[0].cellsize_early.text() or 0.03)
+    cellsize_late = float(form[0].cellsize_late.text() or 0.02)
+    cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.003)
     cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
 
     skeleton_density = float(form[0].skeleton_density.text() or 1.5e-9) # unit: tonne/mm3
