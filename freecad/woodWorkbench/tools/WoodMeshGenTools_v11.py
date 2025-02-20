@@ -395,7 +395,6 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         existing_sites = np.vstack((sites,existing_sites))
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     
-    
     sites_bound = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path to minimize time on relaxation etc
     existing_sites = existing_sites[sites_bound]
 
@@ -405,7 +404,6 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     while lloyd_iter < iter_max:
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
-
         lloyd_iter += 1
     # ax.plot(existing_sites[:,0],existing_sites[:,1],'bd',markersize=3.)
 
@@ -413,7 +411,6 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     if mergeFlag == 'On':
         num_bound = np.shape(boundary_points)[0]  # create boundary segements to enforce boundaries 
         boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
-        print(boundary_segments)
         boundary_region = np.array([[0,0,1,0]])
         tri_inp = {'vertices': existing_sites,'segments':boundary_segments,'regions':boundary_region}
         boundary = shp.Polygon(boundary_points)

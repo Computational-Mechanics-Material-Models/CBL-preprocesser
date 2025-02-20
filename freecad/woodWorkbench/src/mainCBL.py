@@ -51,8 +51,8 @@ def main(self):
 
     # performance check only
     startTime = time.time()
-    pr = cProfile.Profile()
-    pr.enable()
+    # pr = cProfile.Profile()
+    # pr.enable()
     
     # profiler = LineProfiler()
 
@@ -163,7 +163,7 @@ def main(self):
     elif radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
-        sites,radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
+        sites, radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
                                                     mergeFlag,boundary_points_original,omega=10)
     elif radial_growth_rule == 'regular_hexagonal':
@@ -561,7 +561,7 @@ def main(self):
         Gui.Control.closeDialog()
 
     pr.disable()
-    loc = os.path.join(outDir, geoName, 'fullProfile.cProf')
+    # loc = os.path.join(outDir, geoName, 'fullProfile.cProf')
     # pr.dump_stats(loc)
     # p = pstats.Stats(loc)
     # p.strip_dirs().sort_stats('cumulative').print_stats(10)
