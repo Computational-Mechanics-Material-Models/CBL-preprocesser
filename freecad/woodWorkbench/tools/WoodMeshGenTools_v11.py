@@ -1482,7 +1482,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                       nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem):
+                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthick):
     # pr = cProfile.Profile()
     # pr.enable()
 
@@ -1530,7 +1530,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         random_field.generateFieldOnGrid()                  # calculation of preparation files, can be used for any geometry
         
     # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
-    # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag] (22 elements)   
+    # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag short_flag]   
     Meshdata = np.zeros((nel_con,28))
     
     if knotFlag == 'On':
@@ -1572,11 +1572,11 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         # calculate random field per connector
         # inefficient to loop, need to make one operation! -SA
         if randomFlag in ['on','On','Y','y','Yes','yes']:
-            rf_ind = np.where((voronoi_vertices_2D==Meshdata[i,0:2]).all(axis=1))[0]
+            rf_ind = np.where((voronoi_vertices_2D==Meshdata[i+offset,0:2]).all(axis=1))[0]
             rf_array = random_field.getFieldEOLE(np.array([[Meshdata[i+offset,2],0,0]]),rf_ind)
         else:
             Meshdata[i+offset,23] = 1
-    if randomFlag in ['on','On','Y','y','Yes','yes']:
+    if randomFlag in ['on','On','Y','y','Yes','yes'] and nsegments > 1:
         Meshdata[offset:,23] =  rf_array[:,:,0] # EOLE projection with z value
     psi_values = calc_knotstream(Meshdata[:,1]-box_center[1],Meshdata[:,2],m1,m2,a1,a2,Uinf) # check if in knot 
     inds = np.where(np.abs(psi_values) < ktol)
@@ -1588,6 +1588,10 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     Meshdata[:,9:12] = Meshdata[:,6:9] - Meshdata[:,0:3]
     # Calculate distance from center to vertex 2
     Meshdata[:,12:15] = Meshdata[:,6:9] - Meshdata[:,3:6]
+    
+    # flag short connectors
+    dist = np.linalg.norm((Meshdata[:,0:3] - Meshdata[:,3:6]),axis=1)
+    Meshdata[dist < cellwallthick / 4, 27] = 1
 
 
     # Calculate unit t vector
