@@ -322,7 +322,8 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
 
     # generate radii for rings
     radii = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
-    noise = np.random.normal(1,0.25,len(radii))
+    # noise = np.random.normal(1,0.0,len(radii))
+    # noise = np.ones(len(radii))
     # radii = np.multiply(radii,noise)
     radii = np.concatenate(([0],np.cumsum(radii)))
 
@@ -388,7 +389,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         inside_cells = np.concatenate(circles, axis=0)
         
         noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellsize
-        inside_cells = inside_cells + 0.25*noise
+        inside_cells = inside_cells + 1*noise #.25
 
         sites = np.vstack((OuterPerimeterPointsSites,inside_cells))
                     
