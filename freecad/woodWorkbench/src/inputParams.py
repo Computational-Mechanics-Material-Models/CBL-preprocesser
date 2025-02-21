@@ -19,11 +19,11 @@ def inputParams(form):
     # Cell Growth Parameters
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  #
     r_min = float(form[0].r_min.text() or 0)   # inner radius of generation domain
-    r_max = float(form[0].r_max.text() or 1)   # outer radius of generation domain
-    nrings = int(form[0].nrings.text() or 2) # number of rings
-    width_heart = 0.15*(r_max-r_min)/nrings # ring width for the innermost ring
-    width_early = 0.85*(r_max-r_min)/nrings # ring width for rings with early cells
-    width_late = 0.15*(r_max-r_min)/nrings # ring width for rings with late cells
+    r_max = float(form[0].r_max.text() or 10)   # outer radius of generation domain
+    nrings = int(form[0].nrings.text() or 5) # number of rings
+    width_heart = 0.01*(r_max-r_min)/nrings # ring width for the innermost ring 0.15
+    width_early = 0.7*(r_max-r_min)/nrings # ring width for rings with early cells 0.85 
+    width_late = 0.3*(r_max-r_min)/nrings # ring width for rings with late cells 0.15
     generation_center = (0,0) # coordinates of generation domain center
 
     cellsize_early = float(form[0].cellsize_early.text() or 0.03)
@@ -37,17 +37,17 @@ def inputParams(form):
     # Model Parameters     
     box_shape = form[0].box_shape.currentText()
     box_shape = box_shape.lower().replace(' ','_')
-    iter_max = int(form[0].iter_max.text() or 10) # increase this number to achieve a more regular geometry
+    iter_max = int(form[0].iter_max.text() or 0) # increase this number to achieve a more regular geometry
     print_interval = 500 #int(form[0].print_interval.text() or 500) # interval for printing prgress info
     
-    box_center = eval(form[0].box_center.text() or "(0.0,0.0)") # coordinates of clipping box center
+    box_center = eval(form[0].box_center.text() or "(5.5,0.0)") # coordinates of clipping box center
     box_height = float(form[0].box_height.text() or 0.5) # specimen length
     box_width = float(form[0].box_width.text() or 0.5) # side length
     box_depth = float(form[0].box_depth.text() or 0.5) # side length
     box_size = box_width
 
     # longitudinal direction parameters
-    nsegments = int(form[0].nsegments.text() or 1) 
+    nsegments = int(form[0].nsegments.text() or 2) 
     theta_min = float(form[0].theta_min.text() or 0) # unit: radian
     theta_max = 0.00 # unit: radian
     z_min = 0
