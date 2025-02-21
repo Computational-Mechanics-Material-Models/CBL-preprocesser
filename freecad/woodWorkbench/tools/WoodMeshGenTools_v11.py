@@ -1682,7 +1682,6 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
                 irow = i*ninterval_per_beam_vtk*ngrain + j*ngrain + k
                 ivertex = (i + (i*ninterval_per_beam_vtk+j)*2)*npt_per_layer_vtk + k
                 beam_connectivity_vtk[irow,:] = (ivertex,ivertex+2*npt_per_layer_vtk,ivertex+npt_per_layer_vtk)
-    
     # Transverse connectors 
     connector_t_connectivity_vtk = np.zeros((nconnector_t,2))
     for i in range(0,nsegments):
@@ -1950,10 +1949,15 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
 
 # =============================================================================
     # Paraview Beam File
+
+    Beam_width = np.copy(all_vertices_2D[:,12])
+    Beam_width_vtk = np.tile(Beam_width,(ninterval_per_beam_vtk*nsegments))
+    Beam_width_vtk = np.concatenate((Beam_width_vtk,np.zeros(nquad_total)))
+
     VTKcell_types_beams = np.concatenate((21*np.ones(nbeam_total_vtk),23*np.ones(nquad_total))).astype(int)
   
     ncell_beams = VTKcell_types_beams.shape[0]
-
+    
     vtkfile_beams = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '_beams'+'.vtu'),'w')
     
     vtkfile_beams.write('<VTKFile type="UnstructuredGrid" version="2.0" byte_order="LittleEndian">'+'\n')
@@ -2007,7 +2011,21 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     
     vtkfile_beams.write('</Cells>'+'\n')
     # </Cells>
+
+    # <CellData>
+    vtkfile_beams.write("<"+"CellData"\
+            +" "+"Tensors="+'"'+""+'"'\
+            +" "+"Vectors="+'"'+""+'"'\
+            +" "+"Scalars="+'"'+"beam_width"+'"'+">"+'\n')
     
+    vtkfile_beams.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"beam_width"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
+    for i in range(0,ncell_beams):
+        X = Beam_width_vtk[i]
+        vtkfile_beams.write('%11.8e'%X+'\n')
+    vtkfile_beams.write('</DataArray>'+'\n')
+    
+    vtkfile_beams.write('</CellData>'+'\n')
+
     vtkfile_beams.write('</Piece>'+'\n')
     #</Piece>
     

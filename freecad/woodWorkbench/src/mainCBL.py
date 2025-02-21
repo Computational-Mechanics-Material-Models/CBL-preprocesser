@@ -466,7 +466,7 @@ def main(self):
             x1, y1 = voronoi_vertices[end, :]
             ax.plot(
                 [x0, x1],
-                [y0, y1],'ko-',linewidth=0.5,markersize=1.)
+                [y0, y1],'ko-',linewidth=0.25,markersize=0.15)
             
         # Flow
         # vertsD = np.array(conforming_delaunay['vertices'])
@@ -482,8 +482,8 @@ def main(self):
         # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=2.)
 
         # plt.show()
-        plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'))
-
+        plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
+        plt.close()
         
         # ---------------------------------------------
         # # Create visualization files
@@ -509,26 +509,26 @@ def main(self):
         CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
         CBLbeamsVTU.Visibility = True
 
-        importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
-        CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
-        CBLconnsVTU.Label = geoName + '_conns'
-        App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
-        CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'))
-        CBLconnsVTU.Visibility = False
+        # importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
+        # CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
+        # CBLconnsVTU.Label = geoName + '_conns'
+        # App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
+        # CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'))
+        # CBLconnsVTU.Visibility = False
         
-        importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),App.ActiveDocument.Name)
-        CBLconnsvVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
-        CBLconnsvVTU.Label = geoName + '_conns_vol'
-        App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsvVTU)
-        CBLconnsvVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
-        CBLconnsvVTU.Visibility = False
+        # importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),App.ActiveDocument.Name)
+        # CBLconnsvVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
+        # CBLconnsvVTU.Label = geoName + '_conns_vol'
+        # App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsvVTU)
+        # CBLconnsvVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
+        # CBLconnsvVTU.Visibility = False
 
-        importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
-        CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')
-        CBLvertsVTU.Label = geoName + '_vertices'
-        App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLvertsVTU)
-        CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
-        CBLvertsVTU.Visibility = False
+        # importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
+        # CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')
+        # CBLvertsVTU.Label = geoName + '_vertices'
+        # App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLvertsVTU)
+        # CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
+        # CBLvertsVTU.Visibility = False
 
         # =================================================
         # Generate 3D model files
