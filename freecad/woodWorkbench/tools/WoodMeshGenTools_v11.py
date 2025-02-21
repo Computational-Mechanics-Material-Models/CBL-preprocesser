@@ -396,8 +396,8 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         existing_sites = np.vstack((sites,existing_sites))
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     
-    # sites_bound = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path to minimize time on relaxation etc
-    # existing_sites = existing_sites[sites_bound]
+    sites_bound = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path to minimize time on relaxation etc
+    existing_sites = existing_sites[sites_bound]
 
     # ax = plt.gca()
     # ax.plot(existing_sites[:,0],existing_sites[:,1],'rs',markersize=3.)
