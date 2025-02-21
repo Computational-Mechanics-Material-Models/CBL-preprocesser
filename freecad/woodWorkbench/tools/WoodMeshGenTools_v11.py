@@ -1262,10 +1262,10 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     
     vertex_distance2logcenter = np.linalg.norm(all_pts_2D - generation_center, axis=1) # calc distance between vertex and logcenter
     for i in range(0,npt_per_layer):
-        if (bisect.bisect(radii,vertex_distance2logcenter[i]) % 2) != 0: # if odd, sparse cells
-            vertex_cellwallthickness_2D[i] = cellwallthickness_sparse
-        else: # if even, dense cells
+        if (bisect.bisect(radii,vertex_distance2logcenter[i]) % 2) != 0: # if odd, dense cells
             vertex_cellwallthickness_2D[i] = cellwallthickness_dense
+        else: # if even, dense cells
+            vertex_cellwallthickness_2D[i] = cellwallthickness_sparse
     #==================================================================================================
      
     # Generate a list containing info for each vertex
