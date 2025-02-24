@@ -20,9 +20,9 @@ import matplotlib.tri as mtri
 from pylab import *
 import os
 import time
-import cProfile
-import pstats
-from line_profiler import LineProfiler
+# import cProfile
+# import pstats
+# from line_profiler import LineProfiler
 
 from pathlib import Path
 import triangle as tr

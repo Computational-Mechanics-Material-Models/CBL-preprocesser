@@ -25,10 +25,10 @@ import time
 import shapely.plotting
 import shapely as shp
 import FreeCAD as App # type: ignore
-import cProfile
-import pstats
+# import cProfile
+# import pstats
 import os
-from line_profiler import LineProfiler
+# from line_profiler import LineProfiler
 
 
 # from hexalattice.hexalattice import create_hex_grid # 
