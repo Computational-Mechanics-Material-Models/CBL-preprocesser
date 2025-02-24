@@ -152,7 +152,6 @@ def main(self):
     x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
         WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
     
-
     # [sites,radii] = genSites(self.form)
     if radial_growth_rule == 'binary':
         # ---------------------------------------------
@@ -253,7 +252,6 @@ def main(self):
                                                         boundaries,boundaryFlag,boundary_points_original,mergeFlag,merge_tol)
 
     RebuildvorTime = time.time()    
-
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
         # ==================================================================
@@ -460,7 +458,7 @@ def main(self):
         # Original points
         # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
 
-        # Main cells
+        # # Main cells
         for beg, end in voronoi_ridges.astype(int):
             x0, y0 = voronoi_vertices[beg, :]
             x1, y1 = voronoi_vertices[end, :]
@@ -470,7 +468,7 @@ def main(self):
             
         # Flow
         # vertsD = np.array(conforming_delaunay['vertices'])
-        # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=1)
+        # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
         # for el in flow_elems:
         #     beg = int(el[0])
         #     end = int(el[1])
@@ -478,12 +476,12 @@ def main(self):
         #     x1,y1 = flow_nodes[end,1:3]
         #     ax.plot(
         #         [x0, x1],
-        #         [y0, y1],'ro-',linewidth=0.5,markersize=3.)
-        # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=2.)
+        #         [y0, y1],'ro-',linewidth=0.15,markersize=0.1)
+        # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=0.1)
 
         # plt.show()
         plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
-        plt.close()
+        # plt.close()
         
         # ---------------------------------------------
         # # Create visualization files

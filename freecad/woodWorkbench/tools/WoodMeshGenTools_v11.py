@@ -807,9 +807,10 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
         point_ind = ttray_origins[origin] # old index of originating point
         points_check = check_isinside([ttvertices[point_ind]],boundary_points_original) # check coords of orginating vertex
         if all(points_check): # if infinite ridge originates within the boundaries (i.e. original infinite ridge which is still an infinite ridge)
-            ind = np.where(np.all(vertices_in == ttvertices[point_ind],axis=1))[0]
-            infinite_ridges.append((ind[0],-1))
-            ray_origins.append(ind) # append new vertex index to ray_origins list
+            ind = np.where((vertices_in == ttvertices[point_ind]).all(axis=1))[0]
+            ind = ind[0]
+            infinite_ridges.append((ind,-1))
+            ray_origins.append([ind]) # append new vertex index to ray_origins list
             ray_directions.append(ttray_directions[origin]) # get original ray_direction and append
 
     # Store and update arrays
@@ -1256,8 +1257,6 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     # Calculate angles of all Voronoi ridges (angles measured counter-clock wise, x-axis --> (1,0), y-axis --> (0,1))
     all_ridge_angles = np.arctan2(vector[:,1],vector[:,0]) # np.arctan2(y, x) * 180 / np.pi = the angle
 
-    #======== This part can be expanded to allow the smooth transition of cell wall thickness =========
-    # Case 1: Abrupt transition of cell wall thickness between dense/sparse cells
     # thicknesses of all Voronoi vertices (here identical thickness for all wings belonging to the same vertex is assumed)
     vertex_cellwallthickness_2D = np.zeros(npt_per_layer)
     
@@ -1285,6 +1284,8 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
         direction_info.append(direction) # append ridge direction
         vertex_info.append(all_ridge_lengths[allrows]/2) # append wing lengths
         vertex_info.append(np.ones(len(allrows))*vertex_cellwallthickness_2D[i]) # append wing widths
+        # if len(allrows) >3:
+        #     print(all_pts_2D[allrows,0:2])
         vertex_info.append(all_ridge_angles[allrows]+math.pi*(-direction.clip(max=0))) # append wing angles
         
         all_vertices_info_2D.append(vertex_info)

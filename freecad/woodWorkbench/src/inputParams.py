@@ -44,6 +44,10 @@ def inputParams(form):
     box_height = float(form[0].box_height.text() or 0.5) # specimen length
     box_width = float(form[0].box_width.text() or 0.5) # side length
     box_depth = float(form[0].box_depth.text() or 0.5) # side length
+    # patch for unkown bug that causes duplicate vertices for 1mm box 2/24/24   
+    if box_width == box_depth and box_width == 1:
+        box_width += 1e-10
+        box_depth += 1e-10
     box_size = box_width
 
     # longitudinal direction parameters
