@@ -4,12 +4,12 @@ import FreeCAD as App # type: ignore
 
 
 def outputLog(geoName, radial_growth_rule, iter_max, \
-        r_min, r_max, nrings, \
+        r_max, nrings, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_height, \
         nsegments, theta_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
-        skeleton_density, merge_operation, merge_tol, precrackFlag, \
+        merge_operation, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, box_width, box_depth, visFlag, \
         knotFlag, knotParams, randomFlag, randomParams):
 
@@ -36,7 +36,6 @@ def outputLog(geoName, radial_growth_rule, iter_max, \
         \n\n""")
     
     logfile.write('radial_growth_rule= ' + str(radial_growth_rule) + '\n')
-    logfile.write('r_min= ' + str(r_min) + '\n')
     logfile.write('r_max= ' + str(r_max) + '\n')
     logfile.write('nrings= ' + str(nrings) + '\n')
 
@@ -44,8 +43,6 @@ def outputLog(geoName, radial_growth_rule, iter_max, \
     logfile.write('cellsize_late= ' + str(cellsize_late) + '\n')
     logfile.write('cellwallthickness_early=' + str(cellwallthickness_early) + '\n')
     logfile.write('cellwallthickness_late= ' + str(cellwallthickness_late) + '\n')
-
-    logfile.write('skeleton_density= ' + str(skeleton_density) + '\n')
 
     logfile.write('iter_max= ' + str(iter_max) + '\n')
 

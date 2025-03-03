@@ -255,62 +255,62 @@ def check_isinside(points,boundary_points):
     return path_in
 
 
-def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
-                         width_sparse,width_dense,cellsize_sparse,cellsize_dense,\
-                         iter_max,print_interval):
-    """
-    packing cells by randomly placing new cells in the generation rings
-    """
+# def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
+#                          width_sparse,width_dense,cellsize_sparse,cellsize_dense,\
+#                          iter_max,print_interval):
+#     """
+#     packing cells by randomly placing new cells in the generation rings
+#     """
     
-    # generate radii for rings
-    width = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
-    noise = np.random.normal(1,0.25,len(width))
-    width = np.multiply(width,noise)
-    radii = np.concatenate(([0],np.cumsum(width)))
+#     # generate radii for rings
+#     width = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
+#     noise = np.random.normal(1,0.25,len(width))
+#     width = np.multiply(width,noise)
+#     radii = np.concatenate(([0],np.cumsum(width)))
     
-    # Place circular cells in each ring (can be parallelized in the future)
-    # circles: list = list()
-    circles = []
-    for ibin in range(0,nrings*2+1):
-        iter = 0 
-        while iter < iter_max:
-            r = (radii[ibin+1]-radii[ibin])*math.sqrt(np.random.random()) + radii[ibin]  # randomly generate a point in the domain
-            t = np.random.random()*2*math.pi 
+#     # Place circular cells in each ring (can be parallelized in the future)
+#     # circles: list = list()
+#     circles = []
+#     for ibin in range(0,nrings*2+1):
+#         iter = 0 
+#         while iter < iter_max:
+#             r = (radii[ibin+1]-radii[ibin])*math.sqrt(np.random.random()) + radii[ibin]  # randomly generate a point in the domain
+#             t = np.random.random()*2*math.pi 
             
-            x = r*math.cos(t) + generation_center[0]
-            y = r*math.sin(t) + generation_center[1]
+#             x = r*math.cos(t) + generation_center[0]
+#             y = r*math.sin(t) + generation_center[1]
     
-            if (ibin % 2) == 0: # if even, dense cells
-                w = cellsize_dense/2
-            else:
-                w = cellsize_sparse/2
+#             if (ibin % 2) == 0: # if even, dense cells
+#                 w = cellsize_dense/2
+#             else:
+#                 w = cellsize_sparse/2
     
-            circC = [x, y, w]
+#             circC = [x, y, w]
             
-            if check_overlap(circles, circC) and check_isinside_boundcircle(circC,generation_center,radii[ibin],radii[ibin+1]):
-                circles.append(circC)
+#             if check_overlap(circles, circC) and check_isinside_boundcircle(circC,generation_center,radii[ibin],radii[ibin+1]):
+#                 circles.append(circC)
                 
-                # regularly print 
-                if (len(circles) % print_interval == 0):
-                    if (nrings*2+1-ibin == 1):
-                        print('{:d} ring remaining; {:d} cells/particles placed.'.format(nrings*2+1-ibin,len(circles)))
-                    else:
-                        print('{:d} rings remaining; {:d} cells/particles placed.'.format(nrings*2+1-ibin,len(circles)))
-            iter += 1 
+#                 # regularly print 
+#                 if (len(circles) % print_interval == 0):
+#                     if (nrings*2+1-ibin == 1):
+#                         print('{:d} ring remaining; {:d} cells/particles placed.'.format(nrings*2+1-ibin,len(circles)))
+#                     else:
+#                         print('{:d} rings remaining; {:d} cells/particles placed.'.format(nrings*2+1-ibin,len(circles)))
+#             iter += 1 
         
-    sites = np.array(circles)
+#     sites = np.array(circles)
 
-    # out-of-boundary detection for Voronoi vertices
-    outofbound = []
-    for i in range(0,sites.shape[0]):
-        if( ((sites[i,0]-generation_center[0])**2+(sites[i,1]-generation_center[1])**2) > (1.2*r_max)**2 ):
-            outofbound.append(i)
-    sites = np.delete(sites,outofbound,0)
+#     # out-of-boundary detection for Voronoi vertices
+#     outofbound = []
+#     for i in range(0,sites.shape[0]):
+#         if( ((sites[i,0]-generation_center[0])**2+(sites[i,1]-generation_center[1])**2) > (1.2*r_max)**2 ):
+#             outofbound.append(i)
+#     sites = np.delete(sites,outofbound,0)
 
-    sites = sites[:,0:2]
-    print(np.shape(sites),np.shape(radii))
+#     sites = sites[:,0:2]
+#     print(np.shape(sites),np.shape(radii))
 
-    return sites, radii
+#     return sites, radii
 
 
 def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
@@ -390,6 +390,12 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         
         noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellsize
         inside_cells = inside_cells + 1*noise #.25
+        # noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellsize/4
+        # noise = np.squeeze(noise)
+        # r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
+        # theta = np.arctan(inside_cells[:,1]/inside_cells[:,0])
+        # inside_cells[:,0] = np.multiply((r),np.cos(theta))
+        # inside_cells[:,1] = np.multiply((r),np.sin(theta))
 
         sites = np.vstack((OuterPerimeterPointsSites,inside_cells))
                     
@@ -438,42 +444,42 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     return old_sites, radii, new_sites
 
 
-def CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,box_center,box_size,\
-                            width_heart,width_sparse,width_dense,\
-                            cellsize_sparse,cellsize_dense,\
-                            cellwallthickness_sparse,cellwallthickness_dense,\
-                            iter_max,print_interval):
-    """
-    packing cells in hexagonal grids
-    """
+# def CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,box_center,box_size,\
+#                             width_heart,width_sparse,width_dense,\
+#                             cellsize_sparse,cellsize_dense,\
+#                             cellwallthickness_sparse,cellwallthickness_dense,\
+#                             iter_max,print_interval):
+#     """
+#     packing cells in hexagonal grids
+#     """
     
-    # generate radii for rings
-    width = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
-    noise = np.random.normal(1,0.25,len(width))
-    width = np.multiply(width,noise)
-    radii = np.concatenate(([0],np.cumsum(width)))
+#     # generate radii for rings
+#     width = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
+#     noise = np.random.normal(1,0.25,len(width))
+#     width = np.multiply(width,noise)
+#     radii = np.concatenate(([0],np.cumsum(width)))
     
-    cellangle = 0.0
-    cellsize = (cellsize_sparse+cellsize_dense)/2
-    nx = int(2*r_max/cellsize)
-    ny = int(2*r_max/cellsize)
-    # The hexagonal lattice sites are generated via hexalattice: https://pypi.org/project/hexalattice/
-    hex_centers, _ = create_hex_grid(nx=nx, # type: ignore
-                                     ny=ny,
-                                     min_diam=cellsize,
-                                     rotate_deg=cellangle,
-                                     do_plot=False)
-    sites = np.hstack((hex_centers+generation_center,np.ones([hex_centers.shape[0],1])))
-    sites = np.asarray(sites)
+#     cellangle = 0.0
+#     cellsize = (cellsize_sparse+cellsize_dense)/2
+#     nx = int(2*r_max/cellsize)
+#     ny = int(2*r_max/cellsize)
+#     # The hexagonal lattice sites are generated via hexalattice: https://pypi.org/project/hexalattice/
+#     hex_centers, _ = create_hex_grid(nx=nx, # type: ignore
+#                                      ny=ny,
+#                                      min_diam=cellsize,
+#                                      rotate_deg=cellangle,
+#                                      do_plot=False)
+#     sites = np.hstack((hex_centers+generation_center,np.ones([hex_centers.shape[0],1])))
+#     sites = np.asarray(sites)
 
-    # out-of-boundary detection for Voronoi vertices
-    outofbound = []
-    for i in range(0,sites.shape[0]):
-        if( ((sites[i,0]-generation_center[0])**2+(sites[i,1]-generation_center[1])**2) > (1.2*r_max)**2 ):
-            outofbound.append(i)
-    sites = np.delete(sites,outofbound,0)
+#     # out-of-boundary detection for Voronoi vertices
+#     outofbound = []
+#     for i in range(0,sites.shape[0]):
+#         if( ((sites[i,0]-generation_center[0])**2+(sites[i,1]-generation_center[1])**2) > (1.2*r_max)**2 ):
+#             outofbound.append(i)
+#     sites = np.delete(sites,outofbound,0)
 
-    return sites, radii
+#     return sites, radii
 
 
 def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
@@ -501,56 +507,36 @@ def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,
     TBD: adjust to general shape using polygon or similar
     """
 
-    if box_shape in ['square','Square','SQUARE']: # square box
+    box_shape = box_shape.casefold().replace(" ", "")
+
+    if box_shape == "cube": # cube box
         x_min = box_center[0] - box_size/2
         x_max = box_center[0] + box_size/2 
         y_min = box_center[1] - box_size/2
         y_max = box_center[1] + box_size/2
         boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-
-        # l0 = [(x_min, y_min), (x_max, y_min)]
-        # l1 = [(x_max, y_min), (x_max, y_max)]
-        # l2 = [(x_max, y_max), (x_min, y_max)]
-        # l3 = [(x_min, y_max), (x_min, y_min)]
-        # boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
         
-    if box_shape in ['rectangle','Rectangle','RECTANGLE']: # rectangular box
+    elif box_shape =="rectangle": # rectangular box
         x_min = box_center[0] - box_width/2
         x_max = box_center[0] + box_width/2 
         y_min = box_center[1] - box_depth/2
         y_max = box_center[1] + box_depth/2
         boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-        
-        # l0 = [(x_min, y_min), (x_max, y_min)]
-        # l1 = [(x_max, y_min), (x_max, y_max)]
-        # l2 = [(x_max, y_max), (x_min, y_max)]
-        # l3 = [(x_min, y_max), (x_min, y_min)]
-        # boundaries = [('bottom', l0), ('right', l1), ('top', l2), ('left', l3)]
 
-    elif box_shape in ['notched_square','Notched_Square','NOTCHED_SQUARE']: # notched sqaure box
-        x_min = box_center[0] - box_size/2
-        x_max = box_center[0] + box_size/2
-        y_min = box_center[1] - box_size/2
-        y_max = box_center[1] + box_size/2
+    elif box_shape == "notchedsquare": # notched square box (can be rectangular)
+        x_min = box_center[0] - box_width/2
+        x_max = box_center[0] + box_width/2 
+        y_min = box_center[1] - box_depth/2
+        y_max = box_center[1] + box_depth/2
         x_notch = x_min + x_notch_size
         y_notch_min = box_center[1] - y_notch_size/2
         y_notch_max = box_center[1] + y_notch_size/2
         boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
                             [x_notch,y_notch_min],[x_min,y_notch_min]])
-            
-        # l0 = [(x_min, y_min), (x_max, y_min)]
-        # l1 = [(x_max, y_min), (x_max, y_max)]
-        # l2 = [(x_max, y_max), (x_min, y_max)]
-        # l3 = [(x_min, y_max), (x_min, y_notch_max)]
-        # l4 = [(x_min, y_notch_max), (x_notch, y_notch_max)]
-        # l5 = [(x_notch, y_notch_max), (x_notch,y_notch_min)]
-        # l6 = [(x_notch,y_notch_min), (x_min,y_notch_min)]
-        # l7 = [(x_min,y_notch_min), (x_min, y_min)]
-        # boundaries = [('bottom',l0),('right',l1),('top',l2),('l3',l3),('l4',l4),('l5',l5),('l6',l6),('l7',l7)]
-        
+                   
     else:
         print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
-        exit()
+        # exit()
 
     # Relies on boundary points to be defined in order (i.e. cannot only be clockwise for notch)
     boundaries = np.concatenate((np.expand_dims(boundary_points,axis=1),np.roll(np.expand_dims(boundary_points,axis=1),-1,axis=0)),axis=1)
@@ -4162,7 +4148,7 @@ def ReadSavedSites(sites_path, radial_growth_rule):
             return None
         
     
-def ModelInfo(box_shape,boundary_points,z_min,z_max,skeleton_density,MeshData):
+# def ModelInfo(box_shape,boundary_points,z_min,z_max,skeleton_density,MeshData):
 
     """Calculate the material properties of generated geometry
 
@@ -4289,7 +4275,7 @@ def LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_sparse,width_d
         merge_operation,merge_tol,precrackFlag,precrack_size,boundaryFlag,\
         nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
         NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
-        nParticles,nbeamElem,skeleton_density,mass,volume,density,porosity,\
+        nParticles,nbeamElem,\
         stlFlag,inpFlag,inpType,radial_growth_rule,\
         startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime):
     
@@ -4367,13 +4353,6 @@ def LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_sparse,width_d
     logfile.write('GENERATION:\n')  
     logfile.write('nParticles:                              ' + str(nParticles) + '\n')
     logfile.write('nbeamElem:                               ' + str(nbeamElem) + '\n')
-    logfile.write('MODEL PROPERTIES:\n')
-    logfile.write('skeleton density:                        ' + str(skeleton_density) + '\n')
-    logfile.write('total mass:                              ' + str(mass) + '\n')
-    logfile.write('bulk volume:                             ' + str(volume) + '\n')
-    logfile.write('bulk density:                            ' + str(density) + '\n')
-    logfile.write('porosity:                                ' + str(porosity) + '\n')
-    logfile.write('\n')
     logfile.write('PERFORMANCE:\n')  
     logfile.write('Placement Time:                          ' + str(placementTime - startTime) + '\n')
     logfile.write('Tessellation Time:                       ' + str(voronoiTime - placementTime) + '\n')

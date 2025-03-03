@@ -57,31 +57,31 @@ def main(self):
     # profiler = LineProfiler()
 
     # ==================================================================
-    self.form[1].progressBar.setValue(10) 
-    self.form[1].statusWindow.setText("Status: Reading Parameters.") 
+    self.form[3].progressBar.setValue(10) 
+    self.form[3].statusWindow.setText("Status: Reading Parameters.") 
     # ==================================================================
     # Input parameters 
-    [geoName, radial_growth_rule, iter_max, print_interval, \
-        r_min, r_max, nrings, width_heart, width_early, width_late, generation_center, \
+    [geoName, radial_growth_rule, iter_max, \
+        r_max, nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
-        skeleton_density, mergeFlag, merge_tol, precrackFlag, \
+        mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams]\
             = inputParams(self.form)
     
-    precrack_widths = 0 # for future use
+    # precrack_widths = 0 # for future use
     
 
     # ==================================================================
-    self.form[1].progressBar.setValue(15) 
-    self.form[1].statusWindow.setText("Status: Initializing Files.") 
+    self.form[3].progressBar.setValue(15) 
+    self.form[3].statusWindow.setText("Status: Initializing Files.") 
     # ==================================================================
 
     # Make output directory if does not exist
-    outDir = self.form[1].outputDir.text()
+    outDir = self.form[3].outputDir.text()
 
     i = 1
     geoNamenew = geoName
@@ -102,12 +102,12 @@ def main(self):
 
     # Write input parameters to log file for repeated use
     outputLog(geoName, radial_growth_rule, iter_max, \
-        r_min, r_max, nrings, \
+        r_max, nrings, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_height, \
         nsegments, theta_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
-        skeleton_density, mergeFlag, merge_tol, precrackFlag, \
+        mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, box_width, box_depth, visFlag, \
         knotFlag, knotParams, randomFlag, randomParams)
         
@@ -144,42 +144,43 @@ def main(self):
     print('\n')
     print(geoName,':')
     # ==================================================================
-    self.form[1].progressBar.setValue(20) 
-    self.form[1].statusWindow.setText("Status: Placing Cells.") 
+    self.form[3].progressBar.setValue(20) 
+    self.form[3].statusWindow.setText("Status: Placing Cells.") 
     # ==================================================================
     # Place cells with a specific radial growth pattern
 
     x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
         WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
     
+    # stopped supporting other growth rules for now
     # [sites,radii] = genSites(self.form)
-    if radial_growth_rule == 'binary':
-        # ---------------------------------------------
-        # binary radial growth pattern (e.g. wood microstructure with earlywood-latewood alternations)
-        sites,radii = WoodMeshGen.CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,\
-                            width_early,width_late,cellsize_early,cellsize_late,\
-                            iter_max,print_interval)
-    elif radial_growth_rule == 'binary_lloyd':
+    # if radial_growth_rule == 'binary':
+    #     # ---------------------------------------------
+    #     # binary radial growth pattern (e.g. wood microstructure with earlywood-latewood alternations)
+    #     sites,radii = WoodMeshGen.CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,\
+    #                         width_early,width_late,cellsize_early,cellsize_late,\
+    #                         iter_max,print_interval)
+    if radial_growth_rule == 'Binary_Lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
         sites, radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
-                                                    mergeFlag,boundary_points_original,omega=10)
-    elif radial_growth_rule == 'regular_hexagonal':
-        # ----------------------------------
-        # hexagonal honeycomb-like geometry
-        sites,radii = WoodMeshGen.CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,\
-                            box_center,box_size,width_heart,\
-                            width_early,width_late,\
-                            cellsize_early,cellsize_late,\
-                            cellwallthickness_early,cellwallthickness_late,\
-                            iter_max,print_interval)
-    elif os.path.splitext(radial_growth_rule)[1] == '.npy':
-        # ----------------------------------
-        # load saved cell sites and radii data
-        print('Loading saved sites')
-        sites_path = Path(os.path.dirname(os.path.abspath(__file__)))
-        sites,radii = WoodMeshGen.ReadSavedSites(sites_path,radial_growth_rule)
+                                                    mergeFlag,boundary_points_original,omega=1)
+    # elif radial_growth_rule == 'regular_hexagonal':
+    #     # ----------------------------------
+    #     # hexagonal honeycomb-like geometry
+    #     sites,radii = WoodMeshGen.CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,\
+    #                         box_center,box_size,width_heart,\
+    #                         width_early,width_late,\
+    #                         cellsize_early,cellsize_late,\
+    #                         cellwallthickness_early,cellwallthickness_late,\
+    #                         iter_max,print_interval)
+    # elif os.path.splitext(radial_growth_rule)[1] == '.npy':
+    #     # ----------------------------------
+    #     # load saved cell sites and radii data
+    #     print('Loading saved sites')
+    #     sites_path = Path(os.path.dirname(os.path.abspath(__file__)))
+    #     sites,radii = WoodMeshGen.ReadSavedSites(sites_path,radial_growth_rule)
     elif radial_growth_rule == 'debug':
         # ---------------------------------------------
         # debug run
@@ -188,8 +189,8 @@ def main(self):
         
     else:
         print('Growth rule: {:s} is not supported for the current version, please check the README for more details.'.format(radial_growth_rule))
-        # print('Now exiting...')
-        # # exit()
+        print('Now exiting...')
+        # exit()
 
     sites_centroid = new_sites
     sites_vor = sites
@@ -198,8 +199,8 @@ def main(self):
     print(int(nParticles), 'particles placed')
 
     # ==================================================================
-    self.form[1].progressBar.setValue(30) 
-    self.form[1].statusWindow.setText("Status: Defining Boundaries.") 
+    self.form[3].progressBar.setValue(30) 
+    self.form[3].statusWindow.setText("Status: Defining Boundaries.") 
     # ==================================================================
 
     num_bound = np.shape(boundary_points_original)[0]  # create boundary segements to enforce boundaries 
@@ -240,8 +241,8 @@ def main(self):
     # print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
 
     # ==================================================================
-    self.form[1].progressBar.setValue(40) 
-    self.form[1].statusWindow.setText("Status: Clipping Mesh.") 
+    self.form[3].progressBar.setValue(40) 
+    self.form[3].statusWindow.setText("Status: Clipping Mesh.") 
     # ==================================================================
     # Rebuild the Voronoi mesh
 
@@ -255,8 +256,8 @@ def main(self):
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
         # ==================================================================
-        self.form[1].progressBar.setValue(45) 
-        self.form[1].statusWindow.setText("Status: Generating Random Field.") 
+        self.form[3].progressBar.setValue(45) 
+        self.form[3].statusWindow.setText("Status: Generating Random Field.") 
         # ==================================================================
         # Calculate random field
         RF_dist_types = randomParams.get('RF_dist_types')
@@ -271,8 +272,8 @@ def main(self):
         random_field = []
 
     # ==================================================================
-    self.form[1].progressBar.setValue(50) 
-    self.form[1].statusWindow.setText("Status: Writing Vertices.") 
+    self.form[3].progressBar.setValue(50) 
+    self.form[3].statusWindow.setText("Status: Writing Vertices.") 
     # ================================================================== 
     [voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D,voronoi_vertices_2D] = \
@@ -296,8 +297,8 @@ def main(self):
     
 
     # ==================================================================
-    self.form[1].progressBar.setValue(60) 
-    self.form[1].statusWindow.setText("Status: Extruding Cells.") 
+    self.form[3].progressBar.setValue(60) 
+    self.form[3].statusWindow.setText("Status: Extruding Cells.") 
     # ==================================================================
     # Extrude in the parallel-to-grain (longitudinal) direction
     
@@ -337,8 +338,8 @@ def main(self):
         nconnector_l_precrack = 0
 
     # ==================================================================
-    self.form[1].progressBar.setValue(70) 
-    self.form[1].statusWindow.setText("Status: Calculating Mesh Info.") 
+    self.form[3].progressBar.setValue(70) 
+    self.form[3].statusWindow.setText("Status: Calculating Mesh Info.") 
     # ==================================================================
     # Calculate mesh info
 
@@ -359,10 +360,11 @@ def main(self):
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
                     randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early)
 
-    # ===============================================
-    # Calculate model properties
-    [mass,bulk_volume,bulk_density,porosity] = \
-        WoodMeshGen.ModelInfo(box_shape,boundary_points,z_min,z_max,skeleton_density,ConnMeshData)
+    # # ===============================================
+    ## since skeletal density is not actually calculated, these are incorrect.
+    # # Calculate model properties
+    # [mass,bulk_volume,bulk_density,porosity] = \
+    #     WoodMeshGen.ModelInfo(box_shape,boundary_points,z_min,z_max,ConnMeshData)
 
     # ===============================================
     # Bezier extraction 
@@ -373,8 +375,8 @@ def main(self):
                     nconnector_t_per_beam,npatch,knotVec)
 
     # ==================================================================
-    self.form[1].progressBar.setValue(80) 
-    self.form[1].statusWindow.setText("Status: Generating Model Files.") 
+    self.form[3].progressBar.setValue(80) 
+    self.form[3].statusWindow.setText("Status: Generating Model Files.") 
     # ==================================================================
     # Generate input files for numerical simulations
 
@@ -433,21 +435,21 @@ def main(self):
     # print('Files generated in {:.3f} seconds'.format(FileTime - BeamTime))
 
 
-    # ==============================================
-    # Generate log file for the generation
-    WoodMeshGen.LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_early,width_late,\
-            generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
-            cellsize_early,cellsize_late,cellwallthickness_early,cellwallthickness_late,\
-            mergeFlag,merge_tol,precrackFlag,precrack_widths,boundaryFlag,\
-            nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
-            NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
-            nParticles,nbeamElem,skeleton_density,mass,bulk_volume,bulk_density,porosity,\
-            stlFlag,inpFlag,inpType,radial_growth_rule,\
-            startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime)
+    # # ==============================================
+    # # Generate log file for the generation
+    # WoodMeshGen.LogFile(geoName,iter_max,r_max,nrings,width_heart,width_early,width_late,\
+    #         generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
+    #         cellsize_early,cellsize_late,cellwallthickness_early,cellwallthickness_late,\
+    #         mergeFlag,merge_tol,precrackFlag,precrack_widths,boundaryFlag,\
+    #         nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
+    #         NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
+    #         nParticles,nbeamElem,\
+    #         stlFlag,inpFlag,inpType,radial_growth_rule,\
+    #         startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime)
     
     # ==================================================================
-    self.form[1].progressBar.setValue(90) 
-    self.form[1].statusWindow.setText("Status: Generating Vizualiation Files.") 
+    self.form[3].progressBar.setValue(90) 
+    self.form[3].statusWindow.setText("Status: Generating Vizualiation Files.") 
     # ==================================================================
     # Generate Paraview visulization files
     if visFlag in ['on','On','Y','y','Yes','yes']:
@@ -464,8 +466,8 @@ def main(self):
             x1, y1 = voronoi_vertices[end, :]
             ax.plot(
                 [x0, x1],
-                [y0, y1],'ko-',linewidth=0.25,markersize=0.15)
-            
+                [y0, y1],'k-',linewidth=0.25,markersize=0.15)    
+
         # Flow
         # vertsD = np.array(conforming_delaunay['vertices'])
         # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
@@ -534,8 +536,8 @@ def main(self):
             WoodMeshGen.StlModelFile(geoName)
 
         # ==================================================================    
-        self.form[1].progressBar.setValue(100) 
-        self.form[1].statusWindow.setText("Status: Complete.") 
+        self.form[3].progressBar.setValue(100) 
+        self.form[3].statusWindow.setText("Status: Complete.") 
         # ==================================================================
 
         App.ActiveDocument.recompute()
@@ -551,8 +553,8 @@ def main(self):
     else:
 
         # ==================================================================    
-        self.form[1].progressBar.setValue(100) 
-        self.form[1].statusWindow.setText("Status: Complete.") 
+        self.form[3].progressBar.setValue(100) 
+        self.form[3].statusWindow.setText("Status: Complete.") 
         # ==================================================================
         
         App.ActiveDocument.recompute()

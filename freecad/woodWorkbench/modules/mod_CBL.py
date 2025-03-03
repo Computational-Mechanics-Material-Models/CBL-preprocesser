@@ -65,23 +65,32 @@ class genWindow_CBL:
         self.form = []
 
         # Load UI's for Side Panel
-        self.form.append(cwloadUIfile("ui_CBL_cellParams.ui"))       
+        # self.form.append(cwloadUIfile("ui_CBL_cellParams.ui"))       
+        self.form.append(cwloadUIfile("ui_CBL_cellParam_new.ui"))  
+        self.form.append(cwloadUIfile("ui_CBL_geoParams.ui"))
+        self.form.append(cwloadUIfile("ui_CBL_modelParams.ui"))
         self.form.append(cwloadUIfile("ui_CBL_generation.ui"))
 
         # Label, Load Icons, and Initialize Panels
-        self.form[0].setWindowTitle("Model Properties")
-        self.form[1].setWindowTitle("Model Generation")
+        self.form[0].setWindowTitle("Cell Properties")
+        self.form[1].setWindowTitle("Geometry Properties")
+        self.form[2].setWindowTitle("Model Properties")
+        self.form[3].setWindowTitle("Model Generation")
         
         # cwloadUIicon(self.form[0],"ldpmOutput.svg")
         # cwloadUIicon(self.form[1],"PartDesign_AdditiveBox.svg")
 
-        # # Set initial output directory
-        self.form[1].outputDir.setText(str(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench')))
+        # Set initial output directory
+        self.form[3].outputDir.setText(str(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench')))
+
+        # Set geometry window
+        self.form[1].box_shape.currentIndexChanged.connect(self.selectGeometry)
+
         
         # If input parameter file is clicked
         QtCore.QObject.connect(self.form[0].readFileButton, QtCore.SIGNAL("clicked()"), self.openFilePara)
         # Run generation for CBL
-        QtCore.QObject.connect(self.form[1].generate, QtCore.SIGNAL("clicked()"), self.generation)
+        QtCore.QObject.connect(self.form[3].generate, QtCore.SIGNAL("clicked()"), self.generation)
 
     def getStandardButtons(self):
 
@@ -107,6 +116,20 @@ class genWindow_CBL:
 
         return OpenName
     
+    def selectGeometry(self):
+            
+        # Select Geometry
+        geometry = self.form[1].box_shape.currentText()
+        if geometry == 'Cube':
+            self.form[1].stackedWidget.setCurrentIndex(0)
+        elif geometry == 'Rectangle':
+            self.form[1].stackedWidget.setCurrentIndex(1)
+        elif geometry == 'Notched Square':
+            self.form[1].stackedWidget.setCurrentIndex(2)
+        else:
+            self.form[1].stackedWidget.setCurrentIndex(3)
+            App.Console.PrintError("Geometry not recognized\n")
+            return
 
     def openFilePara(self):
 

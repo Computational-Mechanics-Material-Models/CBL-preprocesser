@@ -2,7 +2,7 @@ import datetime
 from pathlib import Path
 import FreeCAD as App # type: ignore
 
-
+# current wrong
 def readInput(self):
     
     paraFile = self.form[0].setupFile.text()
@@ -12,8 +12,6 @@ def readInput(self):
         for line in f:
             if "radial_growth_rule" in line:
                 radial_growth_rule = line.split("=")[1].strip()
-            elif "r_min" in line:
-                r_min = line.split("=")[1].strip()
             elif "r_max" in line:
                 r_max = line.split("=")[1].strip()
             elif "nrings" in line:
@@ -27,11 +25,6 @@ def readInput(self):
                 cellwallthickness_early = line.split("=")[1].strip()
             elif "cellwallthickness_late" in line:
                 cellwallthickness_late = line.split("=")[1].strip()
-
-            elif "skeleton_density" in line:
-                skeleton_density = line.split("=")[1].strip()
-            elif "random_noise" in line:
-                random_noise = line.split("=")[1].strip()
 
             elif "iter_max" in line:
                 iter_max = line.split("=")[1].strip()
@@ -104,7 +97,6 @@ def readInput(self):
 
     # Write parameters to input panel
         self.form[0].radial_growth_rule.setCurrentText(radial_growth_rule)
-        self.form[0].r_min.setText(r_min)
         self.form[0].r_max.setText(r_max)
         self.form[0].nrings.setText(nrings)
 
@@ -112,8 +104,6 @@ def readInput(self):
         self.form[0].cellsize_late.setText(cellsize_late)
         self.form[0].cellwallthickness_early.setText(cellwallthickness_early)
         self.form[0].cellwallthickness_late.setText(cellwallthickness_late)
-
-        self.form[0].skeleton_density.setText(skeleton_density)
 
         self.form[0].iter_max.setText(iter_max)
 
