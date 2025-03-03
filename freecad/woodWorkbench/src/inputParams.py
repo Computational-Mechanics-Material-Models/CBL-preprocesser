@@ -68,12 +68,12 @@ def inputParams(form):
         box_height = float(form[1].box_height.text() or 0.5) # specimen length
         box_width = float(form[1].box_width.text() or 0.5) # side length
         box_depth = float(form[1].box_depth.text() or 0.5) # side length
-        box_size = max(box_depth, box_width)
+        box_size = max(box_depth, box_width, box_depth)
     elif box_shape == 'Notched Square':
         box_height = float(form[1].notch_height.text() or 0.5) # specimen length
         box_width = float(form[1].notch_width.text() or 0.5) # side length
         box_depth = float(form[1].notch_depth.text() or 0.5) # side length
-        box_size = max(box_depth, box_width)
+        box_size = max(box_depth, box_width, box_depth)
         # notch and precrack are always centered on leftmost edge
         x_notch_size = float(form[1].x_indent_size.text() or box_size*0.1) # depth of notch
         y_notch_size = float(form[1].y_indent_size.text() or box_size*0.1) # width of notch
@@ -94,7 +94,7 @@ def inputParams(form):
     precrackFlag = form[1].precrackFlag.currentText()
     precrack_size = float(form[1].x_precrack_size.text() or 0.1) # depth of precrack
 
-    iter_max = int(form[1].iter_max.text() or 0) # lloyd iterations 
+    iter_max = int(form[1].iter_max.text() or 2) # lloyd iterations 
     NURBS_degree = 2
     # longitudinal direction parameters
     theta_min = float(form[1].theta_min.text() or 0) # unit: radian
