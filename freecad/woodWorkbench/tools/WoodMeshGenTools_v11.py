@@ -390,6 +390,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         
         noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellsize
         inside_cells = inside_cells + 1*noise #.25
+        # testing radial relaxation only
         # noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellsize/4
         # noise = np.squeeze(noise)
         # r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
@@ -1248,10 +1249,10 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     
     vertex_distance2logcenter = np.linalg.norm(all_pts_2D - generation_center, axis=1) # calc distance between vertex and logcenter
     for i in range(0,npt_per_layer):
-        if (bisect.bisect(radii,vertex_distance2logcenter[i]) % 2) != 0: # if odd, dense cells
-            vertex_cellwallthickness_2D[i] = cellwallthickness_dense
-        else: # if even, dense cells
-            vertex_cellwallthickness_2D[i] = cellwallthickness_sparse
+        if (bisect.bisect(radii,vertex_distance2logcenter[i]) % 2) == 0: # if even
+            vertex_cellwallthickness_2D[i] = cellwallthickness_sparse # actually wrong, compared to BL placement. flipped as patch
+        else: # if odd
+            vertex_cellwallthickness_2D[i] = cellwallthickness_dense # actually wrong, compared to BL placement. flipped as patch
     #==================================================================================================
      
     # Generate a list containing info for each vertex
