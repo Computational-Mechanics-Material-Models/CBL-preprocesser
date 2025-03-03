@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>358</width>
-    <height>622</height>
+    <width>326</width>
+    <height>630</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -26,7 +26,7 @@
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
-   <layout class="QVBoxLayout" name="verticalLayout_5">
+   <layout class="QVBoxLayout" name="verticalLayout_3">
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_44">
       <item>
@@ -157,7 +157,12 @@
          <widget class="QComboBox" name="species">
           <item>
            <property name="text">
-            <string>Spruce</string>
+            <string>Norway Spruce</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Generic</string>
            </property>
           </item>
          </widget>
@@ -181,6 +186,9 @@
     </item>
     <item>
      <widget class="QStackedWidget" name="cell_params">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
       <widget class="QWidget" name="spruce">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
@@ -284,7 +292,7 @@
              <string/>
             </property>
             <property name="placeholderText">
-             <string>0.03</string>
+             <string>0.032</string>
             </property>
            </widget>
           </item>
@@ -323,7 +331,7 @@
              <string/>
             </property>
             <property name="placeholderText">
-             <string>0.02</string>
+             <string>0.017</string>
             </property>
            </widget>
           </item>
@@ -359,7 +367,7 @@
              <string/>
             </property>
             <property name="placeholderText">
-             <string>0.003</string>
+             <string>0.0035</string>
             </property>
            </widget>
           </item>
@@ -392,7 +400,7 @@
              <string/>
             </property>
             <property name="placeholderText">
-             <string>0.006</string>
+             <string>0.011</string>
             </property>
            </widget>
           </item>
@@ -405,53 +413,45 @@
           </item>
          </layout>
         </item>
+        <item>
+         <layout class="QHBoxLayout" name="horizontalLayout_2">
+          <item>
+           <widget class="QLineEdit" name="cell_length">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>75</width>
+              <height>20</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>75</width>
+              <height>20</height>
+             </size>
+            </property>
+            <property name="text">
+             <string/>
+            </property>
+            <property name="placeholderText">
+             <string>3</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="label_34">
+            <property name="text">
+             <string>Tracheid Length [mm]</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
        </layout>
       </widget>
-     </widget>
-    </item>
-    <item>
-     <widget class="QGroupBox" name="groupBox">
-      <property name="title">
-       <string>Longitudinal</string>
-      </property>
-      <layout class="QVBoxLayout" name="verticalLayout_3">
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_2">
-         <item>
-          <widget class="QLineEdit" name="nsegments">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>75</width>
-             <height>20</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>75</width>
-             <height>20</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
-           </property>
-           <property name="placeholderText">
-            <string>2</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_34">
-           <property name="text">
-            <string>Segments</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-      </layout>
+      <widget class="QWidget" name="page"/>
      </widget>
     </item>
     <item>
@@ -637,8 +637,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>358</width>
-     <height>21</height>
+     <width>326</width>
+     <height>26</height>
     </rect>
    </property>
   </widget>

@@ -82,6 +82,8 @@ class genWindow_CBL:
 
         # Set initial output directory
         self.form[3].outputDir.setText(str(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench')))
+        # Set species window
+        self.form[0].species.currentIndexChanged.connect(self.selectSpecies)
 
         # Set geometry window
         self.form[1].box_shape.currentIndexChanged.connect(self.selectGeometry)
@@ -116,6 +118,20 @@ class genWindow_CBL:
 
         return OpenName
     
+    def selectSpecies(self):
+            
+        # Select species
+        species = self.form[0].species.currentText()
+        if species == 'Norway Spruce':
+            self.form[0].stackedWidget.setCurrentIndex(0)
+        if species == 'Generic':
+            self.form[0].stackedWidget.setCurrentIndex(1)
+            
+        else:
+            self.form[0].stackedWidget.setCurrentIndex(2)
+            App.Console.PrintError("Species not recognized\n")
+            return
+
     def selectGeometry(self):
             
         # Select Geometry

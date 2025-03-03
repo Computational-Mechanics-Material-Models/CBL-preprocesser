@@ -196,7 +196,7 @@ def main(self):
     sites_vor = sites
     placementTime = time.time()
     nParticles = len(sites)
-    print(int(nParticles), 'particles placed')
+    print(int(nParticles), 'cells placed')
 
     # ==================================================================
     self.form[3].progressBar.setValue(30) 

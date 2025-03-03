@@ -18,9 +18,20 @@ def inputParams(form):
     geoName = (form[0].geoName.text() or 'cube')
 
     # Cell Growth Parameters ------------------------
-    radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  #
-    species = form[0].species.currentText() # spruce
-    if species == 'spruce':
+    radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
+    species = form[0].species.currentText().lower()
+    if species == 'norway spruce':
+        width_heart = 0.15 # ring width for the innermost ring
+        ring_width = float(form[0].ring_width.text() or 2)
+        late_ratio = float(form[0].ring_ratio.text() or 0.3)
+        width_early = (1-late_ratio)*ring_width # ring width for rings with early cells 0.85 
+        width_late = late_ratio*ring_width # ring width for rings with late cells 0.15
+        cellsize_early = float(form[0].cellsize_early.text() or 0.032)
+        cellsize_late = float(form[0].cellsize_late.text() or 0.017)
+        cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.0035)
+        cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.011)
+        cell_length = float(form[0].cell_length.text() or 3)
+    else: # defult to generic
         width_heart = 0.15 # ring width for the innermost ring
         ring_width = float(form[0].ring_width.text() or 2)
         late_ratio = float(form[0].ring_ratio.text() or 0.3)
@@ -30,18 +41,8 @@ def inputParams(form):
         cellsize_late = float(form[0].cellsize_late.text() or 0.02)
         cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.003)
         cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
-    else: # defult to spruce
-        width_heart = 0.15 # ring width for the innermost ring
-        ring_width = float(form[0].ring_width.text() or 2)
-        late_ratio = float(form[0].ring_ratio.text() or 0.3)
-        width_early = (1-late_ratio)*ring_width # ring width for rings with early cells 0.85 
-        width_late = late_ratio*ring_width # ring width for rings with late cells 0.15
-        cellsize_early = float(form[0].cellsize_early.text() or 0.03)
-        cellsize_late = float(form[0].cellsize_late.text() or 0.02)
-        cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.003)
-        cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
-    
-    nsegments = int(form[0].nsegments.text() or 2)     
+        cell_length = float(form[0].cell_length.text() or 10)
+        
     
     # random field parameters
     randomFlag = form[0].randomFlag.currentText()
@@ -50,7 +51,6 @@ def inputParams(form):
     randomParams['RF_dist_params'] = ([[float(i) for i in form[0].dist_params.text().split(',')]]) # or [[1.,0.05,0]]) # or doesn't work for empty after converting to float - convert later?
     randomParams['RF_corr_l'] = float(form[0].corr_l.text() or 0.1)
     randomParams['RF_sampling_type'] = (form[0].sampling_type.currentText() or "MC")
-
 
 
     # Geometry Parameters ------------------------
@@ -89,7 +89,9 @@ def inputParams(form):
     max_rad = sqrt(box_center[0]**2 + box_center[1]**2) # radius of box center
     r_max =  max_rad + max_diag + 0.1 # outer radius of generation domain with a buffer of 0.1
     nrings = ceil(r_max/ring_width) # number of rings to generate
-
+    
+    nsegments = max(ceil(box_height/cell_length*3),2) # number of segments in the longitudinal direction
+    # at least 2 segments, with 3 per cell length
    
     precrackFlag = form[1].precrackFlag.currentText()
     precrack_size = float(form[1].x_precrack_size.text() or 0.1) # depth of precrack
