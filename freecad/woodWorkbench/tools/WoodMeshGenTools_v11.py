@@ -149,13 +149,14 @@ def relax_points(vor,omega):
     
     nonempty_regions = list(filter(None, vor.regions))
     filtered_regions = [region for region in nonempty_regions if not any(x < 0 for x in region)]
+    # filtered_regions = nonempty_regions
     
     centroids = np.zeros((len(filtered_regions),2))
     for i in range(0,len(filtered_regions)):   
         vertices = vor.vertices[filtered_regions[i] + [filtered_regions[i][0]], :]
         centroid = find_centroid(vertices,omega) # get the centroid of these verts
         centroids[i,:] = centroid
-        
+
     return centroids # store the centroids as the new site positions
 
 def find_centroid(vertices,omega):
@@ -185,7 +186,7 @@ def find_centroid(vertices,omega):
     area /= 2
     centroid_x /= (6.0 * area)
     centroid_y /= (6.0 * area)
-
+    
     return np.array([[centroid_x, centroid_y]])
 
 def find_intersect(p,normal,boundaries):
@@ -376,27 +377,40 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         nsubrings = int(0.5*np.ceil((radii[i+1]-radii[i])/cellsize))
         subradii = np.linspace(radii[i], radii[i+1], nsubrings, endpoint=False)
         
-        subnpoints =np.ceil(2*np.pi*subradii/(2*cellsize)).astype(int)
+        subnpoints = np.ceil(2*np.pi*subradii/(2*cellsize)).astype(int)
+        # take minimum number of points for all subradii
+        subpoints = int(np.min(subnpoints))
         
         circles = []
-        
-        for subr, subnpoint in zip(subradii, subnpoints):
-            t = np.linspace(0, 2*np.pi, subnpoint, endpoint=False)
+        radialwidthnoise = np.squeeze((np.random.rand(subpoints,1) - [0.5]))
+        for subr in subradii:
+            t = np.linspace(0, 2*np.pi, subpoints, endpoint=False)
+            dt = t[1] - t[0]
+            t = t + radialwidthnoise*dt
             x = subr * np.cos(t)
             y = subr * np.sin(t)
             circles.append(np.c_[x, y])
+
+        # old way with each subradii its own number of points
+        # for subr, subnpoint in zip(subradii, subnpoints):
+        #     t = np.linspace(0, 2*np.pi, subnpoint, endpoint=False)
+        #     x = subr * np.cos(t)
+        #     y = subr * np.sin(t)
+        #     circles.append(np.c_[x, y])
+
             
         inside_cells = np.concatenate(circles, axis=0)
         
-        noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellsize
-        inside_cells = inside_cells + 1*noise #.25
+        # old way with xy randomness
+        # noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellsize
+        # inside_cells = inside_cells # + 1*noise #.25
         # testing radial relaxation only
-        # noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellsize/4
-        # noise = np.squeeze(noise)
-        # r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
-        # theta = np.arctan(inside_cells[:,1]/inside_cells[:,0])
-        # inside_cells[:,0] = np.multiply((r),np.cos(theta))
-        # inside_cells[:,1] = np.multiply((r),np.sin(theta))
+        noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellsize*2
+        noise = np.squeeze(noise)
+        r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
+        theta = np.arctan2(inside_cells[:,1],inside_cells[:,0])
+        inside_cells[:,0] = r*np.cos(theta)
+        inside_cells[:,1] = r*np.sin(theta)
 
         sites = np.vstack((OuterPerimeterPointsSites,inside_cells))
                     
@@ -406,16 +420,16 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     sites_bound = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path to minimize time on relaxation etc
     existing_sites = existing_sites[sites_bound]
 
-    # ax = plt.gca()
-    # ax.plot(existing_sites[:,0],existing_sites[:,1],'rs',markersize=3.)
     lloyd_iter = 0
     while lloyd_iter < iter_max:
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
+        # added check for boundaries again to patch bug -SA
+        sites_bound = check_isinside(existing_sites,boundary_points)
+        existing_sites = existing_sites[sites_bound]
         lloyd_iter += 1
-    # ax.plot(existing_sites[:,0],existing_sites[:,1],'bd',markersize=3.)
-
-    # check if sites are too close the the boundary and would thus create small elements
+    
+    # check if sites are too close the the boundary 
     if mergeFlag == 'On':
         num_bound = np.shape(boundary_points)[0]  # create boundary segements to enforce boundaries 
         boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()

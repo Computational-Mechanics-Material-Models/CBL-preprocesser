@@ -136,10 +136,6 @@ def main(self):
         material_object.Material = mat
         analysis_object.addObject(material_object)
 
-    # Start figure
-    plt.figure()
-    ax = plt.gca()
-    ax.set_aspect('equal', adjustable='box')
 
     print('\n')
     print(geoName,':')
@@ -258,6 +254,12 @@ def main(self):
     # Original points
     # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
 
+    # Start figure
+    plt.close()
+    plt.figure()
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+
     # # Main cells
     for beg, end in voronoi_ridges.astype(int):
         x0, y0 = voronoi_vertices[beg, :]
@@ -281,7 +283,7 @@ def main(self):
 
     # plt.show()
     plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
-    # plt.close()
+    plt.close()
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
         # ==================================================================
