@@ -252,7 +252,36 @@ def main(self):
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
                                                         boundaries,boundaryFlag,boundary_points_original,mergeFlag,merge_tol)
 
-    RebuildvorTime = time.time()    
+    # ---------------------------------------------
+    # # Visualize the meshes
+
+    # Original points
+    # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
+
+    # # Main cells
+    for beg, end in voronoi_ridges.astype(int):
+        x0, y0 = voronoi_vertices[beg, :]
+        x1, y1 = voronoi_vertices[end, :]
+        ax.plot(
+            [x0, x1],
+            [y0, y1],'k-',linewidth=0.25,markersize=0.15)    
+
+    # Flow
+    # vertsD = np.array(conforming_delaunay['vertices'])
+    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
+    # for el in flow_elems:
+    #     beg = int(el[0])
+    #     end = int(el[1])
+    #     x0,y0 = flow_nodes[beg,1:3]
+    #     x1,y1 = flow_nodes[end,1:3]
+    #     ax.plot(
+    #         [x0, x1],
+    #         [y0, y1],'ro-',linewidth=0.15,markersize=0.1)
+    # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=0.1)
+
+    # plt.show()
+    plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
+    # plt.close()
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
         # ==================================================================
@@ -453,37 +482,6 @@ def main(self):
     # ==================================================================
     # Generate Paraview visulization files
     if visFlag in ['on','On','Y','y','Yes','yes']:
-        
-        # ---------------------------------------------
-        # # Visualize the meshes
-
-        # Original points
-        # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
-
-        # # Main cells
-        for beg, end in voronoi_ridges.astype(int):
-            x0, y0 = voronoi_vertices[beg, :]
-            x1, y1 = voronoi_vertices[end, :]
-            ax.plot(
-                [x0, x1],
-                [y0, y1],'k-',linewidth=0.25,markersize=0.15)    
-
-        # Flow
-        # vertsD = np.array(conforming_delaunay['vertices'])
-        # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
-        # for el in flow_elems:
-        #     beg = int(el[0])
-        #     end = int(el[1])
-        #     x0,y0 = flow_nodes[beg,1:3]
-        #     x1,y1 = flow_nodes[end,1:3]
-        #     ax.plot(
-        #         [x0, x1],
-        #         [y0, y1],'ro-',linewidth=0.15,markersize=0.1)
-        # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=0.1)
-
-        # plt.show()
-        plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
-        # plt.close()
         
         # ---------------------------------------------
         # # Create visualization files
