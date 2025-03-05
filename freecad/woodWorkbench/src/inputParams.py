@@ -1,7 +1,7 @@
 ## ================================================================================
 ## CHRONO WOOD WORKBENCH
 ##
-## Copyright (c) 2024 
+## Copyright (c) 2025
 ## All rights reserved. 
 ##
 ## Use of this source code is governed by a BSD-style license that can be found
@@ -12,15 +12,18 @@
 ## Primary Authors: Susan Alexis Brown, Hao Yin
 ## ===========================================================================
 from math import sqrt, ceil
+import os
+from pathlib import Path
+from freecad.woodWorkbench.src.outputLog import outputLog
 
 def inputParams(form):
 
-    geoName = (form[0].geoName.text() or 'cube')
 
     # Cell Growth Parameters ------------------------
     radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
-    species = form[0].species.currentText().lower()
-    if species == 'norway spruce':
+    species = form[0].species.currentText().lower().replace(' ','')  
+    if species == 'norwayspruce':
+        speciesShort = 'spruce'
         width_heart = 0.15 # ring width for the innermost ring
         ring_width = float(form[0].ring_width.text() or 2)
         late_ratio = float(form[0].ring_ratio.text() or 0.3)
@@ -31,7 +34,8 @@ def inputParams(form):
         cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.0035)
         cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.011)
         cell_length = float(form[0].cell_length.text() or 3)
-    else: # defult to generic
+    else: # default to generic
+        speciesShort = 'generic'
         width_heart = 0.15 # ring width for the innermost ring
         ring_width = float(form[0].ring_width.text() or 2)
         late_ratio = float(form[0].ring_ratio.text() or 0.3)
@@ -54,22 +58,22 @@ def inputParams(form):
 
 
     # Geometry Parameters ------------------------
-    box_shape = form[1].box_shape.currentText()
+    box_shape = form[1].box_shape.currentText().lower().replace(' ','')
     box_center = eval(form[1].box_center.text() or "(5.75,0.0)") # coordinates of clipping box center
     generation_center = (0,0) # coordinates of generation domain center ??? - SA?
     x_notch_size = 0 # depth of notch
     y_notch_size = 0 # width of notch
-    if box_shape == 'Cube':
+    if box_shape == 'cube':
         box_size = float(form[1].cube_size.text() or 0.5) # all side lengths
         box_height = box_size
         box_width = box_size
         box_depth = box_size
-    elif box_shape == 'Rectangle':
+    elif box_shape == 'rectangle':
         box_height = float(form[1].box_height.text() or 0.5) # specimen length
         box_width = float(form[1].box_width.text() or 0.5) # side length
         box_depth = float(form[1].box_depth.text() or 0.5) # side length
         box_size = max(box_depth, box_width, box_depth)
-    elif box_shape == 'Notched Square':
+    elif box_shape == 'notchedsquare':
         box_height = float(form[1].notch_height.text() or 0.5) # specimen length
         box_width = float(form[1].notch_width.text() or 0.5) # side length
         box_depth = float(form[1].notch_depth.text() or 0.5) # side length
@@ -115,7 +119,6 @@ def inputParams(form):
     knotParams['m2'] = float(form[1].m2.text() or 0.05)
 
 
-
     # Model Parameters ------------------------     
     boundaryFlag = form[2].boundaryFlag.currentText()
     mergeFlag = form[2].merge_operation.currentText() 
@@ -142,13 +145,33 @@ def inputParams(form):
         mergeFlag = 'Off'
         merge_tol = 5e-5
         boundaryFlag = 'Off'
+    
+    # Make output directory if does not exist
+    geoName = (form[0].geoName.text() or (speciesShort + str(box_size).replace('.','_') + 'mm_' + box_shape))
+    outDir = form[3].outputDir.text()
+    i = 1
+    geoNamenew = geoName + str(i)
+    while os.path.exists(Path(outDir + '/' + geoNamenew)):
+        i +=1
+        geoNamenew = geoName + str(i)
+    geoName = geoNamenew
+    # if not os.path.exists(Path(outDir + '/' + geoName)):
+    os.makedirs(Path(outDir + '/' + geoName))
+
+    # Write input parameters to log file for repeated use
+    outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
+              cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
+                cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
+                  box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_size, \
+                    iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
+                      boundaryFlag, mergeFlag, stlFlag, inpFlag, inpType, visFlag, outDir)
 
     return geoName, radial_growth_rule, iter_max, \
-        r_max, nrings, width_heart, width_early, width_late, generation_center, \
+        nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams
+        knotFlag, knotParams, outDir

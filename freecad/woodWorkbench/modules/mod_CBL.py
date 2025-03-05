@@ -54,8 +54,7 @@ from freecad.woodWorkbench.util.cwloadUIicon                    import cwloadUIi
 # from freecad.woodWorkbench.output.mkChronoInput                  import mkChronoInput
 # from freecad.woodWorkbench.output.mkAbaqusInput                  import mkAbaqusInput
 
-from freecad.woodWorkbench.src.outputLog import outputLog
-from freecad.woodWorkbench.src.readInput import readInput
+from freecad.woodWorkbench.src.readLog import readLog
 
 
 
@@ -164,7 +163,7 @@ class genWindow_CBL:
         else:
             self.form[0].setupFile.setText(OpenName)
         
-        readInput(self)
+        readLog(self)
 
 
     def generation(self):

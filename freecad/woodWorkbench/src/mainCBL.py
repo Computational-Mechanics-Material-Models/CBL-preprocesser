@@ -1,7 +1,7 @@
 ## ================================================================================
 ## CHRONO WOOD WORKBENCH
 ##
-## Copyright (c) 2024 
+## Copyright (c) 2025 
 ## All rights reserved. 
 ##
 ## Use of this source code is governed by a BSD-style license that can be found
@@ -36,10 +36,7 @@ import FemGui # type: ignore
 from PySide import QtCore, QtGui # type: ignore
 
 from freecad.woodWorkbench.src.inputParams import inputParams
-from freecad.woodWorkbench.src.outputParams import outputParams
-from freecad.woodWorkbench.src.outputLog import outputLog
-from freecad.woodWorkbench.src.readInput import readInput
-from freecad.woodWorkbench.src.chronoInput import chronoInput
+from freecad.woodWorkbench.src.readLog import readLog
 from freecad.woodWorkbench.src.chronoInput import chronoAux
 
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
@@ -50,7 +47,6 @@ from freecad.woodWorkbench.tools.rf_generator import RandomField
 def main(self):
 
     # performance check only
-    startTime = time.time()
     # pr = cProfile.Profile()
     # pr.enable()
     
@@ -62,54 +58,27 @@ def main(self):
     # ==================================================================
     # Input parameters 
     [geoName, radial_growth_rule, iter_max, \
-        r_max, nrings, width_heart, width_early, width_late, generation_center, \
+        nrings, width_heart, width_early, width_late, generation_center, \
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams]\
+        knotFlag, knotParams, outDir]\
             = inputParams(self.form)
     
-    # precrack_widths = 0 # for future use
     
-
     # ==================================================================
     self.form[3].progressBar.setValue(15) 
     self.form[3].statusWindow.setText("Status: Initializing Files.") 
     # ==================================================================
 
-    # Make output directory if does not exist
-    outDir = self.form[3].outputDir.text()
-
-    i = 1
-    geoNamenew = geoName
-    while os.path.exists(Path(outDir + '/' + geoNamenew)):
-        i +=1
-        geoNamenew = geoName + str(i)
-    geoName = geoNamenew
-    # if not os.path.exists(Path(outDir + '/' + geoName)):
-    os.makedirs(Path(outDir + '/' + geoName))
-
-
+    
     # Prep naming variables
-    meshName = geoName + "_mesh"
     analysisName = geoName + "_analysis"
     materialName = geoName + "_material"
-    dataFilesName = geoName + '_dataFiles'
     visualFilesName = geoName + '_visualFiles'
-
-    # Write input parameters to log file for repeated use
-    outputLog(geoName, radial_growth_rule, iter_max, \
-        r_max, nrings, \
-        cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-        boundaryFlag, box_shape, box_center, box_height, \
-        nsegments, theta_min, long_connector_ratio, \
-        x_notch_size, y_notch_size, precrack_size, \
-        mergeFlag, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, box_width, box_depth, visFlag, \
-        knotFlag, knotParams, randomFlag, randomParams)
         
 
     # Make new freecad document and set view if does not exisit
@@ -352,8 +321,6 @@ def main(self):
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
 
         x_notch = x_min + x_notch_size
-        # y_notch_min = box_center[1] - y_notch_size/2
-        # y_notch_max = box_center[1] + y_notch_size/2
         x_precrack = x_notch + precrack_size
         y_precrack = box_center[1]
         
@@ -414,15 +381,13 @@ def main(self):
     [nsvars_beam, nsecgp, nsvars_secgp, iprops_beam, props_beam, \
         nsvars_conn_t, iprops_connector_t_bot, props_connector_t_bot, iprops_connector_t_reg, props_connector_t_reg, \
         iprops_connector_t_top, props_connector_t_top, \
-        nsvars_conn_l, iprops_connector_l, props_connector_l, props_strainrate] = outputParams(nconnector_l,nconnector_l_precrack,nconnector_t,nconnector_t_precrack,\
-                 cellwallthickness_early,cellwallthickness_late,height_connector_t,nbeamElem,\
-                    long_connector_ratio,segment_length)
+        nsvars_conn_l, iprops_connector_l, props_connector_l, props_strainrate] = WoodMeshGen.ABQParams(nconnector_l,nconnector_l_precrack,nconnector_t,nconnector_t_precrack,\
+                 cellwallthickness_early,cellwallthickness_late,height_connector_t,nbeamElem)
 
     timestep     = 5.0E-9
     totaltime    = 5.0E-3
     z_min = np.min(z_coord)
     z_max = np.max(z_coord)
-    # boundary_conditions = ['Hydrostatic']
     boundary_conditions = ['Bottom','Top','Left','Right','Front','Back']
     BC_velo_dof = 1 # 1-x, 2-y, 3-z
     BC_velo_value = box_size*0.03 # mm/s
@@ -461,9 +426,6 @@ def main(self):
     #     np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
     #     np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
     #     print('Generated cells and rings info has been saved.')
-    
-    FileTime = time.time() 
-    # print('Files generated in {:.3f} seconds'.format(FileTime - BeamTime))
 
 
     # # ==============================================
@@ -508,27 +470,6 @@ def main(self):
         App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLbeamsVTU)
         CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
         CBLbeamsVTU.Visibility = True
-
-        # importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'),App.ActiveDocument.Name)
-        # CBLconnsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns')
-        # CBLconnsVTU.Label = geoName + '_conns'
-        # App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsVTU)
-        # CBLconnsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns.vtu'))
-        # CBLconnsVTU.Visibility = False
-        
-        # importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'),App.ActiveDocument.Name)
-        # CBLconnsvVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_conns_vol')
-        # CBLconnsvVTU.Label = geoName + '_conns_vol'
-        # App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLconnsvVTU)
-        # CBLconnsvVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_conns_vol.vtu'))
-        # CBLconnsvVTU.Visibility = False
-
-        # importVTK.insert(str(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'),App.ActiveDocument.Name)    
-        # CBLvertsVTU = App.getDocument(App.ActiveDocument.Name).getObject(geoName + '_vertices')
-        # CBLvertsVTU.Label = geoName + '_vertices'
-        # App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLvertsVTU)
-        # CBLvertsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_vertices.vtu'))
-        # CBLvertsVTU.Visibility = False
 
         # =================================================
         # Generate 3D model files
