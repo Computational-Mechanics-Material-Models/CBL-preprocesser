@@ -760,9 +760,9 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
 
 
 def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray_directions,\
-                                      boundaries,boundaryFlag,boundary_points_original,mergeFlag,merge_tol):
+                                      boundaries,boundaryFlag,boundary_points_original):
     """Clip Voronoi mesh by the boundaries, rebuild the new Voronoi mesh
-        Modified to fix incorrect addition of boundary corner points - SA
+        Modified to fix optional addition of boundary corner points - SA
         NOTE: 'tt' prefix to refer to original tessellation, while w/o prefix refers to boundary conforming tesselation)
     """
 
@@ -839,17 +839,6 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
         normal = ray_directions[i,:]/np.linalg.norm(ray_directions[i,:]) # normal                 
         intpt = find_intersect(p,normal,boundaries)
         if intpt.any(): # if an intersection is found (should be the case but some bugs rn)
-            # if mergeFlag == 'On': # if the merge operation is selected 
-            #     dist = np.sum((p - intpt)**2,axis=1) # distance between ray origin and boundary
-            #     if dist < merge_tol: # if the origin is too close to the boundary
-            #         n += 1
-            #         voronoi_vertices_in[ray_origins[i]] = intpt # replace it with the boundary
-            #         # this keeps the total number of voronoi points the same for connectivity
-            #         boundary_points.append(intpt) # also add to array for boundary ridges
-            #         # basically stretching cell to boundary
-            #     else: # add intersection point to boundary
-            #         boundary_points.append(intpt)
-            # else:
             boundary_points.append(intpt)
             # plt.quiver(p[0,0],p[0,1],normal[0],normal[1],color='b')
         else:
@@ -866,11 +855,11 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
         # sometimes there is a bug in the corner when using boundaries, not sure why, just remesh for now -SA
     # ax.plot(boundary_points[:,0],boundary_points[:,1],'b^',markersize=5)
 
-    # # print(boundary_points)
+    # print(boundary_points)
     # points = sort_coordinates(boundary_points)
     # print(points)
     # pgon = shp.Polygon(points)
-    # print(pgon.area)
+    # print('poly area',pgon.area)
     # ax = plt.gca()
     # shapely.plotting.plot_polygon(pgon)
 
@@ -926,11 +915,13 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     ridge_lengths = voronoi_vertices[voronoi_ridges[:,0]] - voronoi_vertices[voronoi_ridges[:,1]]
     ridge_lengths = np.linalg.norm(ridge_lengths,axis=1)
     # get ridge lengths not equal to zero
-    ridge_lengths = ridge_lengths[ridge_lengths >= 1e-15]
+    ridge_lengths_red = ridge_lengths[ridge_lengths >= 1e-15]
     # ridge_lengths = ridge_lengths[1e-2 >= ridge_lengths]
-    print('The minimum ridge distance is', float('{:.2E}'.format(min(ridge_lengths))))
+    print('The minimum ridge distance is', float('{:.2E}'.format(min(ridge_lengths_red))))
 
     # plt.hist(ridge_lengths,bins=100)
+    
+
     
     return voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertices,nvertices_in,nfinite_ridge,nboundary_ridge,\
@@ -1234,8 +1225,6 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
     
     all_pts_2D = np.vstack((voronoi_vertices,finite_ridge_mid,finite_ridge_quarter,boundary_ridge_mid,boundary_ridge_quarter))
     all_ridges = np.hstack((voronoi_ridges,all_midpt_indices,all_quarterpt_indices)).astype(int)
-    
-
 
     return all_pts_3D,npt_per_layer_vtk,all_pts_2D,all_ridges
 
@@ -1270,6 +1259,7 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     # Generate a list containing info for each vertex
     all_vertices_info_2D = []
     all_direction_info_2D = []
+    vert_area = 0
     for i in range(0,npt_per_layer): # loop over all vertices
         
         allrows = np.where(all_ridges == i)[0] # find all Voronoi ridges containing the ith vertex
@@ -1289,7 +1279,25 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
         
         all_vertices_info_2D.append(vertex_info)
         all_direction_info_2D.append(direction_info)
-    
+        # ==================================================================================================
+        # calculate each beam cross-sectional area and add to total for net area for later porosity calcs
+        v_coord = all_pts_2D[i,:]
+        p_coords = all_pts_2D[all_ridges[allrows,0:2][np.nonzero(all_ridges[allrows,0:2]-i)],:]
+        v_points = []
+        for p in p_coords:
+            r = p - v_coord
+            perp = (r[1],-r[0])
+            orth = np.linalg.norm(perp)
+            width = vertex_cellwallthickness_2D[i]
+            ph = (p + v_coord)/2
+            p1 = ph + width/2*orth
+            p2 = ph - width/2*orth
+            v_points.append(p1)
+            v_points.append(p2)
+        area_points = sort_coordinates(np.array(v_points))
+        pgon = shp.Polygon(area_points)
+        vert_area += pgon.area
+
     # flattened 1D numpy array of lengths, widths and angles of wings
     # ref:https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists
     ridge_inices = [vertex_info[1] for vertex_info in all_vertices_info_2D]
@@ -1354,7 +1362,7 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
     #     '\n\
     # [vertex1 vertex2 midpt1 midpt2 qrtrpt1 qrtrpt2]', comments='')
     
-    return all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges
+    return all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges, vert_area
 
 
 def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_per_beam,nctrlpt_per_elem,nsegments,\
@@ -1649,7 +1657,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # p = pstats.Stats(loc)
     # p.strip_dirs().sort_stats('cumulative').print_stats(10)
 
-    return Meshdata,conn_l_tangents,height_connector_t
+    return Meshdata,conn_l_tangents,height_connector_t, nel_con_tbot
 
 
 def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\
@@ -4286,84 +4294,80 @@ def ReadSavedSites(sites_path, radial_growth_rule):
             return None
         
     
-# def ModelInfo(box_shape,boundary_points,z_min,z_max,skeleton_density,MeshData):
+def ModelInfo(boundary_points,height,net_area):
 
-    """Calculate the material properties of generated geometry
-
-    Arguments:
-    ---------
-
-    Returns
-    -------
-    total mass, bulk volume, bulk density, and porosity of the model
-    """
+    #Calculate the material properties of generated geometry
     
-    mass = 0
-    
-    for i in range(0,MeshData.shape[0]):
-        mass += skeleton_density*MeshData[i,17]*MeshData[i,18]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+    wall_density = 1.5e-9 # unit: tonne/mm3
+    # Kellogg, Robert M., and Frederick F. Wangaard. "Variation in the cell-wall density of wood." Wood and Fiber Science (1969): 180-204.
+    # Plötze, Michael, and Peter Niemz. "Porosity and pore size distribution of different wood types as determined by mercury intrusion porosimetry." \
+    # European journal of wood and wood products 69.4 (2011): 649-657.
+    # https://link.springer.com/article/10.1007/s00107-010-0504-0
+    # norway spruce = 73% according to above
 
-    
+    net_volume = net_area*height
+    mass = wall_density*net_volume
+
     hull = ConvexHull(boundary_points)
+    gross_area = hull.volume 
     
-    volume = (z_max-z_min)*hull.volume
-
-    bulk_density = mass/volume
+    bulk_volume = height*gross_area
+    bulk_density = mass/bulk_volume
     
-    mass_if_all_solid = skeleton_density*volume # if all skeleton phase
+    mass_if_all_solid = wall_density*bulk_volume # if all skeleton phase
     porosity = 1 - mass/mass_if_all_solid
-    
-    return mass,volume,bulk_density,porosity
+
+    return mass,bulk_volume,bulk_density,porosity,gross_area
 
 
-def ModelInfo_precrack(box_shape,boundary_points,z_min,z_max,\
-              nbeam_per_grain,fiberlength,NURBS_degree,nctrlpt_per_beam,\
-              props_beam,props_connector_t_bot,props_connector_t_reg,\
-              props_connector_t_top,props_connector_l,iprops_beam,\
-              beam_connectivity,connector_t_bot_connectivity,\
-              connector_t_reg_connectivity,connector_t_top_connectivity,\
-              connector_l_connectivity,MeshData,x_notch_size,y_notch_size):
+# def ModelInfo_precrack(boundary_points,z_min,z_max,\
+#               nbeam_per_grain,fiberlength,\
+#               props_beam,props_connector_t_bot,props_connector_t_reg,\
+#               props_connector_t_top,props_connector_l,\
+#               beam_connectivity,connector_t_bot_connectivity,\
+#               connector_t_reg_connectivity,connector_t_top_connectivity,\
+#               connector_l_connectivity,MeshData,x_notch_size,y_notch_size):
     
-    beam_length = fiberlength/nbeam_per_grain
-    nelem_beam = beam_connectivity.shape[0]
-    nel_con_tbot = connector_t_bot_connectivity.shape[0]
-    nel_con_treg = connector_t_reg_connectivity.shape[0]
-    nel_con_ttop = connector_t_top_connectivity.shape[0]
-    nel_con_l = connector_l_connectivity.shape[0]
+#     beam_length = fiberlength/nbeam_per_grain
+#     nelem_beam = beam_connectivity.shape[0]
+#     nel_con_tbot = connector_t_bot_connectivity.shape[0]
+#     nel_con_treg = connector_t_reg_connectivity.shape[0]
+#     nel_con_ttop = connector_t_top_connectivity.shape[0]
+#     nel_con_l = connector_l_connectivity.shape[0]
     
-    density_beam = props_beam[0]
-    density_connector_t_bot = props_connector_t_bot[0]
-    density_connector_t_top = props_connector_t_top[0]
-    density_connector_t_reg = props_connector_t_reg[0]
-    density_connector_l = props_connector_l[0]
-    mass = 0
+#     density_beam = props_beam[0]
+#     density_connector_t_bot = props_connector_t_bot[0]
+#     density_connector_t_top = props_connector_t_top[0]
+#     density_connector_t_reg = props_connector_t_reg[0]
+#     density_connector_l = props_connector_l[0]
+#     mass = 0
     
-    # mass of beams
-    # for i in range(0,nelem_beam):
-    mass += nelem_beam*density_beam*props_beam[3]*props_beam[4]*beam_length
-    # mass of bot transverse connector
-    for i in range(0,nel_con_tbot):
-        mass += density_connector_t_bot*props_connector_t_bot[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
-    # mass of reg transverse connector
-    for i in range(nel_con_tbot,nel_con_tbot+nel_con_treg):
-        mass += density_connector_t_reg*props_connector_t_reg[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
-    # mass of top transverse connector
-    for i in range(nel_con_tbot+nel_con_treg,nel_con_tbot+nel_con_treg+nel_con_ttop):
-        mass += density_connector_t_top*props_connector_t_top[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
-    # mass of longitudinal connector
-    for i in range(nel_con_tbot+nel_con_treg+nel_con_ttop,MeshData.shape[0]):
-        mass += density_connector_l*props_connector_l[3]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+#     # mass of beams
+#     # for i in range(0,nelem_beam):
+#     mass += nelem_beam*density_beam*props_beam[3]*props_beam[4]*beam_length
+#     # mass of bot transverse connector
+#     for i in range(0,nel_con_tbot):
+#         mass += density_connector_t_bot*props_connector_t_bot[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+#     # mass of reg transverse connector
+#     for i in range(nel_con_tbot,nel_con_tbot+nel_con_treg):
+#         mass += density_connector_t_reg*props_connector_t_reg[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+#     # mass of top transverse connector
+#     for i in range(nel_con_tbot+nel_con_treg,nel_con_tbot+nel_con_treg+nel_con_ttop):
+#         mass += density_connector_t_top*props_connector_t_top[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
+#     # mass of longitudinal connector
+#     for i in range(nel_con_tbot+nel_con_treg+nel_con_ttop,MeshData.shape[0]):
+#         mass += density_connector_l*props_connector_l[3]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
     
-    hull = ConvexHull(boundary_points) 
+#     hull = ConvexHull(boundary_points) 
     
-    volume = (z_max-z_min)*hull.volume - x_notch_size*y_notch_size
+#     volume = (z_max-z_min)*hull.volume - x_notch_size*y_notch_size
 
-    density = mass/volume
+#     density = mass/volume
     
-    mass_if_all_solid = density_beam*volume # if all solid
-    porosity = 1 - mass/mass_if_all_solid
+#     mass_if_all_solid = density_beam*volume # if all solid
+#     porosity = 1 - mass/mass_if_all_solid
     
-    return mass,volume,density,porosity
+#     return mass,volume,density,porosity
 
 
 def StlModelFile(geoName):
@@ -4379,155 +4383,54 @@ def StlModelFile(geoName):
     None or error message, if generation failed (TBD)
     """
     
-    # import vtk
-    # import os
+    import vtk
+    import os
     
-    # vtufilename = geoName + '_conns_vol'+'.vtu'
-    # cwd = os.getcwd()
-    # vtupath = os.path.join(cwd,'meshes',geoName)
-    # stlfilename = os.path.join(vtupath, geoName+".stl")
-    # file_name = os.path.join(vtupath,vtufilename)
+    vtufilename = geoName + '_conns_vol'+'.vtu'
+    cwd = os.getcwd()
+    vtupath = os.path.join(cwd,'meshes',geoName)
+    stlfilename = os.path.join(vtupath, geoName+".stl")
+    file_name = os.path.join(vtupath,vtufilename)
     
-    # # create a new 'XML Unstructured Grid Reader'
-    # reader = vtk.vtkXMLUnstructuredGridReader()
-    # reader.SetFileName(file_name)
-    # reader.Update()
-    # output = reader.GetOutputPort()
+    # create a new 'XML Unstructured Grid Reader'
+    reader = vtk.vtkXMLUnstructuredGridReader()
+    reader.SetFileName(file_name)
+    reader.Update()
+    output = reader.GetOutputPort()
 
-    # # Extract the outer (polygonal) surface.
-    # surface = vtk.vtkDataSetSurfaceFilter()
-    # surface.SetInputConnection(0, output)
-    # surface.Update()
-    # sufaceoutput = surface.GetOutputPort()
+    # Extract the outer (polygonal) surface.
+    surface = vtk.vtkDataSetSurfaceFilter()
+    surface.SetInputConnection(0, output)
+    surface.Update()
+    sufaceoutput = surface.GetOutputPort()
 
-    # # Write the stl file to disk
-    # stlWriter = vtk.vtkSTLWriter()
-    # stlWriter.SetFileName(stlfilename)
-    # stlWriter.SetInputConnection(sufaceoutput)
-    # stlWriter.Write()
+    # Write the stl file to disk
+    stlWriter = vtk.vtkSTLWriter()
+    stlWriter.SetFileName(stlfilename)
+    stlWriter.SetInputConnection(sufaceoutput)
+    stlWriter.Write()
 
 
-def LogFile(geoName,iter_max,r_min,r_max,nrings,width_heart,width_sparse,width_dense,\
-        generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
-        cellsize_sparse,cellsize_dense,cellwallthickness_sparse,cellwallthickness_dense,\
-        merge_operation,merge_tol,precrackFlag,precrack_size,boundaryFlag,\
-        nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
-        NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
-        nParticles,nbeamElem,\
-        stlFlag,inpFlag,inpType,radial_growth_rule,\
-        startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime):
+def LogFile(geoName,outDir,mass,bulk_volume,bulk_density,porosity,net_area,gross_area):
     
-    """Generate the log file (geoName.log file) for the generation procedure.
-
-    Arguments:
-    ---------
-    geoName :: string, geometry name.
-    -
-
-    Returns
-    -------
-    None or error message, if generation failed (TBD)
-    """
+    #Generate the log file (geoName.log file) for the generation procedure.
+    logfile = open(Path(outDir + '/' + geoName + '/' + geoName + '-input.cwPar'),'a')
     
     # get current local time
     current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # Generate log file
-    logfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-report.log'),'w')                                      
-    logfile.write('################################################################################\n')
-    # logfile.write('##             Log Created with RingsPy Mesh Generation Tool V' + pkg_resources.get_distribution("ringspy").version + '           ##\n')
-    logfile.write('##             Files generated at local time: ' + current_time + '             ##\n')
-    logfile.write('################################################################################\n')
+    # Add to log file                                     
+    logfile.write('END' + '\n')
+    logfile.write('[assuming mm kg tonnes]\n')
+    logfile.write('net_area= ' + str('{:0.3e}'.format(net_area)) + ' [mm^2] \n')
+    logfile.write('gross_area= ' + str('{:0.3e}'.format(gross_area)) + ' [mm^2] \n')
+    logfile.write('mass= ' + str('{:0.3e}'.format(mass)) + ' [tonne] \n')
+    logfile.write('bulk_volume= ' + str('{:0.3e}'.format(bulk_volume)) + ' [mm^3] \n')
+    logfile.write('bulk_density= ' + str('{:0.3e}'.format(bulk_density)) + ' [tonne/mm^3] \n')
+    logfile.write('porosity= ' + str('{:0.1f}'.format(porosity*100)) + ' [%] \n')
+    logfile.write('current_time= ' + str(current_time) + '\n')
     logfile.write('\n')
-    logfile.write('GEOMETRY:\n') 
-    logfile.write('geoName:                                 ' + geoName + '\n')  
-    logfile.write('\n')
-    logfile.write('GENERATION PARAMETERS:\n')
-    logfile.write('iter_max:                                ' + str(iter_max) + '\n')
-    logfile.write('radial_growth_rule:                      ' + str(radial_growth_rule) + '\n')
-    logfile.write('merge_operation:                         ' + merge_operation + '\n')
-    logfile.write('boundaryFlag:                            ' + boundaryFlag + '\n')
-    logfile.write('\n')
-    logfile.write('GEOMETRY PARAMETERS:\n')                   
-    logfile.write('r_min:                                   ' + str(r_min) + '\n')
-    logfile.write('r_max:                                   ' + str(r_max) + '\n')
-    logfile.write('nrings:                                  ' + str(nrings) + '\n')
-    logfile.write('width_heart:                             ' + str(width_heart) + '\n')
-    logfile.write('width_sparse:                            ' + str(width_sparse) + '\n')
-    logfile.write('width_dense:                             ' + str(width_dense) + '\n')
-    logfile.write('generation_center:                       ' + str(generation_center) + '\n')
-    logfile.write('cellsize_sparse:                         ' + str(cellsize_sparse) + '\n')
-    logfile.write('cellsize_dense:                          ' + str(cellsize_dense) + '\n')
-    logfile.write('cellwallthickness_sparse:                ' + str(cellwallthickness_sparse) + '\n')
-    logfile.write('cellwallthickness_dense:                 ' + str(cellwallthickness_dense) + '\n')
 
-    if merge_operation in ['on','On','Y','y','Yes','yes']: 
-        logfile.write('merge_tol:                               ' + str(merge_tol) + '\n')
-
-    logfile.write('\n')
-    logfile.write('CLIPPING PARAMETERS:\n')
-    logfile.write('box_shape:                               ' + str(box_shape) + '\n')
-    logfile.write('box_center:                              ' + str(box_center) + '\n')
-    logfile.write('box_size:                                ' + str(box_size) + '\n')
-    logfile.write('precrackFlag:                            ' + precrackFlag + '\n')
-    if precrackFlag in ['on','On','Y','y','Yes','yes']:
-        logfile.write('\n')
-        logfile.write('PRECRACK INSERTION PARAMETERS:\n')
-        logfile.write('precrack_size:                           ' + str(precrack_size) + '\n')
-        logfile.write('nconnector_t_precrack:                   ' + str(nconnector_t_precrack) + '\n')
-        logfile.write('nconnector_l_precrack:                   ' + str(nconnector_l_precrack) + '\n')
-    logfile.write('\n')
-    logfile.write('GRAIN EXTRUSION PARAMETERS:\n')
-    logfile.write('nsegments:                               ' + str(nsegments) + '\n')
-    logfile.write('segment_length:                          ' + str(segment_length) + '\n')
-    logfile.write('z_min:                                   ' + str(z_min) + '\n')
-    logfile.write('z_max:                                   ' + str(z_max) + '\n')
-    logfile.write('theta_min:                               ' + str(theta_min) + '\n')
-    logfile.write('theta_max:                               ' + str(theta_max) + '\n')
-    logfile.write('long_connector_ratio:                    ' + str(long_connector_ratio) + '\n')
-    logfile.write('NURBS_degree:                            ' + str(NURBS_degree) + '\n')
-    logfile.write('nctrlpt_per_beam:                        ' + str(nctrlpt_per_beam) + '\n')
-    logfile.write('\n')
-    logfile.write('GENERATION:\n')  
-    logfile.write('nParticles:                              ' + str(nParticles) + '\n')
-    logfile.write('nbeamElem:                               ' + str(nbeamElem) + '\n')
-    logfile.write('PERFORMANCE:\n')  
-    logfile.write('Placement Time:                          ' + str(placementTime - startTime) + '\n')
-    logfile.write('Tessellation Time:                       ' + str(voronoiTime - placementTime) + '\n')
-    logfile.write('Data Reconstruction Time:                ' + str(RebuildvorTime - voronoiTime) + '\n')
-    logfile.write('Grain Extrusion Time:                    ' + str(BeamTime - RebuildvorTime) + '\n')
-    logfile.write('File Writing Time:                       ' + str(FileTime - BeamTime) + '\n')
-    logfile.write('Total Time:                              ' + str(FileTime - startTime) + '\n')
-    logfile.write('\n')
-    logfile.write('FILE CREATION:\n')  
-    logfile.write('Cross-sectional Image File:              ./meshes/' + geoName + '/' + geoName \
-        + '.png\n')
-    logfile.write('NURBS Beam File:                         ./meshes/' + geoName + '/' + geoName \
-        + 'IGA.txt\n')
-    logfile.write('Connector Data File:                     ./meshes/' + geoName + '/' + geoName \
-        + '-mesh.txt\n')
-    logfile.write('Grain-ridge Data File:                   ./meshes/' + geoName + '/' + geoName \
-        + '-vertex.mesh\n')
-    logfile.write('Ridge Data File:                         ./meshes/' + geoName + '/' + geoName \
-        + '-ridge.mesh\n')
-    logfile.write('Paraview Vertices File:                  ./meshes/' + geoName + '/' + geoName
-                  
-        + '_vertices'+'.vtu\n')
-    logfile.write('Paraview Beams File:                     ./meshes/' + geoName + '/' \
-        + geoName + '_beams'+'.vtu\n')
-    logfile.write('Paraview Connectors File:                ./meshes/' + geoName + '/' + geoName \
-        + '_conns'+'.vtu\n')
-    logfile.write('Paraview Connectors (Volume) File:       ./meshes/' + geoName + '/' + geoName \
-        + '_conns_vol'+'.vtu\n')
-    if stlFlag in ['on','On','Y','y','Yes','yes']:
-        logfile.write('3D Model File:                           ./meshes/' + geoName + '/' + geoName \
-            + '.stl\n')
-    if inpFlag in ['on','On','Y','y','Yes','yes']:
-        if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
-            logfile.write('Abaqus Input File:                       ./meshes/' + geoName + '/' + geoName \
-            + '.inp\n') 
-    logfile.write('Log File:                                ./meshes/' + geoName + '/' + geoName \
-        + '-report.log\n')
     logfile.close()
 
 

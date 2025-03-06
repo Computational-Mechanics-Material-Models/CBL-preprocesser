@@ -215,7 +215,7 @@ def main(self):
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,voronoi_ridges,nridge,infinite_ridges_new] = \
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
-                                                        boundaries,boundaryFlag,boundary_points_original,mergeFlag,merge_tol)
+                                                        boundaries,boundaryFlag,boundary_points_original)
 
     # ---------------------------------------------
     # # Visualize the meshes
@@ -288,9 +288,9 @@ def main(self):
                     nboundary_ridge,nboundary_pts,nlayers,voronoi_vertices)
 
 
-    # ===============================================
+    # ---------------------------------------------
     # Generate a file for vertices and ridges info
-    [all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges] = \
+    [all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges,vert_area] = \
         WoodMeshGen.VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
                         nridge,geoName,radii,generation_center,\
                         cellwallthickness_early,cellwallthickness_late,inpType)
@@ -316,7 +316,7 @@ def main(self):
     print(nbeamElem,'beam elements generated')
 
 
-    # ===============================================
+    # ---------------------------------------------
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
 
@@ -350,7 +350,7 @@ def main(self):
     #                 nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
     #                 randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem)
     # lp.print_stats()
-    [ConnMeshData,conn_l_tangents,height_connector_t] = \
+    [ConnMeshData,conn_l_tangents,height_connector_t,nel_con_tbot] = \
         WoodMeshGen.ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                     connector_t_reg_connectivity,connector_t_top_connectivity,\
                     connector_l_connectivity,all_vertices_2D,\
@@ -358,13 +358,12 @@ def main(self):
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
                     randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early)
 
-    # # ===============================================
-    ## since skeletal density is not actually calculated, these are incorrect.
-    # # Calculate model properties
-    # [mass,bulk_volume,bulk_density,porosity] = \
-    #     WoodMeshGen.ModelInfo(box_shape,boundary_points,z_min,z_max,ConnMeshData)
+    # ---------------------------------------------
 
-    # ===============================================
+    # Calculate model properties
+    [mass,bulk_volume,bulk_density,porosity,gross_area] = WoodMeshGen.ModelInfo(boundary_points,box_height,vert_area)
+
+    # ---------------------------------------------
     # Bezier extraction 
     knotVec = WoodMeshGen.BezierExtraction(NURBS_degree,nbeam_total)
     npatch = beam_connectivity_original.shape[0]
@@ -381,7 +380,8 @@ def main(self):
     [nsvars_beam, nsecgp, nsvars_secgp, iprops_beam, props_beam, \
         nsvars_conn_t, iprops_connector_t_bot, props_connector_t_bot, iprops_connector_t_reg, props_connector_t_reg, \
         iprops_connector_t_top, props_connector_t_top, \
-        nsvars_conn_l, iprops_connector_l, props_connector_l, props_strainrate] = WoodMeshGen.ABQParams(nconnector_l,nconnector_l_precrack,nconnector_t,nconnector_t_precrack,\
+        nsvars_conn_l, iprops_connector_l, props_connector_l, props_strainrate] = \
+            WoodMeshGen.ABQParams(nconnector_l,nconnector_l_precrack,nconnector_t,nconnector_t_precrack,\
                  cellwallthickness_early,cellwallthickness_late,height_connector_t,nbeamElem)
 
     timestep     = 5.0E-9
@@ -428,17 +428,9 @@ def main(self):
     #     print('Generated cells and rings info has been saved.')
 
 
-    # # ==============================================
-    # # Generate log file for the generation
-    # WoodMeshGen.LogFile(geoName,iter_max,r_max,nrings,width_heart,width_early,width_late,\
-    #         generation_center,box_shape,box_center,box_size,x_min,x_max,y_min,y_max,
-    #         cellsize_early,cellsize_late,cellwallthickness_early,cellwallthickness_late,\
-    #         mergeFlag,merge_tol,precrackFlag,precrack_widths,boundaryFlag,\
-    #         nsegments,segment_length,theta_min,theta_max,z_min,z_max,long_connector_ratio,\
-    #         NURBS_degree,nctrlpt_per_beam,nconnector_t_precrack,nconnector_l_precrack,\
-    #         nParticles,nbeamElem,\
-    #         stlFlag,inpFlag,inpType,radial_growth_rule,\
-    #         startTime,placementTime,voronoiTime,RebuildvorTime,BeamTime,FileTime)
+    # ---------------------------------------------
+    # Add to log file for the generation
+    WoodMeshGen.LogFile(geoName,outDir,mass,bulk_volume,bulk_density,porosity,vert_area,gross_area)
     
     # ==================================================================
     self.form[3].progressBar.setValue(90) 
@@ -447,7 +439,6 @@ def main(self):
     # Generate Paraview visulization files
     if visFlag in ['on','On','Y','y','Yes','yes']:
         
-        # ---------------------------------------------
         # # Create visualization files
         # lp = LineProfiler()
         # lp_wrapper = lp(WoodMeshGen.VisualizationFiles)
@@ -471,7 +462,7 @@ def main(self):
         CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
         CBLbeamsVTU.Visibility = True
 
-        # =================================================
+        # ---------------------------------------------
         # Generate 3D model files
         if stlFlag in ['on','On','Y','y','Yes','yes']:
             WoodMeshGen.StlModelFile(geoName)
