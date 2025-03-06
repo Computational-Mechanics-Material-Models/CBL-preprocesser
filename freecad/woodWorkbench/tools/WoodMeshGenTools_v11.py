@@ -1640,7 +1640,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     '\n\
     Number of long connectors\n'+ str(nel_con_l) +
     '\n\
-    [inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag 0]', comments='')  
+    [inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag short_flag]', comments='')  
 
 
     # pr.disable()
