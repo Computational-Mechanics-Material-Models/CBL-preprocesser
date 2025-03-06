@@ -1,6 +1,6 @@
 from pathlib import Path
 import FreeCAD as App # type: ignore
-
+from datetime import datetime
 
 def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
               cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
@@ -31,10 +31,12 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
         // ================================================================================
         \n\n""")
     
+  
+    logfile.write('START' + '\n')
+    current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    logfile.write('current_time= ' + current_time + '\n')
 
     logfile.write('geoName=' + str(geoName) + '\n')
-    
-
     logfile.write('radial_growth_rule=' + str(radial_growth_rule) + '\n')
 
     # cell parameters

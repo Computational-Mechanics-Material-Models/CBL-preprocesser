@@ -20,7 +20,7 @@ def inputParams(form):
 
 
     # Cell Growth Parameters ------------------------
-    radial_growth_rule = form[0].radial_growth_rule.currentText() #'binary'  
+    radial_growth_rule = form[0].radial_growth_rule.currentText().lower().replace(' ','') #'binary'  
     species = form[0].species.currentText().lower().replace(' ','')  
     if species == 'norwayspruce':
         speciesShort = 'spruce'

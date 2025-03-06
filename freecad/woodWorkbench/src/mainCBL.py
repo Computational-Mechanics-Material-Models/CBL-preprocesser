@@ -125,7 +125,7 @@ def main(self):
     #     sites,radii = WoodMeshGen.CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,\
     #                         width_early,width_late,cellsize_early,cellsize_late,\
     #                         iter_max,print_interval)
-    if radial_growth_rule == 'Binary_Lloyd':
+    if radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
         sites, radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
