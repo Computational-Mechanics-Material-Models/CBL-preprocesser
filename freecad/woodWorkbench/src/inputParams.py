@@ -121,6 +121,7 @@ def inputParams(form):
 
     # Model Parameters ------------------------     
     boundaryFlag = form[2].boundaryFlag.currentText()
+    flowFLag = form[2].flowFLag.currentText()
     mergeFlag = form[2].merge_operation.currentText() 
     merge_tol = cellsize_early
 
@@ -164,7 +165,7 @@ def inputParams(form):
                 cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_size, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
-                      boundaryFlag, mergeFlag, stlFlag, inpFlag, inpType, visFlag, outDir)
+                      boundaryFlag,flowFLag, mergeFlag, stlFlag, inpFlag, inpType, visFlag, outDir)
 
     return geoName, radial_growth_rule, iter_max, \
         nrings, width_heart, width_early, width_late, generation_center, \
@@ -174,4 +175,4 @@ def inputParams(form):
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams, outDir
+        knotFlag, knotParams, outDir,flowFLag

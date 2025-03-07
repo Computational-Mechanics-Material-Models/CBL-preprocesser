@@ -255,65 +255,6 @@ def check_isinside(points,boundary_points):
     
     return path_in
 
-
-# def CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,
-#                          width_sparse,width_dense,cellsize_sparse,cellsize_dense,\
-#                          iter_max,print_interval):
-#     """
-#     packing cells by randomly placing new cells in the generation rings
-#     """
-    
-#     # generate radii for rings
-#     width = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
-#     noise = np.random.normal(1,0.25,len(width))
-#     width = np.multiply(width,noise)
-#     radii = np.concatenate(([0],np.cumsum(width)))
-    
-#     # Place circular cells in each ring (can be parallelized in the future)
-#     # circles: list = list()
-#     circles = []
-#     for ibin in range(0,nrings*2+1):
-#         iter = 0 
-#         while iter < iter_max:
-#             r = (radii[ibin+1]-radii[ibin])*math.sqrt(np.random.random()) + radii[ibin]  # randomly generate a point in the domain
-#             t = np.random.random()*2*math.pi 
-            
-#             x = r*math.cos(t) + generation_center[0]
-#             y = r*math.sin(t) + generation_center[1]
-    
-#             if (ibin % 2) == 0: # if even, dense cells
-#                 w = cellsize_dense/2
-#             else:
-#                 w = cellsize_sparse/2
-    
-#             circC = [x, y, w]
-            
-#             if check_overlap(circles, circC) and check_isinside_boundcircle(circC,generation_center,radii[ibin],radii[ibin+1]):
-#                 circles.append(circC)
-                
-#                 # regularly print 
-#                 if (len(circles) % print_interval == 0):
-#                     if (nrings*2+1-ibin == 1):
-#                         print('{:d} ring remaining; {:d} cells/particles placed.'.format(nrings*2+1-ibin,len(circles)))
-#                     else:
-#                         print('{:d} rings remaining; {:d} cells/particles placed.'.format(nrings*2+1-ibin,len(circles)))
-#             iter += 1 
-        
-#     sites = np.array(circles)
-
-#     # out-of-boundary detection for Voronoi vertices
-#     outofbound = []
-#     for i in range(0,sites.shape[0]):
-#         if( ((sites[i,0]-generation_center[0])**2+(sites[i,1]-generation_center[1])**2) > (1.2*r_max)**2 ):
-#             outofbound.append(i)
-#     sites = np.delete(sites,outofbound,0)
-
-#     sites = sites[:,0:2]
-#     print(np.shape(sites),np.shape(radii))
-
-#     return sites, radii
-
-
 def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
                                cellsize_sparse,cellsize_dense,iter_max,\
                                mergeFlag,boundary_points,omega):
@@ -458,45 +399,6 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
 
     return old_sites, radii, new_sites
 
-
-# def CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,box_center,box_size,\
-#                             width_heart,width_sparse,width_dense,\
-#                             cellsize_sparse,cellsize_dense,\
-#                             cellwallthickness_sparse,cellwallthickness_dense,\
-#                             iter_max,print_interval):
-#     """
-#     packing cells in hexagonal grids
-#     """
-    
-#     # generate radii for rings
-#     width = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
-#     noise = np.random.normal(1,0.25,len(width))
-#     width = np.multiply(width,noise)
-#     radii = np.concatenate(([0],np.cumsum(width)))
-    
-#     cellangle = 0.0
-#     cellsize = (cellsize_sparse+cellsize_dense)/2
-#     nx = int(2*r_max/cellsize)
-#     ny = int(2*r_max/cellsize)
-#     # The hexagonal lattice sites are generated via hexalattice: https://pypi.org/project/hexalattice/
-#     hex_centers, _ = create_hex_grid(nx=nx, # type: ignore
-#                                      ny=ny,
-#                                      min_diam=cellsize,
-#                                      rotate_deg=cellangle,
-#                                      do_plot=False)
-#     sites = np.hstack((hex_centers+generation_center,np.ones([hex_centers.shape[0],1])))
-#     sites = np.asarray(sites)
-
-#     # out-of-boundary detection for Voronoi vertices
-#     outofbound = []
-#     for i in range(0,sites.shape[0]):
-#         if( ((sites[i,0]-generation_center[0])**2+(sites[i,1]-generation_center[1])**2) > (1.2*r_max)**2 ):
-#             outofbound.append(i)
-#     sites = np.delete(sites,outofbound,0)
-
-#     return sites, radii
-
-
 def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     """
     place single cell for debug
@@ -508,7 +410,7 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     radii = np.concatenate(([0],np.cumsum(radii)))
 
     # generate point at center    
-    # sites = np.array([[0,0.015],[-0.015,-0.015],[0.015,-0.015]])
+    # sites = np.array([[.012,0.0125],[-0.0125,-0.012],[0.012,-0.012],[-0.0125,0.0125]])
     # sites = np.array([[-0.01,0.01],[0.01,-0.01]])
     sites = np.array([[0.001,0.015],[0.001,-0.01],[0.011,0.001],[-0.013,-0.001]])
     # sites = np.array([[0.1,0.1]])
@@ -566,15 +468,14 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     There are 2*nsegments+1 number of node layers.
     '''
     #***************************************************************************
-    delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
+    delaunay_pts = np.array(conforming_delaunay_old['vertices']) # flow point coords
     npts = len(delaunay_pts)
 
     # different package to calculate voronoi region info because it produces output in different form
     # however input sites are non-centroidal for new method *!!!
 
-    # checked and within tolerance of each other -SA
-    vorsci = Voronoi(conforming_delaunay['vertices']) # location of vor sites
-    vortri = tr.voronoi(conforming_delaunay.get('vertices'))
+    vorsci = Voronoi(conforming_delaunay_old['vertices']) # location of vor sites
+    vortri = tr.voronoi(conforming_delaunay_old['vertices'])
 
     vortri_rayinds = vortri[2]
     vortri_vertices = vortri[0]
@@ -587,8 +488,8 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     nels_long = npts*(nsegments+1)
     nels_trans = nrdgs*nsegments
     nels = nels_long + nels_trans
-    delaun_elems_long = np.zeros((nels_long,7)) 
-    delaun_elems_trans = np.zeros((nels_trans,7)) # empty arrays for flow info
+    delaun_elems_long = np.zeros((nels_long,20)) 
+    delaun_elems_trans = np.zeros((nels_trans,20)) # empty arrays for flow info
     # n1, n2, l1, l2, area, volume, element type, v1, v2 ... vn
 
     segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
@@ -610,7 +511,6 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     delaun_num[:,0] = np.linspace(0,nnodes-1,nnodes,dtype='int64')
     delaun_verts_layers = np.tile(delaunay_pts,(nlayers,1)) # tile node xy coords for each layer
     delaun_nodes = np.concatenate((delaun_num,delaun_verts_layers,coordsz),axis=1)
-
 
     # longitudinal elements
     for l in range(0,nsegments+1):
@@ -692,7 +592,8 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
 
             # calculate the flux area of voronoi region of arbitrary shape by the shoelace formula
             coords_sort = sort_coordinates(coords)
-            flow_area = 0.5*np.abs(np.dot(coords_sort[:,0],np.roll(coords_sort[:,1],1))-np.dot(coords_sort[:,1],np.roll(coords_sort[:,0],1))) 
+            pgon = shp.Polygon(coords_sort)
+            flow_area = pgon.area
             el_vol = el_len*flow_area/3 # element volume
             if el_vol != 0:
                 delaun_elems_long[nel_l,0:2] = nd # element connectivity
@@ -701,6 +602,8 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
                 delaun_elems_long[nel_l,4] = flow_area
                 delaun_elems_long[nel_l,5] =  el_vol
                 delaun_elems_long[nel_l,6] = typeFlag
+                delaun_elems_long[nel_l,7:7+len(pv)] = [v for v in pv] # voronoi indices of related region
+                
 
     # transverse elements
     for l in range(0,nsegments): # each segment
@@ -739,6 +642,8 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
                 delaun_elems_trans[nel_t,4] = flow_area 
                 delaun_elems_trans[nel_t,5] = el_vol
                 delaun_elems_trans[nel_t,6] = typeFlag # element type
+                delaun_elems_trans[nel_t,7] = pv[0] # voronoi indices of related ridge
+                delaun_elems_trans[nel_t,8] = pv[1] #
 
             # delaun_elems_trans[nel_t,7:9] = pv # mark relevant 2D voronoi ridge for possible reference
     
@@ -748,12 +653,16 @@ def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_r
     delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
     nels = np.shape(delaun_elems)[0]
 
+    total_vol = sum(delaun_elems[:,5])
+    print('total flow volume','{:.2e}'.format(total_vol))
+
     # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.npy'), delaun_nodes)
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
         ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
     
     # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.npy'), delaun_elems)
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = ['%d','%d','%0.8f','%0.8f','%0.8f','%0.8f','%d']\
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = \
+               ['%d','%d','%0.8f','%0.8f','%0.8f','%0.8f','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d']\
         ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l1 l2 A V type v1 v2 ... vn]')
     
     return delaun_nodes, delaun_elems
@@ -839,6 +748,17 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
         normal = ray_directions[i,:]/np.linalg.norm(ray_directions[i,:]) # normal                 
         intpt = find_intersect(p,normal,boundaries)
         if intpt.any(): # if an intersection is found (should be the case but some bugs rn)
+            # if mergeFlag == 'On': # if the merge operation is selected 
+            #     dist = np.sum((p - intpt)**2,axis=1) # distance between ray origin and boundary
+            #     if dist < merge_tol: # if the origin is too close to the boundary
+            #         n += 1
+            #         voronoi_vertices_in[ray_origins[i]] = intpt # replace it with the boundary
+            #         # this keeps the total number of voronoi points the same for connectivity
+            #         boundary_points.append(intpt) # also add to array for boundary ridges
+            #         # basically stretching cell to boundary
+            #     else: # add intersection point to boundary
+            #         boundary_points.append(intpt)
+            # else:
             boundary_points.append(intpt)
             # plt.quiver(p[0,0],p[0,1],normal[0],normal[1],color='b')
         else:

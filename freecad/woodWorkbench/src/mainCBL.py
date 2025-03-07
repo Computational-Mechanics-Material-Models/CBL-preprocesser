@@ -65,7 +65,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
         stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams, outDir]\
+        knotFlag, knotParams, outDir,flowFlag]\
             = inputParams(self.form)
     
     
@@ -186,8 +186,7 @@ def main(self):
     tri_inp = {'vertices': delaunay_vertices_old,'segments':boundary_segments,'regions':boundary_region}
     conforming_delaunay_old = tr.triangulate(tri_inp, 'peAq0D') 
     
-    flow = False
-    if flow == True:
+    if flowFlag in ['on','On','Y','y','Yes','yes']:
         # ---------------------------------------------
         # # Build flow mesh
         flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max, \
@@ -202,8 +201,6 @@ def main(self):
     # # Build mechanical mesh 
     vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay_old.get('vertices'))
 
-    voronoiTime = time.time() 
-    # print('Original Voronoi tessellation generated in {:.3f} seconds'.format(voronoiTime - placementTime))
 
     # ==================================================================
     self.form[3].progressBar.setValue(40) 
@@ -236,19 +233,24 @@ def main(self):
         ax.plot(
             [x0, x1],
             [y0, y1],'k-',linewidth=0.25,markersize=0.15)    
+    # for x,y in zip(voronoi_vertices[:,0], voronoi_vertices[:,1]):   
+    #     ax.annotate('({:.2e}, \n{:.2e})'.format(x,y),(x,y),size=3,color='k')
 
     # Flow
     # vertsD = np.array(conforming_delaunay['vertices'])
     # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
-    # for el in flow_elems:
-    #     beg = int(el[0])
-    #     end = int(el[1])
-    #     x0,y0 = flow_nodes[beg,1:3]
-    #     x1,y1 = flow_nodes[end,1:3]
-    #     ax.plot(
-    #         [x0, x1],
-    #         [y0, y1],'ro-',linewidth=0.15,markersize=0.1)
+    for el in flow_elems:
+        beg = int(el[0])
+        end = int(el[1])
+        x0,y0 = flow_nodes[beg,1:3]
+        x1,y1 = flow_nodes[end,1:3]
+        ax.plot(
+            [x0, x1],
+            [y0, y1],'r-',linewidth=0.15)
     # ax.plot(flow_nodes[:,1],flow_nodes[:,2],'r^',markersize=0.1)
+    # for x,y in zip(flow_nodes[:,1], flow_nodes[:,2]):   
+    #     ax.annotate('({:.2e}, \n{:.2e})'.format(x,y),(x,y),size=5,color='r')
+
 
     # plt.show()
     plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
