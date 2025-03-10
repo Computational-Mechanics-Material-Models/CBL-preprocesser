@@ -254,7 +254,6 @@ def main(self):
 
     # plt.show()
     plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
-    plt.close()
 
     if randomFlag in ['on','On','Y','y','Yes','yes']:
         # ==================================================================
@@ -331,11 +330,14 @@ def main(self):
         [precrack_elem,nconnector_t_precrack,nconnector_l_precrack] = \
             WoodMeshGen.InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
                                     cellsize_early,nsegments)
+        plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
+        plt.close()
     else:
         precrack_nodes = []
         precrack_elem = []
         nconnector_t_precrack = 0
         nconnector_l_precrack = 0
+        plt.close()
 
     # ==================================================================
     self.form[3].progressBar.setValue(70) 
