@@ -70,17 +70,17 @@ def inputParams(form):
         box_depth = box_size
     elif box_shape == 'rectangle':
         box_height = float(form[1].box_height.text() or 0.5) # specimen length
-        box_width = float(form[1].box_width.text() or 0.5) # side length
-        box_depth = float(form[1].box_depth.text() or 0.5) # side length
+        box_width = float(form[1].box_width.text() or 0.5) # x side length
+        box_depth = float(form[1].box_depth.text() or 0.5) # y side length
         box_size = max(box_depth, box_width, box_depth)
     elif box_shape == 'notchedsquare':
         box_height = float(form[1].notch_height.text() or 0.5) # specimen length
-        box_width = float(form[1].notch_width.text() or 0.5) # side length
-        box_depth = float(form[1].notch_depth.text() or 0.5) # side length
+        box_width = float(form[1].notch_width.text() or 0.5) # x side length
+        box_depth = float(form[1].notch_depth.text() or 0.5) # y side length
         box_size = max(box_depth, box_width, box_depth)
         # notch and precrack are always centered on leftmost edge
-        x_notch_size = float(form[1].x_indent_size.text() or box_size*0.1) # depth of notch
-        y_notch_size = float(form[1].y_indent_size.text() or box_size*0.1) # width of notch
+        x_notch_size = float(form[1].x_indent_size.text() or box_width*0.1) # depth of notch
+        y_notch_size = float(form[1].y_indent_size.text() or box_depth*0.1) # width of notch
     else:
         form[1].stackedWidget.setCurrentIndex(3)
         print('geometry not recognized')

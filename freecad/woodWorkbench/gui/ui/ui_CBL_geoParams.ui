@@ -321,7 +321,7 @@
                 <string/>
                </property>
                <property name="placeholderText">
-                <string>0</string>
+                <string>0.1xW</string>
                </property>
               </widget>
              </item>
@@ -354,7 +354,7 @@
                 <string/>
                </property>
                <property name="placeholderText">
-                <string>0</string>
+                <string>0.1xD</string>
                </property>
               </widget>
              </item>
