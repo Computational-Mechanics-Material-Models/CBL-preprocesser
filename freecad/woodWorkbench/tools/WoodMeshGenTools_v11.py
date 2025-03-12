@@ -1456,7 +1456,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     if randomFlag in ['on','On','Y','y','Yes','yes']:
         random_field.generateRandVariables(nrf, seed = 8) # generation of random numbers, critical step
         random_field.generateFieldOnGrid()                  # calculation of preparation files, can be used for any geometry
-        
+        rf_array = np.empty((nel_con_l,3,1))
     # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
     # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag short_flag]   
     Meshdata = np.zeros((nel_con,28))
@@ -1501,11 +1501,11 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         # inefficient to loop, need to make one operation! -SA
         if randomFlag in ['on','On','Y','y','Yes','yes']:
             rf_ind = np.where((voronoi_vertices_2D==Meshdata[i+offset,0:2]).all(axis=1))[0]
-            rf_array = random_field.getFieldEOLE(np.array([[Meshdata[i+offset,2],0,0]]),rf_ind)
+            rf_array[i,:,0] = random_field.getFieldEOLE(np.array([[Meshdata[i+offset,2],0,0]]),rf_ind)
         else:
             Meshdata[i+offset,23] = 1
     if randomFlag in ['on','On','Y','y','Yes','yes'] and nsegments > 1:
-        Meshdata[offset:,23] =  rf_array[:,:,0] # EOLE projection with z value
+        Meshdata[offset:,23] =  rf_array[:,0,0] # EOLE projection with z value
     psi_values = calc_knotstream(Meshdata[:,1]-box_center[1],Meshdata[:,2],m1,m2,a1,a2,Uinf) # check if in knot 
     inds = np.where(np.abs(psi_values) < ktol)
     Meshdata[inds,25] = 1
