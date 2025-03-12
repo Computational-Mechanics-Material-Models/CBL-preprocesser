@@ -275,7 +275,6 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     t = np.linspace(0, 2*np.pi, npoint, endpoint=False)
     x = radii[1] * np.cos(t)
     y = radii[1] * np.sin(t)
-    w = cellsize_dense*np.ones(x.shape)
     PerimeterPoints.append(np.c_[x, y])
     PerimeterPointsSites = np.concatenate(PerimeterPoints, axis=0)
     
@@ -302,11 +301,13 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         OuterPerimeter_radii = radii[i+1]
         
         if (i % 2) == 0: # if even, dense cells
-            cellsize = cellsize_dense/2
+            cellradius = cellsize_dense/2
+            aspect = 1
         else:
-            cellsize = cellsize_sparse/2
+            cellradius = cellsize_sparse/2
+            aspect = 1
 
-        OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellsize)))
+        OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellradius)))
         
         t = np.linspace(0, 2*np.pi, OuterPerimeter_npoint, endpoint=False)
         x = OuterPerimeter_radii * np.cos(t)
@@ -315,10 +316,10 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         OuterPerimeterPointsSites = np.concatenate(OuterPerimeterPoints, axis=0)
         
         # generate internal points
-        nsubrings = int(0.5*np.ceil((radii[i+1]-radii[i])/cellsize))
-        subradii = np.linspace(radii[i], radii[i+1], nsubrings, endpoint=False)
+        nsubrings = int(0.5*np.ceil((radii[i+1]-radii[i])/cellradius))
+        subradii = np.linspace(radii[i], radii[i+1], int(aspect*nsubrings), endpoint=False)
         
-        subnpoints = np.ceil(2*np.pi*subradii/(2*cellsize)).astype(int)
+        subnpoints = np.ceil(2*np.pi*subradii/(2*cellradius)).astype(int)
         # take minimum number of points for all subradii
         subpoints = int(np.min(subnpoints))
         
@@ -343,10 +344,10 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         inside_cells = np.concatenate(circles, axis=0)
         
         # old way with xy randomness
-        # noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellsize
+        # noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellradius
         # inside_cells = inside_cells # + 1*noise #.25
         # testing radial relaxation only
-        noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellsize*2
+        noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellradius*2
         noise = np.squeeze(noise)
         r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
         theta = np.arctan2(inside_cells[:,1],inside_cells[:,0])
@@ -358,16 +359,22 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         existing_sites = np.vstack((sites,existing_sites))
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     
-    sites_bound = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path to minimize time on relaxation etc
-    existing_sites = existing_sites[sites_bound]
+    
+    
+    boundary = shp.Polygon(boundary_points)
+    boundary = boundary.buffer(1e-1)
+    shp_sites = shp.points(existing_sites)
+    existing_sites =  [shp.get_coordinates(s) for s in shp_sites if shp.within(s,boundary)]
+    existing_sites =  np.squeeze(existing_sites)
 
     lloyd_iter = 0
     while lloyd_iter < iter_max:
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
         # added check for boundaries again to patch bug -SA
-        sites_bound = check_isinside(existing_sites,boundary_points)
-        existing_sites = existing_sites[sites_bound]
+        shp_sites = shp.points(existing_sites)
+        existing_sites =  [shp.get_coordinates(s) for s in shp_sites if shp.within(s,boundary)]
+        existing_sites =  np.squeeze(existing_sites)
         lloyd_iter += 1
     
     # check if sites are too close the the boundary 
