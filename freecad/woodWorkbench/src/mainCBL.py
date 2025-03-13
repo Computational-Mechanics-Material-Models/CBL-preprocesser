@@ -165,7 +165,7 @@ def main(self):
 
     # ==================================================================
     self.form[3].progressBar.setValue(30) 
-    self.form[3].statusWindow.setText("Status: Defining Boundaries.") 
+    self.form[3].statusWindow.setText("Status: Generating Flow Mesh.") 
     # ==================================================================
 
     num_bound = np.shape(boundary_points_original)[0]  # create boundary segements to enforce boundaries 
@@ -204,7 +204,7 @@ def main(self):
 
     # ==================================================================
     self.form[3].progressBar.setValue(40) 
-    self.form[3].statusWindow.setText("Status: Clipping Mesh.") 
+    self.form[3].statusWindow.setText("Status: Building 2D Mesh.") 
     # ==================================================================
     # Rebuild the Voronoi mesh
 
@@ -271,10 +271,9 @@ def main(self):
                          x_range=[z_min,z_max], sampling_type = RF_sampling_type, periodic = True, filesavetype="binary",sparse=True)
     else:
         random_field = []
-
     # ==================================================================
     self.form[3].progressBar.setValue(50) 
-    self.form[3].statusWindow.setText("Status: Writing Vertices.") 
+    self.form[3].statusWindow.setText("Status: Building 3D Mesh.") 
     # ================================================================== 
     [voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D,voronoi_vertices_2D] = \
@@ -299,7 +298,7 @@ def main(self):
 
     # ==================================================================
     self.form[3].progressBar.setValue(60) 
-    self.form[3].statusWindow.setText("Status: Extruding Cells.") 
+    self.form[3].statusWindow.setText("Status: Generating Beams.") 
     # ==================================================================
     # Extrude in the parallel-to-grain (longitudinal) direction
     
