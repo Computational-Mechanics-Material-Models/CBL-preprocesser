@@ -1511,60 +1511,60 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # print(conn_l_tangents)
 
 
-    # add radial ray flag ---------------------------------------------------------------
-    # Meshdata[  :,26] = 0 same as precrack for now
-    radii_rays = radii[2:]
-    zstart = np.arange(0,z_max,segment_length/2)
-    ds = 0.02
-    nthetas = np.array(radii_rays/ds,dtype='int')
-    zmatrix = np.empty(len(radii_rays))
-    # get an array of rays and corresponding height for each ring, with randomness
-    rands =  [np.random.random((th,1)) - 0.5 for th in nthetas]
-    zmatrix = [(np.tile(zstart,(th,1)) + rands[r]) for r, th in enumerate(nthetas)]
-    thmatrix = [np.linspace(np.random.random()*(np.pi/16),2*np.pi,th) for th in nthetas]
-    # zvec_picked = [(zstart + np.random.random() - 0.5) for th in nthetas]
-    # if close to a theta and z value picked by radii index
+    # # add radial ray flag ---------------------------------------------------------------
+    # # Meshdata[  :,26] = 0 same as precrack for now
+    # radii_rays = radii[2:]
+    # zstart = np.arange(0,z_max,segment_length/2)
+    # ds = 0.02
+    # nthetas = np.array(radii_rays/ds,dtype='int')
+    # zmatrix = np.empty(len(radii_rays))
+    # # get an array of rays and corresponding height for each ring, with randomness
+    # rands =  [np.random.random((th,1)) - 0.5 for th in nthetas]
+    # zmatrix = [(np.tile(zstart,(th,1)) + rands[r]) for r, th in enumerate(nthetas)]
+    # thmatrix = [np.linspace(np.random.random()*(np.pi/16),2*np.pi,th) for th in nthetas]
+    # # zvec_picked = [(zstart + np.random.random() - 0.5) for th in nthetas]
+    # # if close to a theta and z value picked by radii index
 
-    # segment_length
-    widthvals = Meshdata[0:offset,21]
-    latewidth = max(widthvals)
-    rvecs = Meshdata[0:offset,0:2]
-    dvecs = Meshdata[0:offset,3:5] - Meshdata[0:offset,0:2]
-    rvals = np.linalg.norm(rvecs,axis=1)
-    zvals = Meshdata[0:offset,2]
-    thetas = np.acos(np.divide(rvecs[:,0],rvals)) # assume evec = <1,0> to take angle from x axis
-    psis = np.acos(np.divide(np.sum(rvecs*dvecs,axis=1),np.multiply(rvals,np.linalg.norm(dvecs,axis=1))))
+    # # segment_length
+    # widthvals = Meshdata[0:offset,21]
+    # latewidth = max(widthvals)
+    # rvecs = Meshdata[0:offset,0:2]
+    # dvecs = Meshdata[0:offset,3:5] - Meshdata[0:offset,0:2]
+    # rvals = np.linalg.norm(rvecs,axis=1)
+    # zvals = Meshdata[0:offset,2]
+    # thetas = np.acos(np.divide(rvecs[:,0],rvals)) # assume evec = <1,0> to take angle from x axis
+    # psis = np.acos(np.divide(np.sum(rvecs*dvecs,axis=1),np.multiply(rvals,np.linalg.norm(dvecs,axis=1))))
 
-    total_info = np.column_stack((rvals,zvals,thetas,psis,widthvals))
+    # total_info = np.column_stack((rvals,zvals,thetas,psis,widthvals))
 
-    check = False
-    for i in range(0,len(rvals)):
-        r,z,theta,psi,width = total_info[i,:]
-        if width == latewidth:
-            thtol = 2e-3
-        else:
-            thtol = 4e-3
-        r_idx = np.abs((radii_rays - r)).argmin()
-        thetavec = thmatrix[r_idx]
-        # if close to one of the thetas
-        th_idx = np.isclose(theta,thetavec,atol=thtol)
-        if th_idx.any(): #
-            zvec = zmatrix[r_idx][th_idx] # for whichever thetas its close to
-            z_idx = np.isclose(z,zvec,atol=1e-1) # check if its close to the corresponding z value
-            if z_idx.any(): # then if its in a marked location
-                # tan or rad direction
-                if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
-                    Meshdata[i,26] = 1 # tangential 
-                    check = True
-                else:
-                    Meshdata[i,26] = 2 # radial
-                    check = True
-    print('radial rays', check)
-    # print(np.shape(rvals),np.shape(zvals),np.shape(psis),np.shape(thetas))
-    # print(total_info)
-    # plt.figure()
-    # plt.hist(rvals,bins=100)
-    # plt.show()
+    # check = False
+    # for i in range(0,len(rvals)):
+    #     r,z,theta,psi,width = total_info[i,:]
+    #     if width == latewidth:
+    #         thtol = 2e-3
+    #     else:
+    #         thtol = 4e-3
+    #     r_idx = np.abs((radii_rays - r)).argmin()
+    #     thetavec = thmatrix[r_idx]
+    #     # if close to one of the thetas
+    #     th_idx = np.isclose(theta,thetavec,atol=thtol)
+    #     if th_idx.any(): #
+    #         zvec = zmatrix[r_idx][th_idx] # for whichever thetas its close to
+    #         z_idx = np.isclose(z,zvec,atol=1e-1) # check if its close to the corresponding z value
+    #         if z_idx.any(): # then if its in a marked location
+    #             # tan or rad direction
+    #             if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
+    #                 Meshdata[i,26] = 1 # tangential 
+    #                 check = True
+    #             else:
+    #                 Meshdata[i,26] = 2 # radial
+    #                 check = True
+    # print('radial rays', check)
+    # # print(np.shape(rvals),np.shape(zvals),np.shape(psis),np.shape(thetas))
+    # # print(total_info)
+    # # plt.figure()
+    # # plt.hist(rvals,bins=100)
+    # # plt.show()
 
 
     # Replace nodal coordinates with nodal indices
