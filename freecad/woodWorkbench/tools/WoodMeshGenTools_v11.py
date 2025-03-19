@@ -810,7 +810,7 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     
     return voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertices,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,voronoi_ridges,nridge,infinite_ridges_new
+        nboundary_pts,voronoi_ridges,nridge
 
 
 def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
@@ -916,7 +916,7 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     
     
     return voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
-           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D, voronoi_vertices_2D
+           nconnector_t_per_grain,theta,z_coord,npt_per_layer,finite_ridges_3D,boundary_ridges_3D, voronoi_vertices_2D
 
 
 def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
@@ -1115,7 +1115,7 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
 
 
 def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
-                       nridge,geoName,radii,generation_center,\
+                       geoName,radii,generation_center,\
                        cellwallthickness_sparse,cellwallthickness_dense):
     
     """Generate the vertex and ridge info 
@@ -1249,7 +1249,6 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
     
     IGAvertices = np.copy(voronoi_vertices_3D)
     # Connectivity for IGA Control Points (Vertices)
-    npt_total = nvertices_3D
     
     # Beams
     ngrain = nvertex
@@ -1367,7 +1366,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
-                      nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
+                      nctrlpt_per_beam,theta,nridge,\
                       randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthick,radii,z_max):
     # pr = cProfile.Profile()
     # pr.enable()
@@ -1511,60 +1510,60 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # print(conn_l_tangents)
 
 
-    # # add radial ray flag ---------------------------------------------------------------
-    # # Meshdata[  :,26] = 0 same as precrack for now
-    # radii_rays = radii[2:]
-    # zstart = np.arange(0,z_max,segment_length/2)
-    # ds = 0.02
-    # nthetas = np.array(radii_rays/ds,dtype='int')
-    # zmatrix = np.empty(len(radii_rays))
-    # # get an array of rays and corresponding height for each ring, with randomness
-    # rands =  [np.random.random((th,1)) - 0.5 for th in nthetas]
-    # zmatrix = [(np.tile(zstart,(th,1)) + rands[r]) for r, th in enumerate(nthetas)]
-    # thmatrix = [np.linspace(np.random.random()*(np.pi/16),2*np.pi,th) for th in nthetas]
-    # # zvec_picked = [(zstart + np.random.random() - 0.5) for th in nthetas]
-    # # if close to a theta and z value picked by radii index
+    # add radial ray flag ---------------------------------------------------------------
+    # Meshdata[  :,26] = 0 same as precrack for now
+    radii_rays = radii[2:]
+    zstart = np.arange(0,z_max,segment_length/2)
+    ds = 0.02
+    nthetas = np.array(radii_rays/ds,dtype='int')
+    zmatrix = np.empty(len(radii_rays))
+    # get an array of rays and corresponding height for each ring, with randomness
+    rands =  [np.random.random((th,1)) - 0.5 for th in nthetas]
+    zmatrix = [(np.tile(zstart,(th,1)) + rands[r]) for r, th in enumerate(nthetas)]
+    thmatrix = [np.linspace(np.random.random()*(np.pi/16),2*np.pi,th) for th in nthetas]
+    # zvec_picked = [(zstart + np.random.random() - 0.5) for th in nthetas]
+    # if close to a theta and z value picked by radii index
 
-    # # segment_length
-    # widthvals = Meshdata[0:offset,21]
-    # latewidth = max(widthvals)
-    # rvecs = Meshdata[0:offset,0:2]
-    # dvecs = Meshdata[0:offset,3:5] - Meshdata[0:offset,0:2]
-    # rvals = np.linalg.norm(rvecs,axis=1)
-    # zvals = Meshdata[0:offset,2]
-    # thetas = np.acos(np.divide(rvecs[:,0],rvals)) # assume evec = <1,0> to take angle from x axis
-    # psis = np.acos(np.divide(np.sum(rvecs*dvecs,axis=1),np.multiply(rvals,np.linalg.norm(dvecs,axis=1))))
+    # segment_length
+    widthvals = Meshdata[0:offset,21]
+    latewidth = max(widthvals)
+    rvecs = Meshdata[0:offset,0:2]
+    dvecs = Meshdata[0:offset,3:5] - Meshdata[0:offset,0:2]
+    rvals = np.linalg.norm(rvecs,axis=1)
+    zvals = Meshdata[0:offset,2]
+    thetas = np.acos(np.divide(rvecs[:,0],rvals)) # assume evec = <1,0> to take angle from x axis
+    psis = np.acos(np.divide(np.sum(rvecs*dvecs,axis=1),np.multiply(rvals,np.linalg.norm(dvecs,axis=1))))
 
-    # total_info = np.column_stack((rvals,zvals,thetas,psis,widthvals))
+    total_info = np.column_stack((rvals,zvals,thetas,psis,widthvals))
 
-    # check = False
-    # for i in range(0,len(rvals)):
-    #     r,z,theta,psi,width = total_info[i,:]
-    #     if width == latewidth:
-    #         thtol = 2e-3
-    #     else:
-    #         thtol = 4e-3
-    #     r_idx = np.abs((radii_rays - r)).argmin()
-    #     thetavec = thmatrix[r_idx]
-    #     # if close to one of the thetas
-    #     th_idx = np.isclose(theta,thetavec,atol=thtol)
-    #     if th_idx.any(): #
-    #         zvec = zmatrix[r_idx][th_idx] # for whichever thetas its close to
-    #         z_idx = np.isclose(z,zvec,atol=1e-1) # check if its close to the corresponding z value
-    #         if z_idx.any(): # then if its in a marked location
-    #             # tan or rad direction
-    #             if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
-    #                 Meshdata[i,26] = 1 # tangential 
-    #                 check = True
-    #             else:
-    #                 Meshdata[i,26] = 2 # radial
-    #                 check = True
-    # print('radial rays', check)
-    # # print(np.shape(rvals),np.shape(zvals),np.shape(psis),np.shape(thetas))
-    # # print(total_info)
-    # # plt.figure()
-    # # plt.hist(rvals,bins=100)
-    # # plt.show()
+    check = False
+    for i in range(0,len(rvals)):
+        r,z,theta,psi,width = total_info[i,:]
+        if width == latewidth:
+            thtol = 2e-3
+        else:
+            thtol = 4e-3
+        r_idx = np.abs((radii_rays - r)).argmin()
+        thetavec = thmatrix[r_idx]
+        # if close to one of the thetas
+        th_idx = np.isclose(theta,thetavec,atol=thtol)
+        if th_idx.any(): #
+            zvec = zmatrix[r_idx][th_idx] # for whichever thetas its close to
+            z_idx = np.isclose(z,zvec,atol=1e-1) # check if its close to the corresponding z value
+            if z_idx.any(): # then if its in a marked location
+                # tan or rad direction
+                if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
+                    Meshdata[i,26] = 1 # tangential 
+                    check = True
+                else:
+                    Meshdata[i,26] = 2 # radial
+                    check = True
+    print('radial rays', check)
+    # print(np.shape(rvals),np.shape(zvals),np.shape(psis),np.shape(thetas))
+    # print(total_info)
+    # plt.figure()
+    # plt.hist(rvals,bins=100)
+    # plt.show()
 
 
     # Replace nodal coordinates with nodal indices
@@ -1593,7 +1592,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # p = pstats.Stats(loc)
     # p.strip_dirs().sort_stats('cumulative').print_stats(10)
 
-    return Meshdata,conn_l_tangents,height_connector_t, nel_con_tbot
+    return Meshdata,conn_l_tangents,height_connector_t
 
 
 def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D,\

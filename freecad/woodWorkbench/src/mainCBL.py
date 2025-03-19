@@ -190,7 +190,7 @@ def main(self):
 
     [voronoi_vertices,boundary_points,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
-        nboundary_pts,voronoi_ridges,nridge,infinite_ridges_new] = \
+        nboundary_pts,voronoi_ridges,nridge] = \
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
                                                         boundaries,boundaryFlag,boundary_points_original)
 
@@ -256,7 +256,7 @@ def main(self):
     self.form[3].statusWindow.setText("Status: Building 3D Mesh.") 
     # ================================================================== 
     [voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
-           nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D,voronoi_vertices_2D] = \
+           nconnector_t_per_grain,theta,z_coord,npt_per_layer,finite_ridges_3D,boundary_ridges_3D,voronoi_vertices_2D] = \
     WoodMeshGen.LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,boundary_ridges_new,nfinite_ridge,nboundary_ridge,\
                    z_min,z_max,long_connector_ratio,voronoi_vertices,nvertex,generation_center,knotFlag, knotParams, box_center,box_depth)
     
@@ -272,7 +272,7 @@ def main(self):
     # Generate a file for vertices and ridges info
     [all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges,vert_area] = \
         WoodMeshGen.VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
-                        nridge,geoName,radii,generation_center,\
+                        geoName,radii,generation_center,\
                         cellwallthickness_early,cellwallthickness_late)
     
 
@@ -330,15 +330,15 @@ def main(self):
     #                 connector_t_reg_connectivity,connector_t_top_connectivity,\
     #                 connector_l_connectivity,all_vertices_2D,\
     #                 max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
-    #                 nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
+    #                 nctrlpt_per_beam,theta,nridge,\
     #                 randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem)
     # lp.print_stats()
-    [ConnMeshData,conn_l_tangents,height_connector_t,nel_con_tbot] = \
+    [ConnMeshData,conn_l_tangents,height_connector_t] = \
         WoodMeshGen.ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                     connector_t_reg_connectivity,connector_t_top_connectivity,\
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
-                    nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
+                    nctrlpt_per_beam,theta,nridge,\
                     randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early,radii,z_max)
 
     # ---------------------------------------------
