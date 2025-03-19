@@ -116,26 +116,31 @@ def main(self):
     x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
         WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
     
-    # stopped supporting other growth rules for now
-    # [sites,radii] = genSites(self.form)
     if radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
-        sites, radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
+        sites_vor, radii, sites_centroid = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
                                                     mergeFlag,boundary_points_original,omega=1)
+        
     elif radial_growth_rule == 'debug':
         # ---------------------------------------------
         # debug run
-        sites,radii = WoodMeshGen.CellPlacement_Debug(nrings,width_heart,width_early,width_late)     
-        new_sites = sites
-        
-    else:
-        print('Growth rule: {:s} is not supported for the current version, please check the README for more details.'.format(radial_growth_rule))
+        sites_vor,radii = WoodMeshGen.CellPlacement_Debug(nrings,width_heart,width_early,width_late)  
+        vor = Voronoi(sites_vor)   
+        sites_centroid = WoodMeshGen.relax_points(vor,1)
 
-    sites_centroid = new_sites
-    sites_vor = sites
-    nParticles = len(sites)
+    elif radial_growth_rule == 'readsites':
+        # ---------------------------------------------
+        # read in from file
+        oldgeoName = self.form[0].geoName.text()
+        sites_vor = np.load(Path(outDir + '/' + oldgeoName + '/' + oldgeoName + '_sites.npy'))
+        radii = np.load(Path(outDir + '/' + oldgeoName + '/' + oldgeoName + '_radii.npy'))
+        vor = Voronoi(sites_vor)   
+        sites_centroid = WoodMeshGen.relax_points(vor,1)
+
+
+    nParticles = len(sites_vor)
     print(int(nParticles), 'cells placed')
 
     # ==================================================================
@@ -396,10 +401,10 @@ def main(self):
                     nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,mergeFlag,merge_tol,\
                     precrackFlag,precrack_elem)
         WoodMeshGen.ChronoMesh(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
-        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites_vor)
         np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
     else:
-        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites_vor)
         np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
         print('Generated cells and rings info has been saved.')
 

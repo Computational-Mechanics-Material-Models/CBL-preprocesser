@@ -212,6 +212,47 @@ def check_isinside(points,boundary_points):
 
 
 
+def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size):
+    """
+    clipping box for the delauney points (generated cell points)
+    TBD: adjust to general shape using polygon or similar
+    """
+
+    if box_shape == "cube": # cube box
+        x_min = box_center[0] - box_size/2
+        x_max = box_center[0] + box_size/2 
+        y_min = box_center[1] - box_size/2
+        y_max = box_center[1] + box_size/2
+        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+        
+    elif box_shape =="rectangle": # rectangular box
+        x_min = box_center[0] - box_width/2
+        x_max = box_center[0] + box_width/2 
+        y_min = box_center[1] - box_depth/2
+        y_max = box_center[1] + box_depth/2
+        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
+
+    elif box_shape == "notchedsquare": # notched square box (can be rectangular)
+        x_min = box_center[0] - box_width/2
+        x_max = box_center[0] + box_width/2 
+        y_min = box_center[1] - box_depth/2
+        y_max = box_center[1] + box_depth/2
+        x_notch = x_min + x_notch_size
+        y_notch_min = box_center[1] - y_notch_size/2
+        y_notch_max = box_center[1] + y_notch_size/2
+        boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
+                            [x_notch,y_notch_min],[x_min,y_notch_min]])
+                   
+    else:
+        print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
+        # exit()
+
+    # Relies on boundary points to be defined in order (i.e. cannot only be clockwise for notch)
+    boundaries = np.concatenate((np.expand_dims(boundary_points,axis=1),np.roll(np.expand_dims(boundary_points,axis=1),-1,axis=0)),axis=1)
+        
+    return x_min,x_max,y_min,y_max,boundaries,boundary_points
+
+
 def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
                                cellsize_sparse,cellsize_dense,iter_max,\
                                mergeFlag,boundary_points,omega):
@@ -381,47 +422,6 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     # sites = np.array([[0.1,0.1]])
 
     return sites, radii
-
-
-def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size):
-    """
-    clipping box for the delauney points (generated cell points)
-    TBD: adjust to general shape using polygon or similar
-    """
-
-    if box_shape == "cube": # cube box
-        x_min = box_center[0] - box_size/2
-        x_max = box_center[0] + box_size/2 
-        y_min = box_center[1] - box_size/2
-        y_max = box_center[1] + box_size/2
-        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-        
-    elif box_shape =="rectangle": # rectangular box
-        x_min = box_center[0] - box_width/2
-        x_max = box_center[0] + box_width/2 
-        y_min = box_center[1] - box_depth/2
-        y_max = box_center[1] + box_depth/2
-        boundary_points = np.array([[x_min, y_min], [x_max, y_min], [x_max, y_max], [x_min, y_max]])
-
-    elif box_shape == "notchedsquare": # notched square box (can be rectangular)
-        x_min = box_center[0] - box_width/2
-        x_max = box_center[0] + box_width/2 
-        y_min = box_center[1] - box_depth/2
-        y_max = box_center[1] + box_depth/2
-        x_notch = x_min + x_notch_size
-        y_notch_min = box_center[1] - y_notch_size/2
-        y_notch_max = box_center[1] + y_notch_size/2
-        boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
-                            [x_notch,y_notch_min],[x_min,y_notch_min]])
-                   
-    else:
-        print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
-        # exit()
-
-    # Relies on boundary points to be defined in order (i.e. cannot only be clockwise for notch)
-    boundaries = np.concatenate((np.expand_dims(boundary_points,axis=1),np.roll(np.expand_dims(boundary_points,axis=1),-1,axis=0)),axis=1)
-        
-    return x_min,x_max,y_min,y_max,boundaries,boundary_points
 
 
 def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries,boundary_points_original,conforming_delaunay_old):
@@ -4235,50 +4235,6 @@ def ChronoMesh(geoName,woodIGAvertices,beam_connectivity,NURBS_degree,nctrlpt_pe
         igafile.write('{:d}, {:d}, {:d}, {:d}, {:d}\n'.format(beam_connectivity[2*i,0],beam_connectivity[2*i,1],beam_connectivity[2*i,2],beam_connectivity[2*i+1,1],beam_connectivity[2*i+1,2]))
     
     igafile.close()
-
-
-def ReadSavedSites(sites_path, radial_growth_rule):
-    """Search in the current directory and all directories above it 
-    for a file of a particular name.
-
-    Arguments:
-    ---------
-    sites_path :: pathlib obj, the path of saved file.
-    radial_growth_rule :: string, the filename to look for.
-
-    Returns
-    -------
-    pathlib.Path, the location of the first file found or
-    None, if none was found
-    """
-    
-    sitesfile = radial_growth_rule
-    radiifile = radial_growth_rule.strip().replace("_sites", '_radii')
-    root = Path(Path(sites_path).root)
-    
-    # add a timeout condtion
-    tCurrent = time.time()
-    timeout_limit = 10 # seconds
-
-    while sites_path != root:
-        
-        # free up CPU cycles during timeout check, see Anthony's answer in
-        # https://stackoverflow.com/questions/13293269/how-would-i-stop-a-while-loop-after-n-amount-of-time
-        time.sleep(0.25) # sleep for 250 milliseconds
-        
-        sites_attempt = sites_path / sitesfile
-        radii_attempt = sites_path / radiifile
-        if sites_attempt.exists() and radii_attempt.exists():
-            print('Sites info from file: {:s} has been loaded.'.format(str(sites_attempt)))
-            print('Radii info from file: {:s} has been loaded.'.format(str(radii_attempt)))
-            return np.load(sites_attempt), np.load(radii_attempt)
-        sites_path = sites_path.parent
-        
-        if time.time() >= tCurrent + timeout_limit:
-            print('Could not find file: {:s}, please check if the existing site file is under the same directory with the input script.'.format(radial_growth_rule))
-            print('Now exitting...')
-            exit()
-            return None
 
 
 def ModelInfo(boundary_points,height,net_area):

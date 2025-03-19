@@ -117,6 +117,11 @@
             <string>Debug</string>
            </property>
           </item>
+          <item>
+           <property name="text">
+            <string>Read Sites</string>
+           </property>
+          </item>
          </widget>
         </item>
        </layout>
@@ -638,7 +643,7 @@
      <x>0</x>
      <y>0</y>
      <width>326</width>
-     <height>26</height>
+     <height>21</height>
     </rect>
    </property>
   </widget>

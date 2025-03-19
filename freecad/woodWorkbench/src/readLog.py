@@ -122,7 +122,7 @@ def readLog(self):
         self.form[1].y_indent_size.setText(y_notch_size)
 
         self.form[1].precrackFlag.setCurrentText(precrackFlag)
-        self.form[1].x_precrack_size.setText(precrack_size)
+        self.form[1].precrack_size.setText(precrack_size)
 
         self.form[1].iter_max.setText(iter_max)
         self.form[1].theta_min.setText(theta_min)

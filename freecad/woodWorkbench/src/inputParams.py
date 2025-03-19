@@ -98,7 +98,7 @@ def inputParams(form):
     # at least 2 segments, with 3 per cell length
    
     precrackFlag = form[1].precrackFlag.currentText()
-    precrack_size = float(form[1].x_precrack_size.text() or 0.1) # depth of precrack
+    precrack_size = float(form[1].precrack_size.text() or 0.1) # depth of precrack
 
     iter_max = int(form[1].iter_max.text() or 2) # lloyd iterations 
     NURBS_degree = 2
@@ -121,7 +121,7 @@ def inputParams(form):
 
     # Model Parameters ------------------------     
     boundaryFlag = form[2].boundaryFlag.currentText()
-    flowFLag = form[2].flowFLag.currentText()
+    flowFlag = form[2].flowFlag.currentText()
     mergeFlag = form[2].merge_operation.currentText() 
     merge_tol = cellsize_early
 
@@ -145,9 +145,10 @@ def inputParams(form):
         merge_tol = 5e-5
         boundaryFlag = 'Off'
     
-    # Make output directory if does not exist
-    geoName = (form[0].geoName.text() or (speciesShort + str(box_size).replace('.','_') + 'mm_' + box_shape))
+    
+    # Make output directory
     outDir = form[3].outputDir.text()
+    geoName = (form[0].geoName.text() or (speciesShort + str(box_size).replace('.','_') + 'mm_' + box_shape))
     i = 1
     geoNamenew = geoName + str(i)
     while os.path.exists(Path(outDir + '/' + geoNamenew)):
@@ -163,7 +164,7 @@ def inputParams(form):
                 cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_size, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
-                      boundaryFlag,flowFLag, mergeFlag, inpType, visFlag, outDir)
+                      boundaryFlag,flowFlag, mergeFlag, inpType, visFlag, outDir)
 
     return geoName, radial_growth_rule, iter_max, \
         nrings, width_heart, width_early, width_late, generation_center, \
@@ -173,4 +174,4 @@ def inputParams(form):
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
         inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams, outDir,flowFLag
+        knotFlag, knotParams, outDir,flowFlag

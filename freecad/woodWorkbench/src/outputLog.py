@@ -67,8 +67,7 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
     logfile.write('y_notch_size=' + str(y_notch_size) + '\n')
 
     logfile.write('precrackFlag=' + str(precrackFlag) + '\n')
-    if precrackFlag in ['on','On','Y','y','Yes','yes']:
-        logfile.write('precrack_size=' + str(precrack_size) + '\n')
+    logfile.write('precrack_size=' + str(precrack_size) + '\n')
 
     logfile.write('iter_max=' + str(iter_max) + '\n')
     logfile.write('theta_min=' + str(theta_min) + '\n')

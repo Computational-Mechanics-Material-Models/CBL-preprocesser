@@ -61,7 +61,7 @@
     <item>
      <layout class="QHBoxLayout" name="horizontalLayout_5">
       <item>
-       <widget class="QComboBox" name="flowFLag">
+       <widget class="QComboBox" name="flowFlag">
         <property name="maximumSize">
          <size>
           <width>100</width>
