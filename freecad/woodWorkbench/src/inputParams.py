@@ -125,9 +125,7 @@ def inputParams(form):
     mergeFlag = form[2].merge_operation.currentText() 
     merge_tol = cellsize_early
 
-    stlFlag = 'Off'
-    inpFlag = form[2].inpFlag.currentText()
-    inpType = form[2].inpType.currentText()
+    inpType = (form[2].inpType.currentText()).lower()
     visFlag = form[2].visFlag.currentText()
 
     if radial_growth_rule == 'debug': # override
@@ -165,7 +163,7 @@ def inputParams(form):
                 cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_size, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
-                      boundaryFlag,flowFLag, mergeFlag, stlFlag, inpFlag, inpType, visFlag, outDir)
+                      boundaryFlag,flowFLag, mergeFlag, inpType, visFlag, outDir)
 
     return geoName, radial_growth_rule, iter_max, \
         nrings, width_heart, width_early, width_late, generation_center, \
@@ -174,5 +172,5 @@ def inputParams(form):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
+        inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams, outDir,flowFLag

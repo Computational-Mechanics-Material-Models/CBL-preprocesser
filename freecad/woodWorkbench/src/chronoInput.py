@@ -17,55 +17,6 @@ from pathlib import Path
 import FreeCAD as App
 from femtools import membertools
 
-def chronoAux(geoName,woodIGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec):
-
-    # Beam
-   
-    numnode = woodIGAvertices.shape[0]
-    nelem = beam_connectivity.shape[0]
-    nnode = beam_connectivity.shape[1]
-
-
-    # Generate a .inp file which can be directly imported and played in Abaqus
-    nodefile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoNodes.dat'),'w')
-    elementfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoElements.dat'),'w')
-
-    # nodes
-    for i in range(0,numnode):
-        nodefile.write('{:#.9e}, {:#.9e},  {:#.9e}\n'.format(woodIGAvertices[i,0],woodIGAvertices[i,1],woodIGAvertices[i,2]))
-
-    # beam element connectivity 
-    for i in range(0,nelem):
-        elementfile.write('{:d}, {:d},  {:d}\n'.format(beam_connectivity[i,0],beam_connectivity[i,1],beam_connectivity[i,2]))
-
-    elementfile.close()
-    nodefile.close()
-
-    # IGA file
-    igafile = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoIGA.dat'),'w')
-    igafile.write('# Dimension of beam elements \n')
-    igafile.write('1 \n')
-    igafile.write('# Order of basis function \n')
-    igafile.write('{:d} \n'.format(NURBS_degree))
-    igafile.write('# Number of control points per patch \n')
-    igafile.write('{:d} \n'.format(nctrlpt_per_beam))
-    igafile.write('# Number of elements per patch \n') 
-    igafile.write('{:d} \n'.format(nconnector_t_per_beam-1))
-    igafile.write('# Number of Patches \n') 
-    igafile.write('{:d} \n'.format(npatch))
-    # Loop over patches
-    for i in range(0,npatch):
-        igafile.write('{:s} \n'.format('PATCH-'+str(i+1)))
-        igafile.write('Size of knot vectors \n') 
-        igafile.write('{:d} \n'.format(knotVec.shape[1])) 
-        igafile.write('knot vectors \n')
-        for j in range(0,knotVec.shape[1]):
-            igafile.write('{:f} '.format(knotVec[i,j])) 
-        igafile.write('\n')
-        igafile.write('{:d}, {:d}, {:d}, {:d}, {:d}\n'.format(beam_connectivity[2*i,0],beam_connectivity[2*i,1],beam_connectivity[2*i,2],beam_connectivity[2*i+1,1],beam_connectivity[2*i+1,2]))
-    
-    igafile.close()
-
 def chronoInput(form):
 
     """

@@ -37,7 +37,6 @@ from PySide import QtCore, QtGui # type: ignore
 
 from freecad.woodWorkbench.src.inputParams import inputParams
 from freecad.woodWorkbench.src.readLog import readLog
-from freecad.woodWorkbench.src.chronoInput import chronoAux
 
 import freecad.woodWorkbench.tools.WoodMeshGenTools_v11 as WoodMeshGen
 from freecad.woodWorkbench.tools.rf_generator import RandomField
@@ -64,7 +63,7 @@ def main(self):
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
-        stlFlag, inpFlag, inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
+        inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams, outDir,flowFlag]\
             = inputParams(self.form)
     
@@ -75,7 +74,7 @@ def main(self):
     # ==================================================================
 
     
-    # Prep naming variables
+    # Prep freecad naming variables
     analysisName = geoName + "_analysis"
     materialName = geoName + "_material"
     visualFilesName = geoName + '_visualFiles'
@@ -119,33 +118,12 @@ def main(self):
     
     # stopped supporting other growth rules for now
     # [sites,radii] = genSites(self.form)
-    # if radial_growth_rule == 'binary':
-    #     # ---------------------------------------------
-    #     # binary radial growth pattern (e.g. wood microstructure with earlywood-latewood alternations)
-    #     sites,radii = WoodMeshGen.CellPlacement_Binary(generation_center,r_max,r_min,nrings,width_heart,\
-    #                         width_early,width_late,cellsize_early,cellsize_late,\
-    #                         iter_max,print_interval)
     if radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
         sites, radii, new_sites = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
                                                     mergeFlag,boundary_points_original,omega=1)
-    # elif radial_growth_rule == 'regular_hexagonal':
-    #     # ----------------------------------
-    #     # hexagonal honeycomb-like geometry
-    #     sites,radii = WoodMeshGen.CellPlacement_Honeycomb(generation_center,r_max,r_min,nrings,\
-    #                         box_center,box_size,width_heart,\
-    #                         width_early,width_late,\
-    #                         cellsize_early,cellsize_late,\
-    #                         cellwallthickness_early,cellwallthickness_late,\
-    #                         iter_max,print_interval)
-    # elif os.path.splitext(radial_growth_rule)[1] == '.npy':
-    #     # ----------------------------------
-    #     # load saved cell sites and radii data
-    #     print('Loading saved sites')
-    #     sites_path = Path(os.path.dirname(os.path.abspath(__file__)))
-    #     sites,radii = WoodMeshGen.ReadSavedSites(sites_path,radial_growth_rule)
     elif radial_growth_rule == 'debug':
         # ---------------------------------------------
         # debug run
@@ -154,12 +132,9 @@ def main(self):
         
     else:
         print('Growth rule: {:s} is not supported for the current version, please check the README for more details.'.format(radial_growth_rule))
-        print('Now exiting...')
-        # exit()
 
     sites_centroid = new_sites
     sites_vor = sites
-    placementTime = time.time()
     nParticles = len(sites)
     print(int(nParticles), 'cells placed')
 
@@ -293,7 +268,7 @@ def main(self):
     [all_vertices_2D, max_wings, flattened_all_vertices_2D, all_ridges,vert_area] = \
         WoodMeshGen.VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
                         nridge,geoName,radii,generation_center,\
-                        cellwallthickness_early,cellwallthickness_late,inpType)
+                        cellwallthickness_early,cellwallthickness_late)
     
 
     # ==================================================================
@@ -359,7 +334,7 @@ def main(self):
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                     nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                    randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early)
+                    randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early,radii,z_max)
 
     # ---------------------------------------------
 
@@ -394,41 +369,39 @@ def main(self):
     boundary_conditions = ['Bottom','Top','Left','Right','Front','Back']
     BC_velo_dof = 1 # 1-x, 2-y, 3-z
     BC_velo_value = box_size*0.03 # mm/s
-    WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
-                        connector_t_bot_connectivity,connector_t_reg_connectivity,\
-                        connector_t_top_connectivity,connector_l_connectivity,\
-                        segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
-                        props_connector_t_reg,iprops_connector_t_reg,props_connector_t_top,\
-                        iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
-                        timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
-                        x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
-                        nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,mergeFlag,merge_tol,\
-                        precrackFlag,precrack_elem)
-    chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
-    # if inpFlag in ['on','On','Y','y','Yes','yes']:
-    #     if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
-    #         WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
-    #                     connector_t_bot_connectivity,connector_t_reg_connectivity,\
-    #                     connector_t_top_connectivity,connector_l_connectivity,\
-    #                     segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
-    #                     props_connector_t_reg,iprops_connector_t_reg,props_connector_t_top,\
-    #                     iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
-    #                     timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
-    #                     x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
-    #                     nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,mergeFlag,merge_tol,\
-    #                     precrackFlag,precrack_elem)
-    #     elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
-    #         # chronoInput(self.form)
-    #         chronoAux(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
-    #     else:
-    #         np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
-    #         np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
-    #         print('Input files type: {:s} is not supported for the current version, please check the README for more details.'.format(inpType))
-    #         print('Generated cells and rings info has been saved.')
-    # else:
-    #     np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
-    #     np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
-    #     print('Generated cells and rings info has been saved.')
+
+    if inpType == 'abaqus':
+        WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
+                    connector_t_bot_connectivity,connector_t_reg_connectivity,\
+                    connector_t_top_connectivity,connector_l_connectivity,\
+                    segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
+                    props_connector_t_reg,iprops_connector_t_reg,props_connector_t_top,\
+                    iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
+                    timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
+                    x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
+                    nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,mergeFlag,merge_tol,\
+                    precrackFlag,precrack_elem)
+    elif inpType == 'project chrono':
+        # chronoInput(self.form)
+        WoodMeshGen.ChronoMesh(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
+    elif inpType == 'all':
+        WoodMeshGen.AbaqusFile(geoName,NURBS_degree,npatch,nsegments,IGAvertices,beam_connectivity,\
+                    connector_t_bot_connectivity,connector_t_reg_connectivity,\
+                    connector_t_top_connectivity,connector_l_connectivity,\
+                    segment_length,props_beam,iprops_beam,props_connector_t_bot,iprops_connector_t_bot,\
+                    props_connector_t_reg,iprops_connector_t_reg,props_connector_t_top,\
+                    iprops_connector_t_top,props_connector_l,iprops_connector_l,props_strainrate,\
+                    timestep,totaltime,boundary_conditions,BC_velo_dof,BC_velo_value,\
+                    x_max,x_min,y_max,y_min,z_max,z_min,boundaries,nsvars_beam,nsvars_conn_t,\
+                    nsvars_conn_l,nsecgp,nsvars_secgp,cellwallthickness_early,mergeFlag,merge_tol,\
+                    precrackFlag,precrack_elem)
+        WoodMeshGen.ChronoMesh(geoName,IGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec)
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
+    else:
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_sites.npy'),sites)
+        np.save(Path(outDir + '/' + geoName + '/' + geoName + '_radii.npy'),radii)
+        print('Generated cells and rings info has been saved.')
 
 
     # ---------------------------------------------
@@ -464,11 +437,6 @@ def main(self):
         App.getDocument(App.ActiveDocument.Name).getObject(visualFilesName).addObject(CBLbeamsVTU)
         CBLbeamsVTU.addProperty("App::PropertyFile",'Location','Paraview VTK File','Location of Paraview VTK file').Location=str(Path(outDir + '/' + geoName + '/' + geoName + '_beams.vtu'))
         CBLbeamsVTU.Visibility = True
-
-        # ---------------------------------------------
-        # Generate 3D model files
-        if stlFlag in ['on','On','Y','y','Yes','yes']:
-            WoodMeshGen.StlModelFile(geoName)
 
         # ==================================================================    
         self.form[3].progressBar.setValue(100) 

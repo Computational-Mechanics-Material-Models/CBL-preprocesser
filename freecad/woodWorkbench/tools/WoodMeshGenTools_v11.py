@@ -31,7 +31,6 @@ import os
 # from line_profiler import LineProfiler
 
 
-# from hexalattice.hexalattice import create_hex_grid # 
 
 def calc_knotflow(y,z,m1,m2,a1,a2,Uinf,yc):
 
@@ -62,33 +61,6 @@ def sort_coordinates(coords):
     angles = np.arctan2(x-cx, y-cy)
     indices = np.argsort(angles)
     return coords[indices,:]
-
-def TriangleArea2D(x1, y1, x2, y2, x3, y3):
-    """
-    A utility function to calculate area
-    of triangle formed by (x1, y1),
-    (x2, y2) and (x3, y3)
-    """
-    return abs((x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2.0)
-
-def check_isinside_boundcircle(circC,generation_center,rmin,rmax):
-    """ Make sure this circle does not protrude outside the ring's bounding circle """
-    x = circC[0]
-    y = circC[1]
-    w = circC[2]
-    within = ( math.sqrt((x-generation_center[0])**2 + (y-generation_center[1])**2) > rmin+w ) and ( math.sqrt((x-generation_center[0])**2 + (y-generation_center[1])**2)<rmax-w )
-    
-    return within
-
-def check_overlap(circles,circC):
-    """ Make sure the distance between the current circle's center and all
-        other circle centers is greater than or equal to the circle's perimeter (2r)
-    """
-    x = circC[0]
-    y = circC[1]
-    w = circC[2]
-    nooverlap = all( (x - c[0])**2 + (y - c[1])**2 >= (w + c[2])**2 for c in circles )
-    return nooverlap
 
 def check_iscollinear(p1,p2,boundaries):
     """ Make sure the line segment x1-x2 is collinear with 
@@ -227,23 +199,6 @@ def find_intersect(p,normal,boundaries):
         # print(np.asarray(intersect_points))
         return np.reshape(intersect_points,(1,2))
 
-def merge_close(points,radius):
-
-    tree = KDTree(points)
-    rows_to_fuse = tree.query_pairs(r=radius)    
-
-    for row in rows_to_fuse:
-        p1 = points[row[0]]
-        p2 = points[row[1]]
-        pavg = (p1 + p2)/2
-        points[row[0]] = pavg
-    points = np.delete(points, [row[1] for row in rows_to_fuse], axis=0)
-    
-    nrows = len(rows_to_fuse)
-    print(nrows,'sites merged')
-
-    return points
-
 def check_isinside(points,boundary_points):
 
     """
@@ -254,6 +209,8 @@ def check_isinside(points,boundary_points):
     path_in = poly_path.contains_points(points) # binary of points in or not
     
     return path_in
+
+
 
 def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
                                cellsize_sparse,cellsize_dense,iter_max,\
@@ -405,6 +362,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
 
 
     return old_sites, radii, new_sites
+
 
 def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     """
@@ -959,8 +917,8 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     
     return voronoi_vertices_3D,nvertices_3D,nlayers,segment_length,nctrlpt_per_elem,nctrlpt_per_beam,nconnector_t_per_beam,\
            nconnector_t_per_grain,theta,z_coord,npt_per_layer,npt_per_layer_normal,finite_ridges_3D,boundary_ridges_3D, voronoi_vertices_2D
-        
-        
+
+
 def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
                        finite_ridges_new,boundary_ridges_new,finite_ridges_3D,boundary_ridges_3D,nfinite_ridge,\
                        nboundary_ridge,nboundary_pts,nlayers,voronoi_vertices):
@@ -1158,7 +1116,7 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
 
 def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
                        nridge,geoName,radii,generation_center,\
-                       cellwallthickness_sparse,cellwallthickness_dense,inpType):
+                       cellwallthickness_sparse,cellwallthickness_dense):
     
     """Generate the vertex and ridge info 
        Vertex info includes: coordinates, ridge indices, indices of another vertex for each ridge, ridge lengths, ridge angles, ridge width
@@ -1258,31 +1216,24 @@ def VertexandRidgeinfo(all_pts_2D,all_ridges,npt_per_layer,\
         # Save info to txt files
     all_vertices_2D = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
 
-    if inpType in ['abaqus','Abaqus','ABQ','abq','ABAQUS','Abq']:
-        # np.save(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2D)
-        np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2D, fmt='%.16g', delimiter=' '\
-            ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
-            Number of vertices\n'+ str(npt_per_layer) + '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
-            [xcoord ycoord nwings ridge1 ... ridgen farvertex1 ... farvertexn length1 ... lengthn width1 ... widthn angle1 ... anglen]', comments='')
-        
-    elif inpType in ['Project Chrono','project chrono','chrono', 'Chrono']:
-        for i in range(0,npt_per_layer):
-            nwings = all_vertices_info_2D[i][0]
-            for j in range(0,nwings):
-                all_vertices_info_2D_nparray[i,1+j*5] = all_vertices_info_2D[i][1][j]
-                all_vertices_info_2D_nparray[i,2+j*5] = all_vertices_info_2D[i][2][j]
-                all_vertices_info_2D_nparray[i,3+j*5] = all_vertices_info_2D[i][3][j]
-                all_vertices_info_2D_nparray[i,4+j*5] = all_vertices_info_2D[i][4][j]
-                all_vertices_info_2D_nparray[i,5+j*5] = all_vertices_info_2D[i][5][j]
-        # Save info to txt files
-        all_vertices_2Dchrono = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
-        # np.save(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono)
-        np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono, fmt='%.16g', delimiter=' '\
-            ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
-            Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
-            [xcoord ycoord nwings ridge1 farvertex1 length1 width1 angle1 ... ridgen farvertexn lengthn widthn anglen]', comments='')
-        
-        # not used - SA
+    # write vertex info
+    for i in range(0,npt_per_layer):
+        nwings = all_vertices_info_2D[i][0]
+        for j in range(0,nwings):
+            all_vertices_info_2D_nparray[i,1+j*5] = all_vertices_info_2D[i][1][j]
+            all_vertices_info_2D_nparray[i,2+j*5] = all_vertices_info_2D[i][2][j]
+            all_vertices_info_2D_nparray[i,3+j*5] = all_vertices_info_2D[i][3][j]
+            all_vertices_info_2D_nparray[i,4+j*5] = all_vertices_info_2D[i][4][j]
+            all_vertices_info_2D_nparray[i,5+j*5] = all_vertices_info_2D[i][5][j]
+    # Save info to txt files
+    all_vertices_2Dchrono = np.hstack((all_pts_2D[0:npt_per_layer,:],all_vertices_info_2D_nparray))
+    # np.save(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono)
+    np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-vertex.mesh'), all_vertices_2Dchrono, fmt='%.16g', delimiter=' '\
+        ,header='Vertex Data Generated with RingsPy Mesh Generation Tool\n\
+        Number of vertices\n'+ str(npt_per_layer) +  '\nMax number of wings for one vertex\n'+ str(max_wings) + '\n\
+        [xcoord ycoord nwings ridge1 farvertex1 length1 width1 angle1 ... ridgen farvertexn lengthn widthn anglen]', comments='')
+    
+    # not used - SA
     #     np.savetxt(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName +'-ridge.mesh'), all_ridges, fmt='%d', delimiter=' '\
     #         ,header='Ridge Data Generated with RingsPy Mesh Generation Tool\n\
     # Number of ridges\n'+ str(nridge) +
@@ -1417,7 +1368,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
                       max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                       nctrlpt_per_beam,theta,nridge,connector_l_vertex_dict,\
-                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthick):
+                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthick,radii,z_max):
     # pr = cProfile.Profile()
     # pr.enable()
 
@@ -1476,7 +1427,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     IGAcopy = np.copy(IGAvertices) # to protect reference, not sure if necessary. removed copy for efficiency -SA
     # Add basic connector information and reset random field value to 1 for non-longitudinal connectors (just to make clear RF is only for long)
     for i in range(0,nel_con_tbot): # transverse bottom of beam
-        Meshdata[i,0:3] = IGAcopy[connector_t_bot_connectivity[i,0]-1,:] # xyzz coords of first half
+        Meshdata[i,0:3] = IGAcopy[connector_t_bot_connectivity[i,0]-1,:] # xyz coords of first half
         Meshdata[i,3:6] = IGAcopy[connector_t_bot_connectivity[i,1]-1,:] # xyz coords of second half
         Meshdata[i,22] = height_connector_t # connector length
         Meshdata[i,24] = 1 # connector type
@@ -1517,6 +1468,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     inds = np.where(np.abs(psi_values) < ktol)
     Meshdata[inds,25] = 1
     
+
     # Calculate connector center    
     Meshdata[:,6:9] = (Meshdata[:,0:3] + Meshdata[:,3:6])/2
     # Calculate distance from center to vertex 1
@@ -1526,7 +1478,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     
     # flag short connectors
     dist = np.linalg.norm((Meshdata[:,0:3] - Meshdata[:,3:6]),axis=1)
-    Meshdata[dist < cellwallthick / 4, 27] = 1
+    Meshdata[dist < cellwallthick/4, 27] = 1
 
 
     # Calculate unit t vector
@@ -1557,6 +1509,63 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # Add the eccentricity to the centers for longitudinal connectors (new center is correct)
     Meshdata[nel_con-nel_con_l:nel_con,6:9] += conn_l_tangents*Meshdata[nel_con-nel_con_l:nel_con,22][:, np.newaxis]/2
     # print(conn_l_tangents)
+
+
+    # add radial ray flag ---------------------------------------------------------------
+    # Meshdata[  :,26] = 0 same as precrack for now
+    radii_rays = radii[2:]
+    zstart = np.arange(0,z_max,segment_length/2)
+    ds = 0.02
+    nthetas = np.array(radii_rays/ds,dtype='int')
+    zmatrix = np.empty(len(radii_rays))
+    # get an array of rays and corresponding height for each ring, with randomness
+    rands =  [np.random.random((th,1)) - 0.5 for th in nthetas]
+    zmatrix = [(np.tile(zstart,(th,1)) + rands[r]) for r, th in enumerate(nthetas)]
+    thmatrix = [np.linspace(np.random.random()*(np.pi/16),2*np.pi,th) for th in nthetas]
+    # zvec_picked = [(zstart + np.random.random() - 0.5) for th in nthetas]
+    # if close to a theta and z value picked by radii index
+
+    # segment_length
+    widthvals = Meshdata[0:offset,21]
+    latewidth = max(widthvals)
+    rvecs = Meshdata[0:offset,0:2]
+    dvecs = Meshdata[0:offset,3:5] - Meshdata[0:offset,0:2]
+    rvals = np.linalg.norm(rvecs,axis=1)
+    zvals = Meshdata[0:offset,2]
+    thetas = np.acos(np.divide(rvecs[:,0],rvals)) # assume evec = <1,0> to take angle from x axis
+    psis = np.acos(np.divide(np.sum(rvecs*dvecs,axis=1),np.multiply(rvals,np.linalg.norm(dvecs,axis=1))))
+
+    total_info = np.column_stack((rvals,zvals,thetas,psis,widthvals))
+
+    check = False
+    for i in range(0,len(rvals)):
+        r,z,theta,psi,width = total_info[i,:]
+        if width == latewidth:
+            thtol = 2e-3
+        else:
+            thtol = 4e-3
+        r_idx = np.abs((radii_rays - r)).argmin()
+        thetavec = thmatrix[r_idx]
+        # if close to one of the thetas
+        th_idx = np.isclose(theta,thetavec,atol=thtol)
+        if th_idx.any(): #
+            zvec = zmatrix[r_idx][th_idx] # for whichever thetas its close to
+            z_idx = np.isclose(z,zvec,atol=1e-1) # check if its close to the corresponding z value
+            if z_idx.any(): # then if its in a marked location
+                # tan or rad direction
+                if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
+                    Meshdata[i,26] = 1 # tangential 
+                    check = True
+                else:
+                    Meshdata[i,26] = 2 # radial
+                    check = True
+    print('radial rays', check)
+    # print(np.shape(rvals),np.shape(zvals),np.shape(psis),np.shape(thetas))
+    # print(total_info)
+    # plt.figure()
+    # plt.hist(rvals,bins=100)
+    # plt.show()
+
 
     # Replace nodal coordinates with nodal indices
     Meshdata[:,0:2] = np.concatenate((connector_t_bot_connectivity,connector_t_reg_connectivity,connector_t_top_connectivity,connector_l_connectivity))
@@ -2171,7 +2180,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     # p = pstats.Stats(loc)
     # p.strip_dirs().sort_stats('cumulative').print_stats(10)
 
-    
+
 def BezierExtraction(NURBS_degree,nbeam_total):
     nctrlpt_per_beam = 2*NURBS_degree + 1
     knotVec_per_beam = np.concatenate((np.zeros(NURBS_degree),(np.linspace(0,1,int((nctrlpt_per_beam-1)/NURBS_degree+1))),np.ones(NURBS_degree)))
@@ -2225,7 +2234,8 @@ def BezierBeamFile(geoName,NURBS_degree,nctrlpt_per_beam,\
         #         txtfile.write('\n') 
     
     txtfile.close()
-        
+
+
 def ABQParams(nconnector_l,nconnector_l_precrack,nconnector_t,nconnector_t_precrack,\
                  cellwallthickness_early,cellwallthickness_late,height_connector_t,nbeamElem):
     
@@ -4177,6 +4187,56 @@ def AbaqusFile(geoName,NURBS_degree,npatch,nsegments,woodIGAvertices,beam_connec
     inpfile.close()
 
 
+def ChronoMesh(geoName,woodIGAvertices,beam_connectivity,NURBS_degree,nctrlpt_per_beam,nconnector_t_per_beam,npatch,knotVec):
+
+    # Beam
+   
+    numnode = woodIGAvertices.shape[0]
+    nelem = beam_connectivity.shape[0]
+    nnode = beam_connectivity.shape[1]
+
+
+    # Generate a .inp file which can be directly imported and played in Abaqus
+    nodefile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoNodes.dat'),'w')
+    elementfile = open(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoElements.dat'),'w')
+
+    # nodes
+    for i in range(0,numnode):
+        nodefile.write('{:#.9e}, {:#.9e},  {:#.9e}\n'.format(woodIGAvertices[i,0],woodIGAvertices[i,1],woodIGAvertices[i,2]))
+
+    # beam element connectivity 
+    for i in range(0,nelem):
+        elementfile.write('{:d}, {:d},  {:d}\n'.format(beam_connectivity[i,0],beam_connectivity[i,1],beam_connectivity[i,2]))
+
+    elementfile.close()
+    nodefile.close()
+
+    # IGA file
+    igafile = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '-chronoIGA.dat'),'w')
+    igafile.write('# Dimension of beam elements \n')
+    igafile.write('1 \n')
+    igafile.write('# Order of basis function \n')
+    igafile.write('{:d} \n'.format(NURBS_degree))
+    igafile.write('# Number of control points per patch \n')
+    igafile.write('{:d} \n'.format(nctrlpt_per_beam))
+    igafile.write('# Number of elements per patch \n') 
+    igafile.write('{:d} \n'.format(nconnector_t_per_beam-1))
+    igafile.write('# Number of Patches \n') 
+    igafile.write('{:d} \n'.format(npatch))
+    # Loop over patches
+    for i in range(0,npatch):
+        igafile.write('{:s} \n'.format('PATCH-'+str(i+1)))
+        igafile.write('Size of knot vectors \n') 
+        igafile.write('{:d} \n'.format(knotVec.shape[1])) 
+        igafile.write('knot vectors \n')
+        for j in range(0,knotVec.shape[1]):
+            igafile.write('{:f} '.format(knotVec[i,j])) 
+        igafile.write('\n')
+        igafile.write('{:d}, {:d}, {:d}, {:d}, {:d}\n'.format(beam_connectivity[2*i,0],beam_connectivity[2*i,1],beam_connectivity[2*i,2],beam_connectivity[2*i+1,1],beam_connectivity[2*i+1,2]))
+    
+    igafile.close()
+
+
 def ReadSavedSites(sites_path, radial_growth_rule):
     """Search in the current directory and all directories above it 
     for a file of a particular name.
@@ -4219,8 +4279,8 @@ def ReadSavedSites(sites_path, radial_growth_rule):
             print('Now exitting...')
             exit()
             return None
-        
-    
+
+
 def ModelInfo(boundary_points,height,net_area):
 
     #Calculate the material properties of generated geometry
@@ -4245,97 +4305,6 @@ def ModelInfo(boundary_points,height,net_area):
     porosity = 1 - mass/mass_if_all_solid
 
     return mass,bulk_volume,bulk_density,porosity,gross_area
-
-
-# def ModelInfo_precrack(boundary_points,z_min,z_max,\
-#               nbeam_per_grain,fiberlength,\
-#               props_beam,props_connector_t_bot,props_connector_t_reg,\
-#               props_connector_t_top,props_connector_l,\
-#               beam_connectivity,connector_t_bot_connectivity,\
-#               connector_t_reg_connectivity,connector_t_top_connectivity,\
-#               connector_l_connectivity,MeshData,x_notch_size,y_notch_size):
-    
-#     beam_length = fiberlength/nbeam_per_grain
-#     nelem_beam = beam_connectivity.shape[0]
-#     nel_con_tbot = connector_t_bot_connectivity.shape[0]
-#     nel_con_treg = connector_t_reg_connectivity.shape[0]
-#     nel_con_ttop = connector_t_top_connectivity.shape[0]
-#     nel_con_l = connector_l_connectivity.shape[0]
-    
-#     density_beam = props_beam[0]
-#     density_connector_t_bot = props_connector_t_bot[0]
-#     density_connector_t_top = props_connector_t_top[0]
-#     density_connector_t_reg = props_connector_t_reg[0]
-#     density_connector_l = props_connector_l[0]
-#     mass = 0
-    
-#     # mass of beams
-#     # for i in range(0,nelem_beam):
-#     mass += nelem_beam*density_beam*props_beam[3]*props_beam[4]*beam_length
-#     # mass of bot transverse connector
-#     for i in range(0,nel_con_tbot):
-#         mass += density_connector_t_bot*props_connector_t_bot[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
-#     # mass of reg transverse connector
-#     for i in range(nel_con_tbot,nel_con_tbot+nel_con_treg):
-#         mass += density_connector_t_reg*props_connector_t_reg[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
-#     # mass of top transverse connector
-#     for i in range(nel_con_tbot+nel_con_treg,nel_con_tbot+nel_con_treg+nel_con_ttop):
-#         mass += density_connector_t_top*props_connector_t_top[3]*MeshData[i,17]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
-#     # mass of longitudinal connector
-#     for i in range(nel_con_tbot+nel_con_treg+nel_con_ttop,MeshData.shape[0]):
-#         mass += density_connector_l*props_connector_l[3]*np.linalg.norm(MeshData[i,5:8] - MeshData[i,8:11])
-    
-#     hull = ConvexHull(boundary_points) 
-    
-#     volume = (z_max-z_min)*hull.volume - x_notch_size*y_notch_size
-
-#     density = mass/volume
-    
-#     mass_if_all_solid = density_beam*volume # if all solid
-#     porosity = 1 - mass/mass_if_all_solid
-    
-#     return mass,volume,density,porosity
-
-
-def StlModelFile(geoName):
-    
-    """Generate the 3D model file (geoName.stl file) for the generated geometry.
-
-    Arguments:
-    ---------
-    geoName :: string, geometry name.
-
-    Returns
-    -------
-    None or error message, if generation failed (TBD)
-    """
-    
-    import vtk
-    import os
-    
-    vtufilename = geoName + '_conns_vol'+'.vtu'
-    cwd = os.getcwd()
-    vtupath = os.path.join(cwd,'meshes',geoName)
-    stlfilename = os.path.join(vtupath, geoName+".stl")
-    file_name = os.path.join(vtupath,vtufilename)
-    
-    # create a new 'XML Unstructured Grid Reader'
-    reader = vtk.vtkXMLUnstructuredGridReader()
-    reader.SetFileName(file_name)
-    reader.Update()
-    output = reader.GetOutputPort()
-
-    # Extract the outer (polygonal) surface.
-    surface = vtk.vtkDataSetSurfaceFilter()
-    surface.SetInputConnection(0, output)
-    surface.Update()
-    sufaceoutput = surface.GetOutputPort()
-
-    # Write the stl file to disk
-    stlWriter = vtk.vtkSTLWriter()
-    stlWriter.SetFileName(stlfilename)
-    stlWriter.SetInputConnection(sufaceoutput)
-    stlWriter.Write()
 
 
 def LogFile(geoName,outDir,mass,bulk_volume,bulk_density,porosity,net_area,gross_area):
