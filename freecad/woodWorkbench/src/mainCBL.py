@@ -61,7 +61,7 @@ def main(self):
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        x_notch_size, y_notch_size, precrack_size, \
+        x_notch_size, y_notch_size, precrack_depth,precrack_width, \
         mergeFlag, merge_tol, precrackFlag, \
         inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams, outDir,flowFlag,rayFlag]\
@@ -301,14 +301,14 @@ def main(self):
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
 
         x_notch = x_min + x_notch_size
-        x_precrack = x_notch + precrack_size
+        x_precrack = x_notch + precrack_depth
         y_precrack = box_center[1]
         
         precrack_nodes = np.array([[x_notch, y_precrack, x_precrack, y_precrack]])
 
         [precrack_elem,nconnector_t_precrack,nconnector_l_precrack] = \
             WoodMeshGen.InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
-                                    cellsize_early,nsegments)
+                                    cellsize_early,precrack_width,nsegments)
         plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
         plt.close()
     else:

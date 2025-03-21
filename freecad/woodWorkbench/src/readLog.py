@@ -57,8 +57,10 @@ def readLog(self):
 
             elif "precrackFlag" in line:
                 precrackFlag = line.split("=")[1].strip()
-            elif "precrack_size" in line:
-                precrack_size = line.split("=")[1].strip()
+            elif "precrack_depth" in line:
+                precrack_depth = line.split("=")[1].strip()
+            elif "precrack_width" in line:
+                precrack_width = line.split("=")[1].strip()
 
             elif "iter_max" in line:
                 iter_max = line.split("=")[1].strip()
@@ -124,7 +126,8 @@ def readLog(self):
         self.form[1].y_indent_size.setText(y_notch_size)
 
         self.form[1].precrackFlag.setCurrentText(precrackFlag)
-        self.form[1].precrack_size.setText(precrack_size)
+        self.form[1].precrack_depth.setText(precrack_depth)
+        self.form[1].precrack_width.setText(precrack_width)
 
         self.form[1].iter_max.setText(iter_max)
         self.form[1].theta_min.setText(theta_min)

@@ -1321,14 +1321,14 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
 
 
 def InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
-                     cellsize_early,nsegments):
+                     cellsize_early,precrack_width,nsegments):
 
     precrack_midpts = (precrack_nodes[:,0:2]+precrack_nodes[:,2:4])/2.0
     ridge_midpts = all_pts_2D[all_ridges[:,2]]
     ridge_midpts_tree = KDTree(ridge_midpts)
     near_ridges = []
     for i in range(0,len(precrack_midpts)):
-        near_ridges.append(ridge_midpts_tree.query_ball_point(precrack_midpts[i,:],max(2*cellsize_early,1*np.linalg.norm(precrack_nodes[i,2:4]-precrack_midpts[i,:]))))
+        near_ridges.append(ridge_midpts_tree.query_ball_point(precrack_midpts[i,:],max(cellsize_early,1*np.linalg.norm(precrack_nodes[i,2:4]-precrack_midpts[i,:]))))
     # Find the intersect point of neighboring ridges (lines) with the precrack line
     # actually finding if the precrack just interesects? - SA
     precrack_elem = []

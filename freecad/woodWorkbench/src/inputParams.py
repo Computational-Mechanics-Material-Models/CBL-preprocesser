@@ -98,7 +98,8 @@ def inputParams(form):
     # at least 2 segments, with 3 per cell length
    
     precrackFlag = form[1].precrackFlag.currentText()
-    precrack_size = float(form[1].precrack_size.text() or 0.1) # depth of precrack
+    precrack_depth = float(form[1].precrack_depth.text() or 0.1) # depth of precrack
+    precrack_width = float(form[1].precrack_width.text() or 0.01) # width of precrack
 
     iter_max = int(form[1].iter_max.text() or 2) # lloyd iterations 
     NURBS_degree = 2
@@ -125,6 +126,7 @@ def inputParams(form):
     mergeFlag = form[2].merge_operation.currentText() 
     merge_tol = cellsize_early
 
+    rayFlag = form[2].rayFlag.currentText()
     inpType = (form[2].inpType.currentText()).lower()
     visFlag = form[2].visFlag.currentText()
 
@@ -140,7 +142,8 @@ def inputParams(form):
         randomFlag = 'Off'
         x_notch_size = box_size*0.1 # depth of notch
         y_notch_size = box_size*0.1 # width of notch
-        precrack_size = box_size*0.1
+        precrack_depth = box_size*0.1
+        precrack_width = box_size*0.01
         mergeFlag = 'Off'
         merge_tol = 5e-5
         boundaryFlag = 'Off'
@@ -162,7 +165,7 @@ def inputParams(form):
     outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
               cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
                 cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
-                  box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_size, \
+                  box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_depth,precrack_width, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
                       boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir)
 
@@ -171,7 +174,7 @@ def inputParams(form):
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        x_notch_size, y_notch_size, precrack_size, \
+        x_notch_size, y_notch_size, precrack_depth,precrack_width, \
         mergeFlag, merge_tol, precrackFlag, \
         inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams, outDir,flowFlag, rayFlag

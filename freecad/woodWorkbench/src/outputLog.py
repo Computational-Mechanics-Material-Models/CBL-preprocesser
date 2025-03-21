@@ -5,7 +5,7 @@ from datetime import datetime
 def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
               cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
                 cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
-                  box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_size, \
+                  box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_depth,precrack_width, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
                       boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir):
 
@@ -67,7 +67,8 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
     logfile.write('y_notch_size=' + str(y_notch_size) + '\n')
 
     logfile.write('precrackFlag=' + str(precrackFlag) + '\n')
-    logfile.write('precrack_size=' + str(precrack_size) + '\n')
+    logfile.write('precrack_depth=' + str(precrack_depth) + '\n')
+    logfile.write('precrack_width=' + str(precrack_width) + '\n')
 
     logfile.write('iter_max=' + str(iter_max) + '\n')
     logfile.write('theta_min=' + str(theta_min) + '\n')
