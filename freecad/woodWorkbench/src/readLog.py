@@ -86,6 +86,8 @@ def readLog(self):
                 flowFlag = line.split("=")[1].strip()
             elif "mergeFlag" in line:
                 mergeFlag = line.split("=")[1].strip()
+            elif "rayFlag" in line:
+                rayFlag = line.split("=")[1].strip()
             elif "inpType" in line:
                 inpType = line.split("=")[1].strip()
 
@@ -137,6 +139,7 @@ def readLog(self):
         self.form[2].boundaryFlag.setCurrentText(boundaryFlag)
         self.form[2].flowFlag.setCurrentText(flowFlag)
         self.form[2].merge_operation.setCurrentText(mergeFlag)
+        self.form[2].rayFlag.setCurrentText(rayFlag)
         self.form[2].inpType.setCurrentText(inpType)
 
 

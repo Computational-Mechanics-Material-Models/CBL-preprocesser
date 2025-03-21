@@ -7,7 +7,7 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
                 cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_size, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
-                      boundaryFlag,flowFlag, mergeFlag, inpType, visFlag, outDir):
+                      boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir):
 
     # Generate log file
     logfile = open(Path(outDir + '/' + geoName + '/' + geoName + '-input.cwPar'),'w')        
@@ -84,6 +84,7 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
     logfile.write('boundaryFlag=' + str(boundaryFlag) + '\n')
     logfile.write('flowFlag=' + str(flowFlag) + '\n')
     logfile.write('mergeFlag=' + str(mergeFlag) + '\n')
+    logfile.write('rayFlag=' + str(rayFlag) + '\n')
     logfile.write('inpType=' + str(inpType) + '\n')
     logfile.write('visFlag=' + str(visFlag) + '\n')
     

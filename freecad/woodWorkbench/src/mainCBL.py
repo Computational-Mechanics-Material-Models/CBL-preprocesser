@@ -64,7 +64,7 @@ def main(self):
         x_notch_size, y_notch_size, precrack_size, \
         mergeFlag, merge_tol, precrackFlag, \
         inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams, outDir,flowFlag]\
+        knotFlag, knotParams, outDir,flowFlag,rayFlag]\
             = inputParams(self.form)
     
     
@@ -339,7 +339,7 @@ def main(self):
                     connector_l_connectivity,all_vertices_2D,\
                     max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
                     nctrlpt_per_beam,theta,nridge,\
-                    randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early,radii,z_max)
+                    randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early,radii,z_max,rayFlag)
 
     # ---------------------------------------------
 
