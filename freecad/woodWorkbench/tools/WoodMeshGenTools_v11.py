@@ -389,20 +389,12 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         existing_sites = [shp.get_coordinates(p) for p in points if shp.within(p,boundary)]
         existing_sites = np.squeeze(existing_sites)
 
-    old_sites = existing_sites # centroids of relaxed voronoi tesselation become site of mech voronoi tesselation
-    # old sites are thus not centroid of mechnical mesh, but normal dual of voronoi tesselation 
-    vor = Voronoi(old_sites) # final mech mesh of relaxed sites
-    new_sites = relax_points(vor,1) # returns sites which are exact centroids of new vor based on relaxed old sites (new method)
-    # relax_points return centroid with omega=1 means no relaxation = exact centroid
-
     # Clip again sites to be inside boundary
-    path_in_old = check_isinside(old_sites,boundary_points) # checks sites inside boundary using path
-    old_sites = old_sites[path_in_old]
-    path_in_new = check_isinside(new_sites,boundary_points) # checks sites inside boundary using path
-    new_sites = new_sites[path_in_new]
+    path_in = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path
+    sites = existing_sites[path_in]
 
 
-    return old_sites, radii, new_sites
+    return sites, radii
 
 
 def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
@@ -424,8 +416,7 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     return sites, radii
 
 
-def BuildFlowMesh(outDir, geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max,boundaries,boundary_points_original,conforming_delaunay_old):
-
+def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,boundaries,conforming_delaunay_old):
 
     ''' 
     NOTE: There are nsegment number of transverse layers, shifted to occur at 

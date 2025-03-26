@@ -119,7 +119,7 @@ def main(self):
     if radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
         # binary with Lloyd's algorithm (e.g. wood microstructure with earlywood-latewood alternations, but more regular cell shapes)
-        sites_vor, radii, sites_centroid = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
+        sites_vor, radii = WoodMeshGen.CellPlacement_Binary_Lloyd(nrings,width_heart,width_early,width_late,\
                                                     cellsize_early,cellsize_late,iter_max,\
                                                     mergeFlag,boundary_points_original,omega=1)
         
@@ -127,8 +127,6 @@ def main(self):
         # ---------------------------------------------
         # debug run
         sites_vor,radii = WoodMeshGen.CellPlacement_Debug(nrings,width_heart,width_early,width_late)  
-        vor = Voronoi(sites_vor)   
-        sites_centroid = WoodMeshGen.relax_points(vor,1)
 
     elif radial_growth_rule == 'readsites':
         # ---------------------------------------------
@@ -136,9 +134,6 @@ def main(self):
         oldgeoName = self.form[0].geoName.text()
         sites_vor = np.load(Path(outDir + '/' + oldgeoName + '/' + oldgeoName + '_sites.npy'))
         radii = np.load(Path(outDir + '/' + oldgeoName + '/' + oldgeoName + '_radii.npy'))
-        vor = Voronoi(sites_vor)   
-        sites_centroid = WoodMeshGen.relax_points(vor,1)
-
 
     nParticles = len(sites_vor)
     print(int(nParticles), 'cells placed')
@@ -154,23 +149,20 @@ def main(self):
 
     # ---------------------------------------------
     # # Delaunay triangulation             
-
-    # based on new centroid points       
-    delaunay_vertices = np.concatenate((boundary_points_original,np.array(sites_centroid))) # important the boundary points are listed first for index reasons
-    tri_inp = {'vertices': delaunay_vertices,'segments':boundary_segments,'regions':boundary_region}
-    conforming_delaunay = tr.triangulate(tri_inp, 'peAq0D') # peAq0c where the c encloses notches etc, needs to be fixed
-    
     # based on old sites to get vor
-    delaunay_vertices_old = np.concatenate((boundary_points_original,np.array(sites_vor))) 
+    delaunay_vertices = np.concatenate((boundary_points_original,np.array(sites_vor))) 
     # important the boundary points are listed first for region index reasons, and thus not included in tessellation
-    tri_inp = {'vertices': delaunay_vertices_old,'segments':boundary_segments,'regions':boundary_region}
     conforming_delaunay_old = tr.triangulate(tri_inp, 'peAq0D') 
     
+    # Start figure
+    # plt.close()
+    # plt.figure()
+    # ax = plt.gca()
     if flowFlag in ['on','On','Y','y','Yes','yes']:
         # ---------------------------------------------
         # # Build flow mesh
-        flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,conforming_delaunay,nsegments,long_connector_ratio,z_min,z_max, \
-                                                        boundaries,boundary_points_original,conforming_delaunay_old)
+        flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,nsegments,long_connector_ratio,z_min,z_max, \
+                                                        boundaries,conforming_delaunay)
         # flow_nodes are conforming_delaunay vertices layered with z-value added, but volume is calculated based on old sites to match 
         # mechanical cell shapes
     else:
@@ -179,7 +171,7 @@ def main(self):
 
     # ---------------------------------------------
     # # Build mechanical mesh 
-    vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay_old.get('vertices'))
+    vor_vertices, vor_edges, ray_origins, ray_directions = tr.voronoi(conforming_delaunay.get('vertices'))
 
 
     # ==================================================================
