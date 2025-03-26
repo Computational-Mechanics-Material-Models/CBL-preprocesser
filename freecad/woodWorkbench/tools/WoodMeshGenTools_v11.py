@@ -24,6 +24,7 @@ import pkg_resources
 import time
 import shapely.plotting
 import shapely as shp
+from bisect import bisect_left, bisect_right
 import FreeCAD as App # type: ignore
 # import cProfile
 # import pstats
@@ -416,7 +417,7 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
     return sites, radii
 
 
-def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,boundaries,conforming_delaunay_old):
+def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,boundaries,conforming_delaunay):
 
     ''' 
     NOTE: There are nsegment number of transverse layers, shifted to occur at 
@@ -424,14 +425,14 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     There are 2*nsegments+1 number of node layers.
     '''
     #***************************************************************************
-    delaunay_pts = np.array(conforming_delaunay_old['vertices']) # flow point coords
+    delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
     npts = len(delaunay_pts)
 
     # different package to calculate voronoi region info because it produces output in different form
     # however input sites are non-centroidal for new method *!!!
 
-    vorsci = Voronoi(conforming_delaunay_old['vertices']) # location of vor sites
-    vortri = tr.voronoi(conforming_delaunay_old['vertices'])
+    vorsci = Voronoi(conforming_delaunay['vertices']) # location of vor sites
+    vortri = tr.voronoi(conforming_delaunay['vertices'])
 
     vortri_rayinds = vortri[2]
     vortri_vertices = vortri[0]
@@ -500,49 +501,31 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 gen = (v for v in pv if v != -1)
                 coords_int = np.empty((0,2)) # coordinates of voronoi vertices
                 coords_out = np.empty((0,2))
-                if len(pv)==2: # corner element, only one real node with two rays
 
-                    for v in gen: 
-                        coord = vorsci.vertices[v]
-                        coords_int = np.vstack([coords_int,coord])
-                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
-                        ray_dir = vortri_raydirs[inds]     
-                        int_pts = np.empty((np.size(inds),2))  
-                        for i in range(0, np.size(inds)):           
-                            # Find the intersect point of infinite ridges (rays) with the boundary lines
-                            # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment-and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
-                            p = coord
-                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                            intpts = find_intersect(coord,normal,boundaries)
-                            if intpts.any():
-                                int_pts[i,:] = intpts
-                            else:
-                                print('(flow)')
-                        coords_out = np.vstack([coords_out,int_pts])
-                else: # side element, may or may not be touching a corner
+                for v in gen: 
+                    coord = vorsci.vertices[v]
+                    coords_int = np.vstack([coords_int,coord])
+                    inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
+                    ray_dir = vortri_raydirs[inds]     
+                    int_pts = np.empty((np.size(inds),2))  
+                    for i in range(0, np.size(inds)):           
+                        # Find the intersect point of infinite ridges (rays) with the boundary lines
+                        # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment\
+                        # -and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=\
+                        # Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
+                        normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
+                        intpts = find_intersect(coord,normal,boundaries)
+                        if intpts.any():
+                            int_pts[i,:] = intpts
+                        else:
+                            print('(flow)')
+                    if np.size(inds) > 1:
+                        print('single',inds)
+                        index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
+                        int_pts = int_pts[index,:]
+                    coords_out = np.vstack([coords_out,int_pts])
 
-                    for v in gen: 
-                        coord = vorsci.vertices[v]
-                        coords_int = np.vstack([coords_int,coord])
-                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
-                        ray_dir = vortri_raydirs[inds] 
-                        int_pts = np.empty((np.size(inds),2))   
-                        #
-                        for i in range(0, np.size(inds)):    
-                            # Find the intersect point of infinite ridges (rays) with the boundary lines
-                            p = coord
-                            normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                            intpts = find_intersect(coord,normal,boundaries)
-                            if intpts.any():
-                                int_pts[i,:] = intpts
-                            else:
-                                print('(flow)')
-                        if np.size(inds) > 1:
-                            index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
-                            int_pts = int_pts[index,:]
-                        coords_out = np.vstack([coords_out,int_pts])
-
-                coords = np.vstack([coords_int,coords_out])    # combine interior with exterior nodes     
+                coords = np.vstack([coords_int,coords_out,refpt]) # combine interior with exterior nodes and boundary flow point for correct area 
             else:
                 coords = vorsci.vertices[pv] # coordinates of voronoi vertices
 
@@ -559,13 +542,15 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 delaun_elems_long[nel_l,5] =  el_vol
                 delaun_elems_long[nel_l,6] = typeFlag
                 delaun_elems_long[nel_l,7:7+len(pv)] = [v for v in pv] # voronoi indices of related region
+            # if l == 1:
+            #     ax.annotate('A={:.2e},\n L={:.2e}'.format(flow_area,el_len),refpt,size=5,color='r')
                 
 
     # transverse elements
+    tran_area = 0
     for l in range(0,nsegments): # each segment
-        el_h = segment_length + connector_l_length # element height 
+        el_h = segment_length + connector_l_length/2 # element height 
         typeFlag = 2
-        # print('num ridges',nrdgs)
         for r in range(0,nrdgs):
             nel_t = r + l*nrdgs # element index
 
@@ -575,33 +560,48 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
             el_len = np.linalg.norm((coordsd[0,:]-coordsd[1,:])) # distance bewteen flow nodes (element length)
 
             pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
-            coordsv = vorsci.vertices[pv] # 2D vor coords
+            if (-1) in pv: # check if boundary cell, as noted by -1 for vertice index
+
+                v = pv[bisect_right(pv,-1)] # get non-negative index (finite ray)
+                coord = vorsci.vertices[v]
+                # get intercept of infinite ray
+                inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
+                ray_dir = vortri_raydirs[inds]     
+                int_pts = np.empty((np.size(inds),2))  
+                for i in range(0, np.size(inds)):           
+                    normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
+                    intpts = find_intersect(coord,normal,boundaries)
+                    if intpts.any():
+                        int_pts[i,:] = intpts
+                    else:
+                        print('(flow2)')
+                if np.size(inds) > 1:
+                    index = np.argmin(np.sum(((int_pts) - (coord))**2, axis=1))
+                    int_pts = int_pts[index,:]
+                coordsv = np.vstack([coord,int_pts[0,:]]) # combine finite and infinite points 
+            else:
+                coordsv = vorsci.vertices[pv] # coordinates of voronoi vertices
 
             # calculate each length of the element
             coordc = (coordsv[0,:]+coordsv[1,:])/2 # average vor coords to get center of ridge
             el_len1 = np.linalg.norm((coordsd[0,:]-coordc)) # distance between flow node and center of ridge
             el_len2 = np.linalg.norm((coordsd[1,:]-coordc))
 
-            # unsure if this is fully correct, checks out on debugs -SA
-            if (check_iscollinear(coordsd[0,:],coordsd[1,:],boundaries) > 0): # check if the flow element is collinear with boundaries
-                # no flow volume on boundary
-                vor_len = 0
-                flow_area = vor_len*el_h 
-            else:
-                vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
-                flow_area = vor_len*el_h # flux area
+            vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+            flow_area = vor_len*el_h # flux area
             el_vol = el_len*flow_area/3 # element volume (2D area*length*1/3*2 for two pyramids) 
             if el_vol != 0:
                 delaun_elems_trans[nel_t,0:2] = nd # element connectivity
                 delaun_elems_trans[nel_t,2] =  el_len1
                 delaun_elems_trans[nel_t,3] =  el_len2
-                delaun_elems_trans[nel_t,4] = flow_area 
+                delaun_elems_trans[nel_t,4] = flow_area
                 delaun_elems_trans[nel_t,5] = el_vol
                 delaun_elems_trans[nel_t,6] = typeFlag # element type
                 delaun_elems_trans[nel_t,7] = pv[0] # voronoi indices of related ridge
                 delaun_elems_trans[nel_t,8] = pv[1] #
-
-            # delaun_elems_trans[nel_t,7:9] = pv # mark relevant 2D voronoi ridge for possible reference
+                tran_area += 0.5*(el_len1 + el_len2)*vor_len
+                # ax.annotate('r{:d}'.format(r),coordc,size=5,color='b')
+        
     
     # remove zero volume rows
     delaun_elems_long = delaun_elems_long[~np.all(delaun_elems_long == 0, axis=1)]

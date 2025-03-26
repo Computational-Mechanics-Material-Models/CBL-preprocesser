@@ -104,6 +104,11 @@ def main(self):
         material_object.Material = mat
         analysis_object.addObject(material_object)
 
+    # # Start figure
+    plt.close()
+    plt.figure()
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
 
     print('\n')
     print(geoName,':')
@@ -152,7 +157,8 @@ def main(self):
     # based on old sites to get vor
     delaunay_vertices = np.concatenate((boundary_points_original,np.array(sites_vor))) 
     # important the boundary points are listed first for region index reasons, and thus not included in tessellation
-    conforming_delaunay_old = tr.triangulate(tri_inp, 'peAq0D') 
+    tri_inp = {'vertices': delaunay_vertices,'segments':boundary_segments,'regions':boundary_region}
+    conforming_delaunay = tr.triangulate(tri_inp, 'peAq0D') 
     
     # Start figure
     # plt.close()
@@ -191,12 +197,6 @@ def main(self):
 
     # Original points
     # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
-
-    # Start figure
-    plt.close()
-    plt.figure()
-    ax = plt.gca()
-    ax.set_aspect('equal', adjustable='box')
 
     # # Main cells
     for beg, end in voronoi_ridges.astype(int):
