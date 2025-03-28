@@ -119,7 +119,7 @@ def main(self):
     # Place cells with a specific radial growth pattern
 
     x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
-        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size)
+        WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size,self.form)
     
     if radial_growth_rule == 'binary_lloyd':
         # ---------------------------------------------
@@ -152,21 +152,39 @@ def main(self):
     boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
     boundary_region = np.array([[box_center[0],box_center[1],1,0]])
 
+    boundary_coords = boundary_points_original[np.array(boundary_segments,dtype='int')]
+    for seg in boundary_coords:
+        ax.plot(seg[:,0],seg[:,1],'ko--',markersize=1.,linewidth=0.1)
+
+
+    # ax.plot(sites_vor[:,0],sites_vor[:,1],'ks',markersize=3.)
+
+    
     # ---------------------------------------------
     # # Delaunay triangulation             
     # based on old sites to get vor
     delaunay_vertices = np.concatenate((boundary_points_original,np.array(sites_vor))) 
     # important the boundary points are listed first for region index reasons, and thus not included in tessellation
     tri_inp = {'vertices': delaunay_vertices,'segments':boundary_segments,'regions':boundary_region}
-    conforming_delaunay = tr.triangulate(tri_inp, 'peAq0D') 
-    
-    # Start figure
-    # plt.close()
-    # plt.figure()
-    # ax = plt.gca()
+    conforming_delaunay = tr.triangulate(tri_inp, 'peq3D') 
+
+
+
+    # vertsD = np.array(conforming_delaunay['vertices'])
+    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
+
+    vorsci = Voronoi(conforming_delaunay.get('vertices')) # location of vor sites
+
+    # ax.plot(vorsci.vertices[:,0],vorsci.vertices[:,1],'bo',markersize=3.)
+    # vortri_vertices = tr.voronoi(conforming_delaunay.get('vertices'))[0]
+    # ax.plot(vortri_vertices[:,0],vortri_vertices[:,1],'g^',markersize=3.)
+    # plt.show()
+
+
+
+    # ---------------------------------------------
+    # # Build flow mesh
     if flowFlag in ['on','On','Y','y','Yes','yes']:
-        # ---------------------------------------------
-        # # Build flow mesh
         flow_nodes, flow_elems = WoodMeshGen.BuildFlowMesh(outDir,geoName,nsegments,long_connector_ratio,z_min,z_max, \
                                                         boundaries,conforming_delaunay)
         # flow_nodes are conforming_delaunay vertices layered with z-value added, but volume is calculated based on old sites to match 
@@ -194,9 +212,6 @@ def main(self):
 
     # ---------------------------------------------
     # # Visualize the meshes
-
-    # Original points
-    # ax.plot(vor_vertices[:,0],vor_vertices[:,1],'g^',markersize=4.)
 
     # # Main cells
     for beg, end in voronoi_ridges.astype(int):
@@ -302,13 +317,13 @@ def main(self):
             WoodMeshGen.InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
                                     cellsize_early,precrack_width,nsegments)
         plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
-        plt.close()
+        # plt.close()
     else:
         precrack_nodes = []
         precrack_elem = []
         nconnector_t_precrack = 0
         nconnector_l_precrack = 0
-        plt.close()
+        # plt.close()
 
     # ==================================================================
     self.form[3].progressBar.setValue(70) 

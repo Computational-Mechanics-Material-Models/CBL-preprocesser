@@ -47,6 +47,8 @@ from freecad.woodWorkbench                                     import SRCPATH
 
 # from freecad.woodWorkbench.src                                 import Verifications_cube_v11
 from freecad.woodWorkbench.src                                 import mainCBL
+from freecad.woodWorkbench.src.inputParams                     import inputParams
+from freecad.woodWorkbench.src.readLog                         import readLog
 
 from freecad.woodWorkbench.util.cwloadUIfile                    import cwloadUIfile
 from freecad.woodWorkbench.util.cwloadUIicon                    import cwloadUIicon
@@ -54,7 +56,6 @@ from freecad.woodWorkbench.util.cwloadUIicon                    import cwloadUIi
 # from freecad.woodWorkbench.output.mkChronoInput                  import mkChronoInput
 # from freecad.woodWorkbench.output.mkAbaqusInput                  import mkAbaqusInput
 
-from freecad.woodWorkbench.src.readLog import readLog
 
 
 
@@ -79,6 +80,9 @@ class genWindow_CBL:
         # cwloadUIicon(self.form[0],"ldpmOutput.svg")
         # cwloadUIicon(self.form[1],"PartDesign_AdditiveBox.svg")
 
+        # If input parameter file is clicked
+        QtCore.QObject.connect(self.form[0].readFileButton, QtCore.SIGNAL("clicked()"), self.openFilePara)
+
         # Set initial output directory
         self.form[3].outputDir.setText(str(Path(App.ConfigGet('UserHomePath') + '/woodWorkbench')))
         # Set species window
@@ -86,12 +90,14 @@ class genWindow_CBL:
 
         # Set geometry window
         self.form[1].box_shape.currentIndexChanged.connect(self.selectGeometry)
-
+        if self.form[1].box_shape.currentText() == 'Input':
+            # If input geometry file is clicked
+            QtCore.QObject.connect(self.form[1].readGeoButton, QtCore.SIGNAL("clicked()"), self.openFileGeo)
         
-        # If input parameter file is clicked
-        QtCore.QObject.connect(self.form[0].readFileButton, QtCore.SIGNAL("clicked()"), self.openFilePara)
         # Run generation for CBL
         QtCore.QObject.connect(self.form[3].generate, QtCore.SIGNAL("clicked()"), self.generation)
+        # create input file
+        QtCore.QObject.connect(self.form[3].writePara, QtCore.SIGNAL("clicked()"), self.writeFilePara)
 
     def getStandardButtons(self):
 
@@ -141,30 +147,54 @@ class genWindow_CBL:
             self.form[1].stackedWidget.setCurrentIndex(1)
         elif geometry == 'Notched Square':
             self.form[1].stackedWidget.setCurrentIndex(2)
-        else:
+        elif geometry == 'Input':
             self.form[1].stackedWidget.setCurrentIndex(3)
+            QtCore.QObject.connect(self.form[1].readGeoButton, QtCore.SIGNAL("clicked()"), self.openFileGeo)
+        else:
+            self.form[1].stackedWidget.setCurrentIndex(4)
             App.Console.PrintError("Geometry not recognized\n")
             return
+    
+    def openFileGeo(self):
+
+        path = App.ConfigGet("UserHomePath")
+
+        filetype = "openCAD (*.oca)"
+        GeoPath = ""
+        try:
+            GeoPath = QtGui.QFileDialog.getOpenFileName(None,QString.fromLocal8Bit("Read a geometry file"),path, filetype) # type: ignore
+        #                                                                     "here the text displayed on windows" "here the filter (extension)"   
+        except Exception:
+            GeoPath, Filter = QtGui.QFileDialog.getOpenFileName(None, "Read a geometry file", path, filetype) #PySide
+        #                                                                     "here the text displayed on windows" "here the filter (extension)"   
+        if GeoPath == "":                                                            # if the name file are not selected then Abort process
+            App.Console.PrintMessage("Process aborted"+"\n")
+        else:
+            self.form[1].geoFile.setText(GeoPath)
+
 
     def openFilePara(self):
 
         path = App.ConfigGet("UserHomePath")
         filetype = "CW Parameter input format (*.cwPar)"
 
-        OpenName = ""
+        InputPath = ""
         try:
-            OpenName = QtGui.QFileDialog.getOpenFileName(None,QString.fromLocal8Bit("Read a file parameter file"),path,             filetype) # type: ignore
+            InputPath = QtGui.QFileDialog.getOpenFileName(None,QString.fromLocal8Bit("Read a parameter file"),path, filetype) # type: ignore
         #                                                                     "here the text displayed on windows" "here the filter (extension)"   
         except Exception:
-            OpenName, Filter = QtGui.QFileDialog.getOpenFileName(None, "Read a file parameter file", path,             filetype) #PySide
+            InputPath, Filter = QtGui.QFileDialog.getOpenFileName(None, "Read a parameter file", path, filetype) #PySide
         #                                                                     "here the text displayed on windows" "here the filter (extension)"   
-        if OpenName == "":                                                            # if the name file are not selected then Abord process
+        if InputPath == "":                                                            # if the name file are not selected then Abort process
             App.Console.PrintMessage("Process aborted"+"\n")
         else:
-            self.form[0].setupFile.setText(OpenName)
+            self.form[0].setupFile.setText(InputPath)
         
         readLog(self)
 
+    def writeFilePara(self):
+
+        inputParams(self)
 
     def generation(self):
 
@@ -172,7 +202,6 @@ class genWindow_CBL:
         mainCBL.main(self)
 
         print('Fin.')
-        # print("CModel package written to: " + outDir + outName)
 
         
 # What to do when "Close" Button Clicked

@@ -63,6 +63,7 @@ def inputParams(form):
     generation_center = (0,0) # coordinates of generation domain center ??? - SA?
     x_notch_size = 0 # depth of notch
     y_notch_size = 0 # width of notch
+    geoFile = ''
     if box_shape == 'cube':
         box_size = float(form[1].cube_size.text() or 0.5) # all side lengths
         box_height = box_size
@@ -81,9 +82,15 @@ def inputParams(form):
         # notch and precrack are always centered on leftmost edge
         x_notch_size = float(form[1].x_indent_size.text() or box_width*0.1) # depth of notch
         y_notch_size = float(form[1].y_indent_size.text() or box_depth*0.1) # width of notch
+    elif box_shape == 'input':
+        geoFile = form[1].geoFile.text()
+        box_height = float(form[1].geo_height.text() or 0.05)
+        box_size = float(form[1].geo_size.text() or 2)
+        box_width = box_size
+        box_depth = box_size
     else:
-        form[1].stackedWidget.setCurrentIndex(3)
-        print('geometry not recognized')
+        form[1].stackedWidget.setCurrentIndex(4)
+        print('Geometry not recognized')
         return
     # patch for unkown bug that causes duplicate vertices for 1mm box 2/24/24   
     if box_width == box_depth and box_width == 1:
@@ -144,9 +151,6 @@ def inputParams(form):
         y_notch_size = box_size*0.1 # width of notch
         precrack_depth = box_size*0.1
         precrack_width = box_size*0.01
-        mergeFlag = 'Off'
-        merge_tol = 5e-5
-        boundaryFlag = 'Off'
     
     
     # Make output directory
@@ -164,10 +168,10 @@ def inputParams(form):
     # Write input parameters to log file for repeated use
     outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
               cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-                cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
+                cell_length, randomFlag, randomParams, box_shape, box_center, box_size, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_depth,precrack_width, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
-                      boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir)
+                      boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir,geoFile)
 
     return geoName, radial_growth_rule, iter_max, \
         nrings, width_heart, width_early, width_late, generation_center, \

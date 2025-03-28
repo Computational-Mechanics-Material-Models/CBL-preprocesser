@@ -213,7 +213,7 @@ def check_isinside(points,boundary_points):
 
 
 
-def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size):
+def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size,form):
     """
     clipping box for the delauney points (generated cell points)
     TBD: adjust to general shape using polygon or similar
@@ -244,13 +244,32 @@ def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,
         boundary_points = np.array([[x_min, y_min],[x_max, y_min],[x_max, y_max],[x_min, y_max],[x_min, y_notch_max],[x_notch, y_notch_max],\
                             [x_notch,y_notch_min],[x_min,y_notch_min]])
                    
+    elif box_shape == "input":
+        boundary_points = []
+        check = False
+        with open(Path(form[1].geoFile.text()), "r") as geofil:
+            for line in geofil:
+                if check and "P(" in line:
+                    coord = np.round(np.array(line.split("P")[1].strip(' ').strip('(').strip('\n').strip(')').split(' '),dtype='float'),5)
+                    print(coord)
+                    boundary_points.append(coord[0:2])
+                if "edges" in line:
+                    check = True
+                if "faces" in line:
+                    check = False
+        boundary_points = np.array(boundary_points)
+        x_min = min(boundary_points[:,0])
+        x_max = max(boundary_points[:,0])
+        y_min = min(boundary_points[:,1])
+        y_max = max(boundary_points[:,1])
+
     else:
         print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
         # exit()
 
     # Relies on boundary points to be defined in order (i.e. cannot only be clockwise for notch)
     boundaries = np.concatenate((np.expand_dims(boundary_points,axis=1),np.roll(np.expand_dims(boundary_points,axis=1),-1,axis=0)),axis=1)
-        
+
     return x_min,x_max,y_min,y_max,boundaries,boundary_points
 
 
@@ -331,21 +350,10 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
             x = subr * np.cos(t)
             y = subr * np.sin(t)
             circles.append(np.c_[x, y])
-
-        # old way with each subradii its own number of points
-        # for subr, subnpoint in zip(subradii, subnpoints):
-        #     t = np.linspace(0, 2*np.pi, subnpoint, endpoint=False)
-        #     x = subr * np.cos(t)
-        #     y = subr * np.sin(t)
-        #     circles.append(np.c_[x, y])
-
             
         inside_cells = np.concatenate(circles, axis=0)
         
-        # old way with xy randomness
-        # noise = (np.random.rand(len(inside_cells),2) - [0.5,0.5])*cellradius
-        # inside_cells = inside_cells # + 1*noise #.25
-        # testing radial relaxation only
+        # radial randomness 
         noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellradius*2
         noise = np.squeeze(noise)
         r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
@@ -361,7 +369,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     
     
     boundary = shp.Polygon(boundary_points)
-    boundary = boundary.buffer(1e-1)
+    boundary = boundary.buffer(2e-1)
     shp_sites = shp.points(existing_sites)
     existing_sites =  [shp.get_coordinates(s) for s in shp_sites if shp.within(s,boundary)]
     existing_sites =  np.squeeze(existing_sites)

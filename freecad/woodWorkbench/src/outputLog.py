@@ -4,10 +4,10 @@ from datetime import datetime
 
 def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
               cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-                cell_length, randomFlag, randomParams, box_shape, box_center, box_height, \
+                cell_length, randomFlag, randomParams, box_shape, box_center, box_size, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_depth,precrack_width, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
-                      boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir):
+                      boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir, geoFile):
 
     # Generate log file
     logfile = open(Path(outDir + '/' + geoName + '/' + geoName + '-input.cwPar'),'w')        
@@ -60,6 +60,7 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
     # specimen geometry
     logfile.write('box_shape=' + str(box_shape) + '\n')
     logfile.write('box_center=' + str(box_center) + '\n')
+    logfile.write('box_size=' + str(box_size) + '\n')
     logfile.write('box_height=' + str(box_height) + '\n')
     logfile.write('box_width=' + str(box_width) + '\n')
     logfile.write('box_depth=' + str(box_depth) + '\n')
@@ -90,6 +91,7 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
     logfile.write('visFlag=' + str(visFlag) + '\n')
     
     logfile.write('outDir=' + str(outDir) + '\n')
+    logfile.write('geoFile=' + str(geoFile) + '\n')
 
     logfile.write('\n')
     

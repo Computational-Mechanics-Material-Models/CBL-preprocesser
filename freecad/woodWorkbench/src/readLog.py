@@ -44,6 +44,8 @@ def readLog(self):
                 box_shape = line.split("=")[1].strip()
             elif "box_center" in line:
                 box_center = line.split("=")[1].strip()
+            elif "box_size" in line:
+                box_size = line.split("=")[1].strip()
             elif "box_height" in line:
                 box_height = line.split("=")[1].strip()
             elif "box_width" in line:
@@ -93,6 +95,9 @@ def readLog(self):
             elif "inpType" in line:
                 inpType = line.split("=")[1].strip()
 
+            elif "geoFil" in line:
+                geoFil = line.split("=")[1].strip()
+
     # Write parameters to input panel
         self.form[0].geoName.setText(geoName)
         self.form[0].radial_growth_rule.setCurrentText(radial_growth_rule)
@@ -112,18 +117,27 @@ def readLog(self):
         self.form[0].sampling_type.setCurrentText(sampling_type)
 
         
+        self.form[1].box_center.setText(box_center)
         if box_shape == 'cube':
             self.form[1].box_shape.setCurrentText('Cube')
+            self.form[1].cube_size.setText(box_size)
         elif box_shape == 'rectangle':
             self.form[1].box_shape.setCurrentText('Rectangle')
+            self.form[1].box_height.setText(box_height)
+            self.form[1].box_width.setText(box_width)
+            self.form[1].box_depth.setText(box_depth)
         elif box_shape == 'notchedsquare':
             self.form[1].box_shape.setCurrentText('Notched Square')
-        self.form[1].box_center.setText(box_center)
-        self.form[1].box_height.setText(box_height)
-        self.form[1].box_width.setText(box_width)
-        self.form[1].box_depth.setText(box_depth)
-        self.form[1].x_indent_size.setText(x_notch_size)
-        self.form[1].y_indent_size.setText(y_notch_size)
+            self.form[1].notch_height.setText(box_height)
+            self.form[1].notch_width.setText(box_width)
+            self.form[1].notch_depth.setText(box_depth)
+            self.form[1].x_indent_size.setText(x_notch_size)
+            self.form[1].y_indent_size.setText(y_notch_size)
+        if box_shape == 'input':
+            self.form[1].box_shape.setCurrentText('Input')
+            self.form[1].geoFile.setText(geoFil)
+            self.form[1].geo_size.setText(box_size)
+            self.form[1].geo_height.setText(box_height)
 
         self.form[1].precrackFlag.setCurrentText(precrackFlag)
         self.form[1].precrack_depth.setText(precrack_depth)
