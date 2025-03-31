@@ -427,25 +427,39 @@ def CellPlacement_Debug(nrings,width_heart,width_sparse,width_dense):
 
 def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,boundaries,conforming_delaunay):
 
+    
+    ax = plt.gca()
     ''' 
     NOTE: There are nsegment number of transverse layers, shifted to occur at 
     the mid-segment location, and there are nsegment+1 longitudinal layers.
     There are 2*nsegments+1 number of node layers.
     '''
     #***************************************************************************
+
     delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
     npts = len(delaunay_pts)
 
-    # different package to calculate voronoi region info because it produces output in different form
-    # however input sites are non-centroidal for new method *!!!
+    # vertsD = np.array(conforming_delaunay['vertices'])
+    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
 
-    vorsci = Voronoi(conforming_delaunay['vertices']) # location of vor sites
-    vortri = tr.voronoi(conforming_delaunay['vertices'])
+    # different package to calculate voronoi region info because it produces output in different form
+    vorsci = Voronoi(conforming_delaunay.get('vertices')) # location of vor sites
+    vortri = tr.voronoi(conforming_delaunay.get('vertices'))
+
+    # print(conforming_delaunay['vertices'])
 
     vortri_rayinds = vortri[2]
     vortri_vertices = vortri[0]
     vortri_raycoords = vortri_vertices[vortri_rayinds]
     vortri_raydirs = vortri[3]
+
+    # ax.plot(vorsci.vertices[:,0],vorsci.vertices[:,1],'ko',markersize=4.)
+    # # ax.plot(vortri_vertices[:,0],vortri_vertices[:,1],'g^',markersize=3.)
+
+    # plt.show()
+
+    # vor_test = np.where((np.isclose(vortri_vertices,vorsci.vertices,rtol=1e-3, atol=1e-3)).all(axis=1))
+    # print((vortri_vertices),(vorsci.vertices))
 
     nrdgs = len(vorsci.ridge_points) # number of ridges and thus number of flow elements
     nlayers = 2*nsegments + 1 # number of node layers 
