@@ -200,16 +200,18 @@ def find_intersect(p,normal,boundaries):
         # print(np.asarray(intersect_points))
         return np.reshape(intersect_points,(1,2))
 
-def check_isinside(points,boundary_points):
+def check_isinside(points,boundary_points,buf):
 
     """
     checks if points are inside poly path created by boundaries
     """
-       
-    poly_path = mpltPath.Path(boundary_points.tolist())
-    path_in = poly_path.contains_points(points) # binary of points in or not
     
-    return path_in
+    boundary = shp.Polygon((boundary_points))
+    boundary = boundary.buffer(buf)
+    points = shp.points(points)
+    points_in =  shp.within(points,boundary)
+    
+    return np.array(points_in)
 
 
 
@@ -251,7 +253,7 @@ def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,
             for line in geofil:
                 if check and "P(" in line:
                     coord = np.round(np.array(line.split("P")[1].strip(' ').strip('(').strip('\n').strip(')').split(' '),dtype='float'),5)
-                    print(coord)
+                    # print(coord)
                     boundary_points.append(coord[0:2])
                 if "edges" in line:
                     check = True
@@ -367,11 +369,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     
     
-    
-    boundary = shp.Polygon(boundary_points)
-    boundary = boundary.buffer(2e-1)
-    shp_sites = shp.points(existing_sites)
-    existing_sites =  [shp.get_coordinates(s) for s in shp_sites if shp.within(s,boundary)]
+    existing_sites = existing_sites[check_isinside(existing_sites,boundary_points,2e-1)]
     existing_sites =  np.squeeze(existing_sites)
 
     lloyd_iter = 0
@@ -379,8 +377,7 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
         # added check for boundaries again to patch bug -SA
-        shp_sites = shp.points(existing_sites)
-        existing_sites =  [shp.get_coordinates(s) for s in shp_sites if shp.within(s,boundary)]
+        existing_sites[check_isinside(existing_sites,boundary_points,2e-1)]
         existing_sites =  np.squeeze(existing_sites)
         lloyd_iter += 1
     
@@ -390,16 +387,13 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
         boundary_region = np.array([[0,0,1,0]])
         tri_inp = {'vertices': existing_sites,'segments':boundary_segments,'regions':boundary_region}
-        boundary = shp.Polygon(boundary_points)
-        boundary = boundary.buffer(-1e-2)
         conform = tr.triangulate(tri_inp, 'peAq0D')
         conform_sites = conform['vertices']
-        points = shp.points(conform_sites)
-        existing_sites = [shp.get_coordinates(p) for p in points if shp.within(p,boundary)]
+        existing_sites[check_isinside(conform_sites,boundary_points,-1e-2)]
         existing_sites = np.squeeze(existing_sites)
 
     # Clip again sites to be inside boundary
-    path_in = check_isinside(existing_sites,boundary_points) # checks sites inside boundary using path
+    path_in = check_isinside(existing_sites,boundary_points,0) # checks sites inside boundary using path
     sites = existing_sites[path_in]
 
 
@@ -439,14 +433,9 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     delaunay_pts = np.array(conforming_delaunay['vertices']) # flow point coords
     npts = len(delaunay_pts)
 
-    # vertsD = np.array(conforming_delaunay['vertices'])
-    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
-
     # different package to calculate voronoi region info because it produces output in different form
     vorsci = Voronoi(conforming_delaunay.get('vertices')) # location of vor sites
     vortri = tr.voronoi(conforming_delaunay.get('vertices'))
-
-    # print(conforming_delaunay['vertices'])
 
     vortri_rayinds = vortri[2]
     vortri_vertices = vortri[0]
@@ -455,11 +444,6 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
 
     # ax.plot(vorsci.vertices[:,0],vorsci.vertices[:,1],'ko',markersize=4.)
     # # ax.plot(vortri_vertices[:,0],vortri_vertices[:,1],'g^',markersize=3.)
-
-    # plt.show()
-
-    # vor_test = np.where((np.isclose(vortri_vertices,vorsci.vertices,rtol=1e-3, atol=1e-3)).all(axis=1))
-    # print((vortri_vertices),(vorsci.vertices))
 
     nrdgs = len(vorsci.ridge_points) # number of ridges and thus number of flow elements
     nlayers = 2*nsegments + 1 # number of node layers 
@@ -493,10 +477,11 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
 
     # longitudinal elements
     for l in range(0,nsegments+1):
+        long_area = 0
         # get layer properties
         if (l == 0) or (l == nsegments): # first or last layer
             typeFlag = 1
-            el_len1 = segment_length
+            el_len1 = segment_length/2
             el_len2 = 0
             ni = 1
         else:
@@ -521,40 +506,63 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 # it could probably be done more efficiently -SA
 
                 gen = (v for v in pv if v != -1)
-                coords_int = np.empty((0,2)) # coordinates of voronoi vertices
-                coords_out = np.empty((0,2))
-
-                for v in gen: 
+                coords_in = np.empty((0,2)) # coordinates of voronoi vertices
+                coords_out = np.empty((0,2)) # coordinates of new intersection vertices
+                for v in gen: # for every actual vertex of the cell
                     coord = vorsci.vertices[v]
-                    coords_int = np.vstack([coords_int,coord])
-                    inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
-                    ray_dir = vortri_raydirs[inds]     
-                    int_pts = np.empty((np.size(inds),2))  
-                    for i in range(0, np.size(inds)):           
-                        # Find the intersect point of infinite ridges (rays) with the boundary lines
-                        # Ref: https://stackoverflow.com/questions/14307158/how-do-you-check-for-intersection-between-a-line-segment\
-                        # -and-a-line-ray-emanatin#:~:text=Let%20r%20%3D%20(cos%20%CE%B8%2C,0%20%E2%89%A4%20u%20%E2%89%A4%201).&text=\
-                        # Then%20your%20line%20segment%20intersects,0%20%E2%89%A4%20u%20%E2%89%A4%201.
-                        normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                        intpts = find_intersect(coord,normal,boundaries)
-                        if intpts.any():
-                            int_pts[i,:] = intpts
-                        else:
-                            print('(flow)')
-                    if np.size(inds) > 1:
-                        print('single',inds)
-                        index = np.argmin(np.sum(((int_pts) - (refpt))**2, axis=1))
-                        int_pts = int_pts[index,:]
-                    coords_out = np.vstack([coords_out,int_pts])
+                    path_in = check_isinside([coord],boundaries[:,1],0) # checks coordinate is inside
+                    if path_in:
+                        # for each vertex add to list of coordinates
+                        coords_in = np.vstack([coords_in,coord])
+                        # check if vertex is start of infinite ray
+                        inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-5)).all(axis=1)) 
+                        int_pts = np.empty((np.size(inds),2))  # could be multiple boundary rays for single vertex (i.e. a corner)
+                        # if infinite ray
+                        for i in range(0, np.size(inds)):           
+                            # Find the intersect point of infinite ridges (rays) with the boundary lines
+                            ray_dir = vortri_raydirs[inds[i]]
+                            # print(np.shape(ray_dir[:]),np.shape(np.linalg.norm(ray_dir[:]) ))
+                            normal = ray_dir[:]/np.linalg.norm(ray_dir[:]) # normal
+                            intpts = find_intersect(coord,normal,boundaries)
+                            if intpts.any():
+                                int_pts[i,:] = intpts
+                            else:
+                                print('(flow)',coord)
+                                int_pts[i,:] = coord
+                        coords_out = np.vstack([coords_out,int_pts])
+                    # else: # if the point is outside, treat like a new infinite ridge ***************
+                    #     # print('out',coord)
+                    #     # coords_out = np.vstack([coords_out,refpt])
+                    #     # get the ridge its on
+                    #     # intpts = find_closeintersect(coord,boundaries)
+                    #     # print(intpts)
+                coords = np.vstack([coords_in,coords_out,refpt]) # combine interior with exterior nodes and boundary flow point for correct area 
+                if np.shape(coords)[0] > 2:
+                    # cells must be convex and greater than only two points
+                    coords_sort = sort_coordinates(coords)
+                    pgon = shp.Polygon(coords_sort)
+                    flow_area = pgon.area
+                    # shapely.plotting.plot_polygon(pgon)
+                else:
+                    flow_area = 0
 
-                coords = np.vstack([coords_int,coords_out,refpt]) # combine interior with exterior nodes and boundary flow point for correct area 
             else:
-                coords = vorsci.vertices[pv] # coordinates of voronoi vertices
+                # coords = vorsci.vertices[pv] # coordinates of voronoi vertices
+                path_in = check_isinside(vorsci.vertices[pv],boundaries[:,1],1e-5) # checks sites inside boundary using path
+                if not path_in.all(): # if any coordinates are not in, turn into intersections
+                    # print('cut new cell') *************
+                    coords = np.vstack([vorsci.vertices[pv][path_in],refpt]) # coordinates of voronoi vertices
+                    coords_sort = sort_coordinates(coords) # cells must be convex
+                    pgon = shp.Polygon(coords_sort)
+                    flow_area = pgon.area
+                    # shapely.plotting.plot_polygon(pgon)
+                else: # if all the coordinates are in
+                    coords = vorsci.vertices[pv] # coordinates of voronoi vertices
+                    # calculate the flux area of voronoi region of arbitrary shape
+                    coords_sort = sort_coordinates(coords) # cells must be convex
+                    pgon = shp.Polygon(coords_sort)
+                    flow_area = pgon.area
 
-            # calculate the flux area of voronoi region of arbitrary shape by the shoelace formula
-            coords_sort = sort_coordinates(coords)
-            pgon = shp.Polygon(coords_sort)
-            flow_area = pgon.area
             el_vol = el_len*flow_area/3 # element volume
             if el_vol != 0:
                 delaun_elems_long[nel_l,0:2] = nd # element connectivity
@@ -564,13 +572,15 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 delaun_elems_long[nel_l,5] =  el_vol
                 delaun_elems_long[nel_l,6] = typeFlag
                 delaun_elems_long[nel_l,7:7+len(pv)] = [v for v in pv] # voronoi indices of related region
-            # if l == 1:
-            #     ax.annotate('A={:.2e},\n L={:.2e}'.format(flow_area,el_len),refpt,size=5,color='r')
-                
+                long_area += flow_area
+                # if l == 1:
+                #     ax.annotate('p{:d}'.format(p),refpt,size=5,color='b')
+        # print('longitudinal area',long_area)
+    # plt.show()
 
     # transverse elements
-    tran_area = 0
     for l in range(0,nsegments): # each segment
+        tran_area = 0
         el_h = segment_length + connector_l_length/2 # element height 
         typeFlag = 2
         for r in range(0,nrdgs):
@@ -582,37 +592,75 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
             el_len = np.linalg.norm((coordsd[0,:]-coordsd[1,:])) # distance bewteen flow nodes (element length)
 
             pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
-            if (-1) in pv: # check if boundary cell, as noted by -1 for vertice index
-
-                v = pv[bisect_right(pv,-1)] # get non-negative index (finite ray)
+            if (-1) in pv: # check if inifite ridge, as noted by -1 for vertice index
+                v = pv[bisect_right(pv,-1)] # get non-negative index (finite ray)                
                 coord = vorsci.vertices[v]
-                # get intercept of infinite ray
-                inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-10)).all(axis=1))
-                ray_dir = vortri_raydirs[inds]     
-                int_pts = np.empty((np.size(inds),2))  
-                for i in range(0, np.size(inds)):           
+                path_in = check_isinside(np.array([coord]),boundaries[:,1],0) # checks if ridge inside boundary using path
+                if path_in:
+                    # get intercept of infinite ray by checking which infinite point the vertex is (comparing vortri and vorsci)
+                    inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-5)).all(axis=1)) 
+                    # if infinite ray
+                    for i in range(0, np.size(inds)):           
+                        # Find the intersect point of infinite ridges (rays) with the boundary lines
+                        ray_dir = vortri_raydirs[inds[i]]
+                        normal = ray_dir[:]/np.linalg.norm(ray_dir[:]) # normal
+                        # all infinite rays cross boundary at delauney line? should be -SA
+                        intpts = find_intersect(coord,normal,[coordsd]) # 
+                        if np.shape(intpts)[0] > 1:
+                            print('two??')
+                        if not intpts.any():
+                            print('(flow2)',coord)
+                    coordsv = np.vstack([coord,intpts]) # combine finite and infinite points
+                    vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+
+                    # coords_pgon = np.vstack([coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]])
+                    # pgon = shp.Polygon(coords_pgon)
+                    # shapely.plotting.plot_polygon(pgon)
+                    # tran_area += pgon.area
+                else:
+                    vor_len = 0
+
+            else: # if finite ridge
+                coords = vorsci.vertices[pv]
+                path_in = check_isinside(coords,boundaries[:,1],0) # checks if ridge fully inside boundary using path
+                if path_in.all(): # if both vertices are inside the boundary
+                    coordsv = coords # coordinates of voronoi vertices
+                    vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+
+                    # coords_pgon = np.vstack([coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]])
+                    # pgon = shp.Polygon(coords_pgon)
+                    # shapely.plotting.plot_polygon(pgon)
+                    # tran_area += pgon.area
+
+                elif path_in.any(): # if only one vertice is inside the boundary, treat as inifite ridge
+                    v = [v for v in pv if check_isinside(np.array([vorsci.vertices[v]]),boundaries[:,1],0)] # index of inside vertex
+                    d = [v for v in pv if not check_isinside(np.array([vorsci.vertices[v]]),boundaries[:,1],0)] # index of outside vertex
+                    coord = vorsci.vertices[v] # coordinates of inside vertex
+                    # create direction of ridge
+                    ray_dir = vorsci.vertices[d] - vorsci.vertices[v]     # outside corods minus inside coords
                     normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
-                    intpts = find_intersect(coord,normal,boundaries)
-                    if intpts.any():
-                        int_pts[i,:] = intpts
-                    else:
-                        print('(flow2)')
-                if np.size(inds) > 1:
-                    index = np.argmin(np.sum(((int_pts) - (coord))**2, axis=1))
-                    int_pts = int_pts[index,:]
-                coordsv = np.vstack([coord,int_pts[0,:]]) # combine finite and infinite points 
-            else:
-                coordsv = vorsci.vertices[pv] # coordinates of voronoi vertices
+                    intpts = find_intersect(coord,normal,[coordsd]) # 
+                    if np.shape(intpts)[0] > 1:
+                        print('twox2??')
+                    if not intpts.any():
+                        print('(flow3)',coord)
+                    coordsv = np.vstack([coord,intpts]) # combine finite and infinite points 
+                    vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+
+                    # coords_pgon = np.vstack([coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]])
+                    # pgon = shp.Polygon(coords_pgon)
+                    # shapely.plotting.plot_polygon(pgon)
+                    # tran_area += pgon.area
+                else: # finite ridge totally outside
+                    vor_len = 0
 
             # calculate each length of the element
-            coordc = (coordsv[0,:]+coordsv[1,:])/2 # average vor coords to get center of ridge
-            el_len1 = np.linalg.norm((coordsd[0,:]-coordc)) # distance between flow node and center of ridge
-            el_len2 = np.linalg.norm((coordsd[1,:]-coordc))
-
-            vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
-            flow_area = vor_len*el_h # flux area
-            el_vol = el_len*flow_area/3 # element volume (2D area*length*1/3*2 for two pyramids) 
-            if el_vol != 0:
+            if vor_len > 0:
+                coordc = (coordsv[0,:]+coordsv[1,:])/2 # average vor coords to get center of ridge
+                el_len1 = np.linalg.norm((coordsd[0,:]-coordc)) # distance between flow node and center of ridge
+                el_len2 = np.linalg.norm((coordsd[1,:]-coordc))
+                flow_area = vor_len*el_h # flux area
+                el_vol = el_len*flow_area/3 # element volume (2D area*length*1/3*2 for two pyramids)
                 delaun_elems_trans[nel_t,0:2] = nd # element connectivity
                 delaun_elems_trans[nel_t,2] =  el_len1
                 delaun_elems_trans[nel_t,3] =  el_len2
@@ -622,8 +670,10 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 delaun_elems_trans[nel_t,7] = pv[0] # voronoi indices of related ridge
                 delaun_elems_trans[nel_t,8] = pv[1] #
                 tran_area += 0.5*(el_len1 + el_len2)*vor_len
-                # ax.annotate('r{:d}'.format(r),coordc,size=5,color='b')
-        
+                # if l == 0:
+                #     ax.plot(coordsv[:,0],coordsv[:,1],'bs-',markersize=3)
+                #     ax.annotate('r{:d}'.format(r),coordc,size=5,color='g')
+        # print('transverse area',tran_area)
     
     # remove zero volume rows
     delaun_elems_long = delaun_elems_long[~np.all(delaun_elems_long == 0, axis=1)]
@@ -662,12 +712,12 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     boundary_points = []
 
     # Remove points outside the boundary
-    vertices_in = ttvertices[check_isinside(ttvertices,boundary_points_original)] # list of vertices inside boundaries
+    vertices_in = ttvertices[check_isinside(ttvertices,boundary_points_original,0)] # list of vertices inside boundaries
 
     # Construct infinite ridges based on ridges that were cut by the boundary
     for ridge in ttedges: # for finite ridges
         points = ttvertices[ridge] # coordinates of ridge vertices
-        points_check = check_isinside(points,boundary_points_original) # check check if fully in
+        points_check = check_isinside(points,boundary_points_original,0) # check check if fully in
         if all(points_check): # if fully in
             # get new index for vertices
             inds = [np.where(np.all(vertices_in == points[0],axis=1))[0],np.where(np.all(vertices_in == points[1],axis=1))[0]]
@@ -691,7 +741,7 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
             ray_directions.append(direction)
     for origin in range(0,len(ttray_origins)): # for infinite ridges
         point_ind = ttray_origins[origin] # old index of originating point
-        points_check = check_isinside([ttvertices[point_ind]],boundary_points_original) # check coords of orginating vertex
+        points_check = check_isinside([ttvertices[point_ind]],boundary_points_original,0) # check coords of orginating vertex
         if all(points_check): # if infinite ridge originates within the boundaries (i.e. original infinite ridge which is still an infinite ridge)
             ind = np.where((vertices_in == ttvertices[point_ind]).all(axis=1))[0]
             ind = ind[0]
