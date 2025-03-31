@@ -61,7 +61,7 @@ def main(self):
         cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
         boundaryFlag, box_shape, box_center, box_size, box_height, \
         nsegments, theta_max, theta_min, z_max, z_min, long_connector_ratio, \
-        x_notch_size, y_notch_size, precrack_depth,precrack_width, \
+        x_notch_size, y_notch_size, precrack_start,precrack_end, \
         mergeFlag, merge_tol, precrackFlag, \
         inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
         knotFlag, knotParams, outDir,flowFlag,rayFlag]\
@@ -159,7 +159,7 @@ def main(self):
 
     # ax.plot(sites_vor[:,0],sites_vor[:,1],'ks',markersize=3.)
 
-    
+
     # ---------------------------------------------
     # # Delaunay triangulation             
     # based on old sites to get vor
@@ -171,10 +171,8 @@ def main(self):
 
 
     # vertsD = np.array(conforming_delaunay['vertices'])
-    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'b^-',markersize=2.,linewidth=0.15)
-
-    vorsci = Voronoi(conforming_delaunay.get('vertices')) # location of vor sites
-
+    # ax.triplot(vertsD[:, 0], vertsD[:, 1], conforming_delaunay['triangles'], 'r^-',markersize=2.,linewidth=0.15)
+    # vorsci = Voronoi(conforming_delaunay.get('vertices')) # location of vor sites
     # ax.plot(vorsci.vertices[:,0],vorsci.vertices[:,1],'bo',markersize=3.)
     # vortri_vertices = tr.voronoi(conforming_delaunay.get('vertices'))[0]
     # ax.plot(vortri_vertices[:,0],vortri_vertices[:,1],'g^',markersize=3.)
@@ -307,15 +305,13 @@ def main(self):
     # Insert precracks
     if precrackFlag in ['on','On','Y','y','Yes','yes']:
 
-        x_notch = x_min + x_notch_size
-        x_precrack = x_notch + precrack_depth
-        y_precrack = box_center[1]
-        
-        precrack_nodes = np.array([[x_notch, y_precrack, x_precrack, y_precrack]])
+        x_start, y_start = precrack_start
+        x_end, y_end = precrack_end
+        precrack_nodes = np.array([[x_start, y_start, x_end, y_end]])
 
         [precrack_elem,nconnector_t_precrack,nconnector_l_precrack] = \
             WoodMeshGen.InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
-                                    cellsize_early,precrack_width,nsegments)
+                                    cellsize_early,nsegments)
         plt.savefig(Path(outDir + '/' + geoName + '/' + geoName + '.png'), format='png', dpi=1000) 
         # plt.close()
     else:

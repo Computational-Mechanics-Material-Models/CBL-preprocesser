@@ -634,7 +634,7 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_4">
          <item>
-          <widget class="QLineEdit" name="precrack_depth">
+          <widget class="QLineEdit" name="precrack_start">
            <property name="enabled">
             <bool>true</bool>
            </property>
@@ -654,7 +654,7 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>0.1</string>
+            <string>-0.25,0</string>
            </property>
           </widget>
          </item>
@@ -667,7 +667,7 @@
             </size>
            </property>
            <property name="text">
-            <string>Crack Depth [mm]</string>
+            <string>Crack Start (x,y)</string>
            </property>
           </widget>
          </item>
@@ -676,7 +676,7 @@
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_5">
          <item>
-          <widget class="QLineEdit" name="precrack_width">
+          <widget class="QLineEdit" name="precrack_end">
            <property name="enabled">
             <bool>true</bool>
            </property>
@@ -696,7 +696,7 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>0.01</string>
+            <string>-0.2,0</string>
            </property>
           </widget>
          </item>
@@ -709,7 +709,7 @@
             </size>
            </property>
            <property name="text">
-            <string>Crack Width [mm]</string>
+            <string>Crack End (x,y)</string>
            </property>
           </widget>
          </item>

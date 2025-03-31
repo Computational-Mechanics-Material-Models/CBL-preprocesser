@@ -59,10 +59,10 @@ def readLog(self):
 
             elif "precrackFlag" in line:
                 precrackFlag = line.split("=")[1].strip()
-            elif "precrack_depth" in line:
-                precrack_depth = line.split("=")[1].strip()
-            elif "precrack_width" in line:
-                precrack_width = line.split("=")[1].strip()
+            elif "precrack_start" in line:
+                precrack_start = line.split("=")[1].strip()
+            elif "precrack_end" in line:
+                precrack_end = line.split("=")[1].strip()
 
             elif "iter_max" in line:
                 iter_max = line.split("=")[1].strip()
@@ -140,8 +140,8 @@ def readLog(self):
             self.form[1].geo_height.setText(box_height)
 
         self.form[1].precrackFlag.setCurrentText(precrackFlag)
-        self.form[1].precrack_depth.setText(precrack_depth)
-        self.form[1].precrack_width.setText(precrack_width)
+        self.form[1].precrack_start.setText(precrack_start)
+        self.form[1].precrack_end.setText(precrack_end)
 
         self.form[1].iter_max.setText(iter_max)
         self.form[1].theta_min.setText(theta_min)

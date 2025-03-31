@@ -1320,7 +1320,7 @@ def GenerateBeamElement(voronoi_vertices_3D,nvertices_3D,NURBS_degree,nctrlpt_pe
 
 
 def InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
-                     cellsize_early,precrack_width,nsegments):
+                     cellsize_early,nsegments):
 
     precrack_midpts = (precrack_nodes[:,0:2]+precrack_nodes[:,2:4])/2.0
     ridge_midpts = all_pts_2D[all_ridges[:,2]]
