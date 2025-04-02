@@ -1614,9 +1614,11 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                 if z_idx.any(): # then if its in a marked location
                     # tan or rad direction
                     if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
-                        Meshdata[i,28] = 1 # tangential 
+                        Meshdata[i,28] = 1  # tangential 
+                        Meshdata[i,24] += 10  # modify connector type 
                     else:
                         Meshdata[i,28] = 2 # radial
+                        Meshdata[i,24] += 20 
 
     # Replace nodal coordinates with nodal indices
     Meshdata[:,0:2] = np.concatenate((connector_t_bot_connectivity,connector_t_reg_connectivity,connector_t_top_connectivity,connector_l_connectivity))
