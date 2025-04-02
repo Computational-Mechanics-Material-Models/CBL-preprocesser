@@ -1478,8 +1478,8 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         random_field.generateFieldOnGrid()                  # calculation of preparation files, can be used for any geometry
         rf_array = np.empty((nel_con_l,3,1))
     # Meshdata = [nodex1 nodey1 nodez1 nodex2 nodey2 nodez2 centerx centery centerz 
-    # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag short_flag]   
-    Meshdata = np.zeros((nel_con,28))
+    # dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag short_flag ray_flag]   
+    Meshdata = np.zeros((nel_con,29))
     
     if knotFlag == 'On':
         ktol = 0.02 # needs to be calibrated -SA
@@ -1577,7 +1577,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     if rayFlag == 'On':
         radii_rays = radii[2:]
         zstart = np.arange(0,z_max,segment_length/2)
-        ds = 0.02
+        ds = 0.02 #arbitrary
         nthetas = np.array(radii_rays/ds,dtype='int')
         zmatrix = np.empty(len(radii_rays))
         # get an array of rays and corresponding height for each ring, with randomness
@@ -1598,7 +1598,6 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
 
         total_info = np.column_stack((rvals,zvals,thetas,psis,widthvals))
 
-        check = 0
         for i in range(0,len(rvals)):
             r,z,theta,psi,width = total_info[i,:]
             if width == latewidth:
@@ -1615,11 +1614,9 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                 if z_idx.any(): # then if its in a marked location
                     # tan or rad direction
                     if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
-                        Meshdata[i,26] = 1 # tangential 
-                        check +=1
+                        Meshdata[i,28] = 1 # tangential 
                     else:
-                        Meshdata[i,26] = 2 # radial
-        print(check,'tangential connectors removed for rays')
+                        Meshdata[i,28] = 2 # radial
 
     # Replace nodal coordinates with nodal indices
     Meshdata[:,0:2] = np.concatenate((connector_t_bot_connectivity,connector_t_reg_connectivity,connector_t_top_connectivity,connector_l_connectivity))
@@ -1637,7 +1634,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     '\n\
     Number of long connectors\n'+ str(nel_con_l) +
     '\n\
-    [inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag short_flag]', comments='')  
+    [inode jnode centerx centery centerz dx1 dy1 dz1 dx2 dy2 dz2 n1x n1y n1z n2x n2y n2z width height random_field connector_flag knot_flag precrack_flag short_flag ray_flag]', comments='')  
 
     # pr.disable()
     # loc = os.path.join(r"C:\Users\SusanAlexisBrown\woodWorkbench", geoName, 'connProfile.cProf')
@@ -2133,6 +2130,8 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     knot_vtk = np.tile(np.copy(ConnMeshData[:,21]),(2))
     RF_vtk = np.tile(np.copy(ConnMeshData[:,19]),(2))
     precrack_vtk = np.tile(np.copy(ConnMeshData[:,22]),(2))
+    short_vtk = np.tile(np.copy(ConnMeshData[:,23]),(2))
+    rays_vtk = np.tile(np.copy(ConnMeshData[:,24]),(2))
 
     vtkfile_conns_vol = open (Path(App.ConfigGet('UserHomePath') + '/woodWorkbench' + '/' + geoName + '/' + geoName + '_conns_vol'+'.vtu'),'w')
     
@@ -2211,6 +2210,18 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     for i in range(0,ncell_conns_vol):
         PC = precrack_vtk[i]
         vtkfile_conns_vol.write('%11.8e'%PC+'\n')
+    vtkfile_conns_vol.write('</DataArray>'+'\n')
+    # add short connectors visualization
+    vtkfile_conns_vol.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"shortFlag"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
+    for i in range(0,ncell_conns_vol):
+        SC = short_vtk[i]
+        vtkfile_conns_vol.write('%11.8e'%SC+'\n')
+    vtkfile_conns_vol.write('</DataArray>'+'\n')
+    # add radial ray visualization
+    vtkfile_conns_vol.write("<"+"DataArray"+" "+"type="+'"'+"Float32"+'"'+" "+"Name="+'"rayFlag"'+" "+"format="+'"'+"ascii"+'"'+">"+'\n')
+    for i in range(0,ncell_conns_vol):
+        RR = rays_vtk[i]
+        vtkfile_conns_vol.write('%11.8e'%RR+'\n')
     vtkfile_conns_vol.write('</DataArray>'+'\n')
 
     vtkfile_conns_vol.write('</CellData>'+'\n')
