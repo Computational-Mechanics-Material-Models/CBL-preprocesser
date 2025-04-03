@@ -1603,7 +1603,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                     # tan or rad direction
                     if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
                         Meshdata[i,28] = 1  # tangential 
-                        Meshdata[i,24] = 6  # modify connector type 
+                        Meshdata[i,24] = 5  # modify connector type 
                     else:
                         Meshdata[i,28] = 2 # radial
                         Meshdata[i,24] = 6 
