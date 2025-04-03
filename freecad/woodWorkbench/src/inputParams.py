@@ -105,8 +105,8 @@ def inputParams(form):
     # at least 2 segments, with 3 per cell length
    
     precrackFlag = form[1].precrackFlag.currentText()
-    precrack_start = eval(form[1].precrack_start.text() or "(-0.25,0)") # starting coords of precrack
-    precrack_end = eval(form[1].precrack_end.text() or "(-0.2,0)") # end of precrack
+    precrack_start = eval(form[1].precrack_start.text() or "(5.5,0)") # starting coords of precrack
+    precrack_end = eval(form[1].precrack_end.text() or "(5.65,0)") # end of precrack
 
     iter_max = int(form[1].iter_max.text() or 2) # lloyd iterations 
     NURBS_degree = 2

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>369</width>
-    <height>735</height>
+    <height>780</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -654,7 +654,7 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>-0.25,0</string>
+            <string>5.5,0</string>
            </property>
           </widget>
          </item>
@@ -696,7 +696,7 @@
             <string/>
            </property>
            <property name="placeholderText">
-            <string>-0.2,0</string>
+            <string>5.65,0</string>
            </property>
           </widget>
          </item>
@@ -1066,7 +1066,7 @@
      <x>0</x>
      <y>0</y>
      <width>369</width>
-     <height>21</height>
+     <height>26</height>
     </rect>
    </property>
   </widget>
