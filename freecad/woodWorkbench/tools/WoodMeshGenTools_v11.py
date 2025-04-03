@@ -113,10 +113,6 @@ def rotate_around_point_highperf(xy, radians, origin=(0, 0)):
     return qx, qy
 
 def relax_points(vor,omega):
-    """
-    Moves each point to the centroid of its cell in the Voronoi map to "relax"
-    the points (i.e. jitter them so as to spread them out within the space).
-    """
 
     filtered_regions = []
     
@@ -133,15 +129,7 @@ def relax_points(vor,omega):
     return centroids # store the centroids as the new site positions
 
 def find_centroid(vertices,omega):
-    """
-    Find the centroid of a Voroni region described by `vertices`, and return a
-    np array with the x and y coords of that centroid.
-    The equation for the method used here to find the centroid of a 2D polygon
-    is given here: https://en.wikipedia.org/wiki/Centroid#Of_a_polygon
-    @params: np.array `vertices` a numpy array with shape n,2
-    @returns np.array a numpy array that defines the x, y coords
-      of the centroid described by `vertices`
-    """
+    # https://en.wikipedia.org/wiki/Centroid#Of_a_polygon
 
     area = 0
     centroid_x = 0
@@ -1615,10 +1603,10 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                     # tan or rad direction
                     if (np.pi/4 < psi < 3*np.pi/4) or (5*np.pi/4 < psi < 7*np.pi/4):
                         Meshdata[i,28] = 1  # tangential 
-                        Meshdata[i,24] += 10  # modify connector type 
+                        Meshdata[i,24] = 6  # modify connector type 
                     else:
                         Meshdata[i,28] = 2 # radial
-                        Meshdata[i,24] += 20 
+                        Meshdata[i,24] = 6 
 
     # Replace nodal coordinates with nodal indices
     Meshdata[:,0:2] = np.concatenate((connector_t_bot_connectivity,connector_t_reg_connectivity,connector_t_top_connectivity,connector_l_connectivity))
