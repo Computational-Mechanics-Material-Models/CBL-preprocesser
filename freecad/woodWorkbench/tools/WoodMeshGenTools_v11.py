@@ -356,17 +356,16 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         existing_sites = np.vstack((sites,existing_sites))
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     
-    
-    existing_sites = existing_sites[check_isinside(existing_sites,boundary_points,2e-1)]
-    existing_sites =  np.squeeze(existing_sites)
+    # cut sites to boundary to make lloyd relaxation more efficient
+    # due to bug cannot use regular checkisinside    -SA
+    poly_path = mpltPath.Path(boundary_points.tolist())
+    in_path = poly_path.contains_points(existing_sites) # binary of points in or not
+    existing_sites = existing_sites[in_path]
 
     lloyd_iter = 0
     while lloyd_iter < iter_max:
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
-        # added check for boundaries again to patch bug -SA
-        existing_sites[check_isinside(existing_sites,boundary_points,2e-1)]
-        existing_sites =  np.squeeze(existing_sites)
         lloyd_iter += 1
     
     # check if sites are too close the the boundary 
