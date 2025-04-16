@@ -98,8 +98,8 @@ def inputParams(form):
         box_depth += 1e-10
     max_diag = sqrt(box_size**2*2) # diagonal length of square
     max_rad = sqrt(box_center[0]**2 + box_center[1]**2) # radius of box center
-    r_max =  max_rad + max_diag + 0.1 # outer radius of generation domain with a buffer of 0.1
-    nrings = ceil(r_max/ring_width) # number of rings to generate
+    r_max =  max_rad + max_diag + 0.1 # outer radius of generation domain with a buffer of 0.1 mm
+    nrings = ceil(r_max/ring_width) # number of rings to generate, rounded up
     
     nsegments = max(ceil(box_height/cell_length*3),2) # number of segments in the longitudinal direction
     # at least 2 segments, with 3 per cell length
