@@ -23,6 +23,7 @@ import datetime
 import pkg_resources
 import time
 import shapely.plotting
+import shapely.ops
 import shapely as shp
 from bisect import bisect_left, bisect_right
 import FreeCAD as App # type: ignore
@@ -429,14 +430,15 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     vortri_raycoords = vortri_vertices[vortri_rayinds]
     vortri_raydirs = vortri[3]
 
-    # ax.plot(vorsci.vertices[:,0],vorsci.vertices[:,1],'ko',markersize=4.)
+    # ax.plot(vorsci.vertices[:,0],vorsci.vertices[:,1],'go',markersize=1.)
     # # ax.plot(vortri_vertices[:,0],vortri_vertices[:,1],'g^',markersize=3.)
+    # plt.show()
 
     nrdgs = len(vorsci.ridge_points) # number of ridges and thus number of flow elements
-    nlayers = 2*nsegments + 1 # number of node layers 
+    nlayers = nsegments + 2 # number of node layers (on per segment plus top and bottom layers)
     nnodes = npts*nlayers 
-    nels_long = npts*(nsegments+1)
-    nels_trans = nrdgs*nsegments
+    nels_long = npts*(nsegments+1) # in between layers plus top and bottom
+    nels_trans = nrdgs*nsegments 
     nels = nels_long + nels_trans
     delaun_elems_long = np.zeros((nels_long,20)) 
     delaun_elems_trans = np.zeros((nels_trans,20)) # empty arrays for flow info
@@ -454,37 +456,36 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
         if (l == 0) or (l == nlayers-2): # the first or last layer
             z_coord += segment_length/2
         else: # for middle elements include connector distance
-            z_coord += segment_length/2 + connector_l_length/2
+            z_coord += segment_length + connector_l_length
 
     # nodes
     delaun_num = np.zeros(((nnodes),1)) # delaun_num is hacky because of np dimension nonsense -SA
     delaun_num[:,0] = np.linspace(0,nnodes-1,nnodes,dtype='int64')
     delaun_verts_layers = np.tile(delaunay_pts,(nlayers,1)) # tile node xy coords for each layer
-    delaun_nodes = np.concatenate((delaun_num,delaun_verts_layers,coordsz),axis=1)
+    delaun_nodes = np.concatenate((delaun_verts_layers,coordsz),axis=1)
 
     # longitudinal elements
     for l in range(0,nsegments+1):
         long_area = 0
         # get layer properties
-        if (l == 0) or (l == nsegments): # first or last layer
+        if (l == 0) or (l == nlayers-1): # first or last element layer
             typeFlag = 1
             el_len1 = segment_length/2
             el_len2 = 0
-            ni = 1
         else:
             typeFlag = 0
             el_len1 = (segment_length + connector_l_length)/2
-            el_len2 = el_len1 # for longitudinal elements they are always half and half, won't work for curved beams though -SA
-            ni = 3
+            el_len2 = (segment_length + connector_l_length)/2 
+            # for mid longitudinal elements they are always half and half, won't work for curved beams though -SA
         # for each element in layer
         el_len = el_len1 + el_len2 # in long direction, total length is just sum of lengths due to purely vertical direction
         for p in range(0,npts):
             nel_l = p + l*npts # element index
-            nd = [p + l*npts, p + (l+ni)*npts] # manual calculation of 3D node numbers
+            nd = [p + l*npts, p + (l+1)*npts] # manual calculation of 3D node numbers
 
             pr = vorsci.point_region[p] # index of voronoi region
             pv = vorsci.regions[pr] # vertices of voronoi region
-            refpt = (delaun_nodes[nd[0],1:3] + delaun_nodes[nd[1],1:3])/2 # average xy of top/bot of long element to get average xy location
+            refpt = (delaun_nodes[nd[0],0:2] + delaun_nodes[nd[1],0:2])/2 # average xy of top/bot of long element to get average xy location
 
             if (-1) in pv: # check if boundary cell, as noted by -1 for vertice index
                 # this part gets the intersection of the infinite ray and a perpindicular line 
@@ -495,6 +496,9 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 gen = (v for v in pv if v != -1)
                 coords_in = np.empty((0,2)) # coordinates of voronoi vertices
                 coords_out = np.empty((0,2)) # coordinates of new intersection vertices
+                corner = False
+                if np.shape(pv)[0] < 3: # check if a corner element with two rays from vertex (only case with only one real vertex)
+                    corner = True
                 for v in gen: # for every actual vertex of the cell
                     coord = vorsci.vertices[v]
                     path_in = check_isinside([coord],boundaries[:,1],0) # checks coordinate is inside
@@ -503,27 +507,36 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                         coords_in = np.vstack([coords_in,coord])
                         # check if vertex is start of infinite ray
                         inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-5)).all(axis=1)) 
-                        int_pts = np.empty((np.size(inds),2))  # could be multiple boundary rays for single vertex (i.e. a corner)
-                        # if infinite ray
-                        for i in range(0, np.size(inds)):           
-                            # Find the intersect point of infinite ridges (rays) with the boundary lines
-                            ray_dir = vortri_raydirs[inds[i]]
-                            # print(np.shape(ray_dir[:]),np.shape(np.linalg.norm(ray_dir[:]) ))
-                            normal = ray_dir[:]/np.linalg.norm(ray_dir[:]) # normal
-                            intpts = find_intersect(coord,normal,boundaries)
-                            if intpts.any():
-                                int_pts[i,:] = intpts
+                        if np.any(inds): # uf the vertex is start of ray
+                            int_pts = np.empty((np.size(inds),2))  # could be multiple boundary rays for single vertex (i.e. a corner)
+                            # if infinite ray
+                            if corner: # if corner with two rays from vertex
+                                for i in range(0, np.shape(inds)[1]): # take both rays      
+                                    # Find the intersect point of infinite ridges (rays) with the boundary lines
+                                    ray_dir = vortri_raydirs[inds[0][i]]
+                                    normal = ray_dir[:]/np.linalg.norm(ray_dir[:]) # normal
+                                    intpts = find_intersect(coord,normal,boundaries)
+                                    if intpts.any(): # double check there was an interesection
+                                        int_pts[i,:] = intpts # add intersection point to coordinates
+                                    else:
+                                        print('(flowa)',coord)
+                                        int_pts[i,:] = coord
                             else:
-                                print('(flow)',coord)
-                                int_pts[i,:] = coord
-                        coords_out = np.vstack([coords_out,int_pts])
-                    # else: # if the point is outside, treat like a new infinite ridge ***************
-                    #     # print('out',coord)
-                    #     # coords_out = np.vstack([coords_out,refpt])
-                    #     # get the ridge its on
-                    #     # intpts = find_closeintersect(coord,boundaries)
-                    #     # print(intpts)
-                coords = np.vstack([coords_in,coords_out,refpt]) # combine interior with exterior nodes and boundary flow point for correct area 
+                                # only take first ray? *** how to pick which ray to take -SA coordsd as in transverse?
+                                # Find the intersect point of infinite ridges (rays) with the boundary lines
+                                ray_dir = vortri_raydirs[inds[0][0]]
+                                normal = ray_dir[:]/np.linalg.norm(ray_dir[:]) # normal
+                                intpts = find_intersect(coord,normal,boundaries)
+                                if intpts.any(): # double check there was an interesection
+                                    int_pts = intpts
+                                else:
+                                    print('(flowb)',coord)
+                                    int_pts = coord
+                            coords_out = np.vstack((coords_out,int_pts))
+                    else: # if the point is outside, treat like a new infinite ridge ***************
+                        print('bound cell')
+                        # boundary cell for which one real vertex is outside, is that vertex needed for correct area?
+                coords = np.vstack((coords_in,coords_out,refpt)) # combine interior with exterior nodes and boundary flow point for correct area 
                 if np.shape(coords)[0] > 2:
                     # cells must be convex and greater than only two points
                     coords_sort = sort_coordinates(coords)
@@ -533,22 +546,38 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 else:
                     flow_area = 0
 
-            else:
-                # coords = vorsci.vertices[pv] # coordinates of voronoi vertices
-                path_in = check_isinside(vorsci.vertices[pv],boundaries[:,1],1e-5) # checks sites inside boundary using path
-                if not path_in.all(): # if any coordinates are not in, turn into intersections
-                    # print('cut new cell') *************
-                    coords = np.vstack([vorsci.vertices[pv][path_in],refpt]) # coordinates of voronoi vertices
-                    coords_sort = sort_coordinates(coords) # cells must be convex
-                    pgon = shp.Polygon(coords_sort)
-                    flow_area = pgon.area
-                    # shapely.plotting.plot_polygon(pgon)
+            else: # not infinite
+                path_in = check_isinside(vorsci.vertices[pv],boundaries[:,1],0) # checks sites inside boundary using path
+                if not path_in.all(): # if any coordinates are not in, cut cell to get actual area
+                    # cut cell geometry by line of boundary points
+                    bound = shp.LineString(boundaries[:,1])
+                    coords = vorsci.vertices[pv]
+                    coords_sort = sort_coordinates(coords) 
+                    cell = shp.Polygon(coords_sort)
+                    outcome = shapely.ops.split(cell, bound)
+                    # take the resulting shape with maximum area (since that will always be the remaining cell? seems not true)
+                    # should compare coordinates - SA
+                    # areas = [pgon.area for pgon in outcome.geoms]
+                    pgons = outcome.geoms
+                    for pgon in pgons:
+                        # get coordinates, including new coordinate of intersection point
+                        coords = shapely.get_coordinates(pgon)
+                        pgon_in = check_isinside(coords,boundaries[:,1],0)
+                        if pgon_in.all():
+                            flow_area = pgon.area
+                            # print('in')
+                            # shapely.plotting.plot_polygon(pgon)
+                            pv = np.array(pv)[path_in] # only inside points for index connectivity
+                        else:
+                            flow_area = 0
+                            # print('out')
                 else: # if all the coordinates are in
                     coords = vorsci.vertices[pv] # coordinates of voronoi vertices
                     # calculate the flux area of voronoi region of arbitrary shape
                     coords_sort = sort_coordinates(coords) # cells must be convex
                     pgon = shp.Polygon(coords_sort)
                     flow_area = pgon.area
+                    # shapely.plotting.plot_polygon(pgon)
 
             el_vol = el_len*flow_area/3 # element volume
             if el_vol != 0:
@@ -568,14 +597,14 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     # transverse elements
     for l in range(0,nsegments): # each segment
         tran_area = 0
-        el_h = segment_length + connector_l_length/2 # element height 
+        el_h = segment_length + connector_l_length # element height 
         typeFlag = 2
         for r in range(0,nrdgs):
             nel_t = r + l*nrdgs # element index
 
             pd = vorsci.ridge_points[r] # 2D flow index for ridge
             coordsd = delaunay_pts[pd] # 2D flow coords
-            nd = pd + (2*l+1)*npts # translate 2D flow index to 3D flow index
+            nd = pd + (l+1)*npts # translate 2D flow index to 3D flow index
             el_len = np.linalg.norm((coordsd[0,:]-coordsd[1,:])) # distance bewteen flow nodes (element length)
 
             pv = vorsci.ridge_vertices[r] # 2D vor index for ridge
@@ -589,19 +618,17 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                     # if infinite ray
                     for i in range(0, np.size(inds)):           
                         # Find the intersect point of infinite ridges (rays) with the boundary lines
-                        ray_dir = vortri_raydirs[inds[i]]
+                        ray_dir = vortri_raydirs[inds[0][i]]
                         normal = ray_dir[:]/np.linalg.norm(ray_dir[:]) # normal
-                        # all infinite rays cross boundary at delauney line? should be -SA
                         intpts = find_intersect(coord,normal,[coordsd]) # 
-                        if np.shape(intpts)[0] > 1:
-                            print('two??')
-                        if not intpts.any():
-                            print('(flow2)',coord)
-                    coordsv = np.vstack([coord,intpts]) # combine finite and infinite points
-                    vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
+                        # if not intpts.any():
+                            # print('(flow2)',coord) # means second ray of two ray vertex which wasn't in element
+                        if intpts.any():
+                            coordsv = np.vstack((coord,intpts)) # combine finite and infinite points
+                            vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
 
-                    # coords_pgon = np.vstack([coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]])
-                    # pgon = shp.Polygon(coords_pgon)
+                    coords_pgon = np.vstack((coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]))
+                    pgon = shp.Polygon(coords_pgon)
                     # shapely.plotting.plot_polygon(pgon)
                     # tran_area += pgon.area
                 else:
@@ -614,8 +641,8 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                     coordsv = coords # coordinates of voronoi vertices
                     vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
 
-                    # coords_pgon = np.vstack([coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]])
-                    # pgon = shp.Polygon(coords_pgon)
+                    coords_pgon = np.vstack((coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]))
+                    pgon = shp.Polygon(coords_pgon)
                     # shapely.plotting.plot_polygon(pgon)
                     # tran_area += pgon.area
 
@@ -624,18 +651,14 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                     d = [v for v in pv if not check_isinside(np.array([vorsci.vertices[v]]),boundaries[:,1],0)] # index of outside vertex
                     coord = vorsci.vertices[v] # coordinates of inside vertex
                     # create direction of ridge
-                    ray_dir = vorsci.vertices[d] - vorsci.vertices[v]     # outside corods minus inside coords
-                    normal = ray_dir[i,:]/np.linalg.norm(ray_dir[i,:]) # normal
+                    ray_dir = vorsci.vertices[d] - vorsci.vertices[v]     # outside coords minus inside coords
+                    normal = ray_dir/np.linalg.norm(ray_dir) # normal
                     intpts = find_intersect(coord,normal,[coordsd]) # 
-                    if np.shape(intpts)[0] > 1:
-                        print('twox2??')
-                    if not intpts.any():
-                        print('(flow3)',coord)
-                    coordsv = np.vstack([coord,intpts]) # combine finite and infinite points 
+                    coordsv = np.vstack((coord,intpts)) # combine finite and infinite points 
                     vor_len = np.linalg.norm((coordsv[0,:]-coordsv[1,:])) # distance between vor coords (for area)
 
-                    # coords_pgon = np.vstack([coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]])
-                    # pgon = shp.Polygon(coords_pgon)
+                    coords_pgon = np.vstack((coordsd[0,:],coordsv[0,:],coordsd[1,:],coordsv[1,:]))
+                    pgon = shp.Polygon(coords_pgon)
                     # shapely.plotting.plot_polygon(pgon)
                     # tran_area += pgon.area
                 else: # finite ridge totally outside
@@ -656,11 +679,11 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                 delaun_elems_trans[nel_t,6] = typeFlag # element type
                 delaun_elems_trans[nel_t,7] = pv[0] # voronoi indices of related ridge
                 delaun_elems_trans[nel_t,8] = pv[1] #
-                tran_area += 0.5*(el_len1 + el_len2)*vor_len
+                tran_area += 0.5*(el_len)*vor_len
                 # if l == 0:
                 #     ax.plot(coordsv[:,0],coordsv[:,1],'bs-',markersize=3)
                 #     ax.annotate('r{:d}'.format(r),coordc,size=5,color='g')
-        # print('transverse area',tran_area)
+        # print('transverse area',tran_area) # error using formulated, correct using shapely
     
     # remove zero volume rows
     delaun_elems_long = delaun_elems_long[~np.all(delaun_elems_long == 0, axis=1)]
@@ -668,12 +691,26 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
     nels = np.shape(delaun_elems)[0]
 
-    total_vol = sum(delaun_elems[:,5])
-    print('total flow volume','{:.2e}'.format(total_vol))
+    plt.show()
+    # total_vol = sum(delaun_elems[:,5])
+    # print('total flow volume','{:.2e}'.format(total_vol))
 
-    # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.npy'), delaun_nodes)
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
-        ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
+    with open(Path(outDir + '/' + geoName + '/' + geoName +'-flowMesh.mesh'), 'w') as meshfile:
+        meshfile.write('*Nodes\n')
+        for row in delaun_nodes:
+            meshfile.write(' '.join([str(a) for a in row]) + '\n')
+        meshfile.write('*Element\n')
+        for row in delaun_elems:
+            meshfile.write(' '.join([str(a) for a in row[0:2]]) + '\n')
+    
+    # add node number for visualization
+    ncount = np.arange(0,nnodes,1,dtype=int)
+    delaun_nodes = np.hstack((np.expand_dims(ncount.transpose(),axis=1),delaun_nodes))
+
+        # close(meshfile)
+    # # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.npy'), delaun_nodes)
+    # np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowMesh.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
+    #     ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
     
     # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.npy'), delaun_elems)
     np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = \
@@ -791,10 +828,11 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     # ax.plot(boundary_points[:,0],boundary_points[:,1],'b^',markersize=5)
 
     # print(boundary_points)
-    # points = sort_coordinates(boundary_points)
+    points = sort_coordinates(boundary_points)
     # print(points)
-    # pgon = shp.Polygon(points)
-    # print('poly area',pgon.area)
+    pgon = shp.Polygon(points)
+    # print('cross sectional area',pgon.area)
+    # cell_area = pgon.area
     # ax = plt.gca()
     # shapely.plotting.plot_polygon(pgon)
 
