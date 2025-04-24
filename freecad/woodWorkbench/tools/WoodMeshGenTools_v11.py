@@ -119,7 +119,7 @@ def relax_points(vor,omega):
     
     nonempty_regions = list(filter(None, vor.regions))
     filtered_regions = [region for region in nonempty_regions if not any(x < 0 for x in region)]
-    # filtered_regions = nonempty_regions
+    # filtered_regions = non boundary regions
     
     centroids = np.zeros((len(filtered_regions),2))
     for i in range(0,len(filtered_regions)):   
@@ -175,8 +175,6 @@ def find_intersect(p,normal,boundaries):
                 intersect_point = p + normal * t_final
                 intersect_points.append(intersect_point)
     if not intersect_points:
-        print('no intersect found')
-        # print(p, normal)
         return np.empty([0,2])
     elif np.shape(intersect_points)[0] > 1:
         # vector crosses multiple boundaries, get the closest one as adhoc solution
@@ -257,11 +255,16 @@ def Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,
     else:
         print('box_shape: {:s} is not supported for current version, please check README for more details.'.format(box_shape))
         # exit()
+    
+    points = sort_coordinates(boundary_points)
+    pgon = shp.Polygon(points)
+    # print('cross sectional area',pgon.area)
+    bound_area = pgon.area
 
     # Relies on boundary points to be defined in order (i.e. cannot only be clockwise for notch)
     boundaries = np.concatenate((np.expand_dims(boundary_points,axis=1),np.roll(np.expand_dims(boundary_points,axis=1),-1,axis=0)),axis=1)
 
-    return x_min,x_max,y_min,y_max,boundaries,boundary_points
+    return x_min,x_max,y_min,y_max,boundaries,boundary_points, bound_area
 
 
 def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
@@ -896,7 +899,7 @@ def RebuildVoronoi_ConformingDelaunay_New(ttvertices,ttedges,ttray_origins,ttray
     
 
     
-    return voronoi_vertices,boundary_points,finite_ridges_new,\
+    return voronoi_vertices,finite_ridges_new,\
         boundary_ridges_new,nvertices,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,voronoi_ridges,nridge
 
@@ -911,8 +914,7 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     Uinf = knotParams.get('Uinf')
     # Number of points per layer
     npt_per_layer = nvertex
-    npt_per_layer_normal = npt_per_layer
-            
+
     # Number of control points per beam
     nctrlpt_per_elem = NURBS_degree + 1
     nctrlpt_per_beam = 2*NURBS_degree + 1
@@ -925,7 +927,7 @@ def LayerOperation(NURBS_degree,nsegments,theta_min,theta_max,finite_ridges_new,
     nconnector_t_per_grain = int(nconnector_t_per_beam*nsegments)
     
     # Length of layer
-    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
+    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio) # beam segment length
     segment_angle = (theta_max-theta_min) / (nsegments + (nsegments-1)*long_connector_ratio)
 
     # Size of connectors
@@ -1111,7 +1113,7 @@ def RidgeMidQuarterPts(voronoi_vertices_3D,nvertex,nvertices_in,voronoi_ridges,\
             all_ridges_3D = np.vstack((all_ridges_3D,all_ridges_2D))
 
     
-### Old code
+    ### Old code
 
     ######################### For finite Voronoi ridges ###########################
     # Form a list of middle points of finite Voronoi edges
@@ -1453,7 +1455,7 @@ def InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                       connector_t_reg_connectivity,connector_t_top_connectivity,\
                       connector_l_connectivity,all_vertices_2D,\
-                      max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
+                      max_wings,flattened_all_vertices_2D,nsegments,segment_length,long_connector_ratio,\
                       nctrlpt_per_beam,theta,nridge,\
                       randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthick,radii,z_max,rayFlag):
     # pr = cProfile.Profile()
@@ -1474,7 +1476,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     nel_con = nel_con_tbot + nel_con_treg + nel_con_ttop + nel_con_l
     
     # calculate heights of transverse connectors
-    height_connector_t = segment_length/4
+    height_connector_t = segment_length*(1 - long_connector_ratio)/4
     
     # calculate longitudinal connectors
     nlayers_conn_l = nsegments - 1
@@ -1517,6 +1519,8 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         Meshdata[i,0:3] = IGAcopy[connector_t_bot_connectivity[i,0]-1,:] # xyz coords of first half
         Meshdata[i,3:6] = IGAcopy[connector_t_bot_connectivity[i,1]-1,:] # xyz coords of second half
         Meshdata[i,22] = height_connector_t # connector length
+        Meshdata[i,2] += height_connector_t/2
+        Meshdata[i,5] += height_connector_t/2
         Meshdata[i,24] = 1 # connector type
         if i in precrack_elem: # 
             Meshdata[i,26] = 1 # precrack flag
@@ -1533,6 +1537,8 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         Meshdata[i+offset,0:3] = IGAcopy[connector_t_top_connectivity[i,0]-1,:]
         Meshdata[i+offset,3:6] = IGAcopy[connector_t_top_connectivity[i,1]-1,:]
         Meshdata[i+offset,22] = height_connector_t
+        Meshdata[i+offset,2] += -height_connector_t/2
+        Meshdata[i+offset,5] += -height_connector_t/2
         Meshdata[i+offset,24] = 3
         if i in precrack_elem:
             Meshdata[i+offset,26] = 1 # precrack flag
@@ -4327,7 +4333,7 @@ def ChronoMesh(geoName,woodIGAvertices,beam_connectivity,NURBS_degree,nctrlpt_pe
     igafile.close()
 
 
-def ModelInfo(boundary_points,height,net_area):
+def ModelInfo(height,net_area,sec_area):
 
     #Calculate the material properties of generated geometry
     
@@ -4340,17 +4346,14 @@ def ModelInfo(boundary_points,height,net_area):
 
     net_volume = net_area*height
     mass = wall_density*net_volume
-
-    hull = ConvexHull(boundary_points)
-    gross_area = hull.volume 
     
-    bulk_volume = height*gross_area
+    bulk_volume = height*sec_area
     bulk_density = mass/bulk_volume
     
     mass_if_all_solid = wall_density*bulk_volume # if all skeleton phase
     porosity = 1 - mass/mass_if_all_solid
 
-    return mass,bulk_volume,bulk_density,porosity,gross_area
+    return mass,bulk_volume,bulk_density,porosity
 
 
 def LogFile(geoName,outDir,mass,bulk_volume,bulk_density,porosity,net_area,gross_area):

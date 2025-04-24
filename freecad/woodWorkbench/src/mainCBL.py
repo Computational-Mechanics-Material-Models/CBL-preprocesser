@@ -118,7 +118,7 @@ def main(self):
     # ==================================================================
     # Place cells with a specific radial growth pattern
 
-    x_min,x_max,y_min,y_max,boundaries,boundary_points_original = \
+    x_min,x_max,y_min,y_max,boundaries,boundary_points_original, sec_area = \
         WoodMeshGen.Clipping_Box(box_shape,box_center,box_size,box_width,box_depth,x_notch_size,y_notch_size,self.form)
     
     if radial_growth_rule == 'binary_lloyd':
@@ -202,7 +202,7 @@ def main(self):
     # ==================================================================
     # Rebuild the Voronoi mesh
 
-    [voronoi_vertices,boundary_points,finite_ridges_new,\
+    [voronoi_vertices,finite_ridges_new,\
         boundary_ridges_new,nvertex,nvertices_in,nfinite_ridge,nboundary_ridge,\
         nboundary_pts,voronoi_ridges,nridge] = \
         WoodMeshGen.RebuildVoronoi_ConformingDelaunay_New(vor_vertices,vor_edges,ray_origins,ray_directions,\
@@ -340,14 +340,14 @@ def main(self):
         WoodMeshGen.ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
                     connector_t_reg_connectivity,connector_t_top_connectivity,\
                     connector_l_connectivity,all_vertices_2D,\
-                    max_wings,flattened_all_vertices_2D,nsegments,segment_length,\
+                    max_wings,flattened_all_vertices_2D,nsegments,segment_length,long_connector_ratio,\
                     nctrlpt_per_beam,theta,nridge,\
                     randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthickness_early,radii,z_max,rayFlag)
 
     # ---------------------------------------------
 
     # Calculate model properties
-    [mass,bulk_volume,bulk_density,porosity,gross_area] = WoodMeshGen.ModelInfo(boundary_points,box_height,vert_area)
+    [mass,bulk_volume,bulk_density,porosity] = WoodMeshGen.ModelInfo(box_height,vert_area,sec_area)
 
     # ---------------------------------------------
     # Bezier extraction 
@@ -414,7 +414,7 @@ def main(self):
 
     # ---------------------------------------------
     # Add to log file for the generation
-    WoodMeshGen.LogFile(geoName,outDir,mass,bulk_volume,bulk_density,porosity,vert_area,gross_area)
+    WoodMeshGen.LogFile(geoName,outDir,mass,bulk_volume,bulk_density,porosity,vert_area,sec_area)
     
     # ==================================================================
     self.form[3].progressBar.setValue(90) 
