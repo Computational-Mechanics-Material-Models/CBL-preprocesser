@@ -53,7 +53,7 @@ def inputParams(form):
     randomParams = {}
     randomParams['RF_dist_types'] = ([form[0].dist_types.currentText()] or ["TruncatedGaussian"])
     randomParams['RF_dist_params'] = ([[float(i) for i in form[0].dist_params.text().split(',')]]) # or [[1.,0.05,0]]) # or doesn't work for empty after converting to float - convert later?
-    randomParams['RF_corr_l'] = float(form[0].corr_l.text() or 0.1)
+    randomParams['RF_corr_l'] = float(form[0].corr_l.text() or cell_length/10)
     randomParams['RF_sampling_type'] = (form[0].sampling_type.currentText() or "MC")
 
 
