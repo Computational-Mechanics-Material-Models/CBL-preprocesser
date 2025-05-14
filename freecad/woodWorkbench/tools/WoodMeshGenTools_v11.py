@@ -360,14 +360,17 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
         existing_sites = np.vstack((sites,existing_sites))
         PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
     
-    # cut sites to boundary to make lloyd relaxation more efficient
-    # due to bug cannot use regular checkisinside    -SA
-    poly_path = mpltPath.Path(boundary_points.tolist())
-    in_path = poly_path.contains_points(existing_sites) # binary of points in or not
-    existing_sites = existing_sites[in_path]
+    # cut sites to buffered boundary to make lloyd relaxation more efficient
+    existing_sites = existing_sites[check_isinside(existing_sites,boundary_points,0.2)]
+
+    # try doing the full triangulation and getting the vertices back
+    num_bound = np.shape(boundary_points)[0]  # create boundary segements to enforce boundaries 
+    boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
+    boundary_region = np.array([[5.75,0,1,0]])
 
     lloyd_iter = 0
-    while lloyd_iter < iter_max:
+    for i in range(0,iter_max):
+        # print('iter')
         vor = Voronoi(existing_sites)
         existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
         lloyd_iter += 1
@@ -447,7 +450,7 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     delaun_elems_trans = np.zeros((nels_trans,20)) # empty arrays for flow info
     # n1, n2, l1, l2, area, volume, element type, v1, v2 ... vn
 
-    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio)
+    segment_length = (z_max - z_min) / (nsegments + (nsegments-1)*long_connector_ratio) # beam segment length
     connector_l_length = segment_length*long_connector_ratio
 
     # define z coordinate for each node layer
@@ -471,7 +474,7 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     for l in range(0,nsegments+1):
         long_area = 0
         # get layer properties
-        if (l == 0) or (l == nlayers-1): # first or last element layer
+        if (l == 0) or (l == nsegments): # first or last element layer
             typeFlag = 1
             el_len1 = segment_length/2
             el_len2 = 0
@@ -510,7 +513,7 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                         coords_in = np.vstack([coords_in,coord])
                         # check if vertex is start of infinite ray
                         inds = np.where((np.isclose(vortri_raycoords,coord,rtol=1e-05, atol=1e-5)).all(axis=1)) 
-                        if np.any(inds): # uf the vertex is start of ray
+                        if np.any(inds): # if the vertex is start of ray
                             int_pts = np.empty((np.size(inds),2))  # could be multiple boundary rays for single vertex (i.e. a corner)
                             # if infinite ray
                             if corner: # if corner with two rays from vertex
@@ -548,6 +551,7 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                     # shapely.plotting.plot_polygon(pgon)
                 else:
                     flow_area = 0
+                    print('too small?')
 
             else: # not infinite
                 path_in = check_isinside(vorsci.vertices[pv],boundaries[:,1],0) # checks sites inside boundary using path
@@ -623,6 +627,7 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                         # Find the intersect point of infinite ridges (rays) with the boundary lines
                         ray_dir = vortri_raydirs[inds[0][i]]
                         normal = ray_dir[:]/np.linalg.norm(ray_dir[:]) # normal
+                        # all infinite rays cross boundary at delauney line of ridge? should be -SA
                         intpts = find_intersect(coord,normal,[coordsd]) # 
                         # if not intpts.any():
                             # print('(flow2)',coord) # means second ray of two ray vertex which wasn't in element
@@ -668,12 +673,12 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
                     vor_len = 0
 
             # calculate each length of the element
-            if vor_len > 0:
-                coordc = (coordsv[0,:]+coordsv[1,:])/2 # average vor coords to get center of ridge
-                el_len1 = np.linalg.norm((coordsd[0,:]-coordc)) # distance between flow node and center of ridge
-                el_len2 = np.linalg.norm((coordsd[1,:]-coordc))
-                flow_area = vor_len*el_h # flux area
-                el_vol = el_len*flow_area/3 # element volume (2D area*length*1/3*2 for two pyramids)
+            coordc = (coordsv[0,:]+coordsv[1,:])/2 # average vor coords to get center of ridge
+            el_len1 = np.linalg.norm((coordsd[0,:]-coordc)) # distance between flow node and center of ridge
+            el_len2 = np.linalg.norm((coordsd[1,:]-coordc))
+            flow_area = vor_len*el_h # flux area
+            el_vol = el_len*flow_area/3 # element volume (2D area*length*1/3*2 for two pyramids)
+            if el_vol != 0:
                 delaun_elems_trans[nel_t,0:2] = nd # element connectivity
                 delaun_elems_trans[nel_t,2] =  el_len1
                 delaun_elems_trans[nel_t,3] =  el_len2
@@ -692,34 +697,40 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     delaun_elems_long = delaun_elems_long[~np.all(delaun_elems_long == 0, axis=1)]
     delaun_elems_trans = delaun_elems_trans[~np.all(delaun_elems_trans == 0, axis=1)]
     delaun_elems = np.concatenate((delaun_elems_long,delaun_elems_trans))
+    delaun_elems[:,0:2] += 1 # use 1-base for meshing
     nels = np.shape(delaun_elems)[0]
 
-    plt.show()
-    # total_vol = sum(delaun_elems[:,5])
-    # print('total flow volume','{:.2e}'.format(total_vol))
-
-    with open(Path(outDir + '/' + geoName + '/' + geoName +'-flowMesh.mesh'), 'w') as meshfile:
-        meshfile.write('*Nodes\n')
-        for row in delaun_nodes:
-            meshfile.write(' '.join([str(a) for a in row]) + '\n')
-        meshfile.write('*Element\n')
-        for row in delaun_elems:
-            meshfile.write(' '.join([str(a) for a in row[0:2]]) + '\n')
+    # plt.show()
+    total_vol = sum(delaun_elems[:,5])
+    print('total flow volume','{:.2e}'.format(total_vol))
     
-    # add node number for visualization
+
+    with open(Path(outDir + '/' + geoName + '/' + geoName +'-flowMesh.inp'), 'w') as meshfile:
+        meshfile.write('*Heading\n*Preprint, echo=NO, model=NO, history=NO, contact=NO\n*Part, name=')
+        meshfile.write(geoName)
+        meshfile.write('\n*Node, nset=all\n')
+        i = 0
+        for row in delaun_nodes:
+            i += 1
+            meshfile.write(str(int(i)) + ', ' + ', '.join([str(np.format_float_positional(a, precision=10, unique=False, fractional=False, trim='k')) for a in row]) + '\n')
+        meshfile.write('*Element, type=U1, elset=all\n')
+        i = 0
+        for row in delaun_elems:
+            i += 1
+            meshfile.write(str(int(i)) + ', ' + ', '.join([str(int(a)) for a in row[0:2]]) + '\n')
+        meshfile.write('*End Part\n')
+    
+    # add node index for visualization
     ncount = np.arange(0,nnodes,1,dtype=int)
     delaun_nodes = np.hstack((np.expand_dims(ncount.transpose(),axis=1),delaun_nodes))
-
-        # close(meshfile)
-    # # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowNodes.npy'), delaun_nodes)
-    # np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowMesh.mesh'), delaun_nodes, fmt = ['%d','%0.8f','%0.8f','%0.8f']\
-    #     ,header='Flow Mesh Node Coordinates\nn = '+ str(nnodes) + '\n[# x y z]')
     
     # np.save(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.npy'), delaun_elems)
-    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.mesh'), delaun_elems, fmt = \
+    np.savetxt(Path(outDir + '/' + geoName + '/' + geoName +'-flowElements.dat'), delaun_elems, fmt = \
                ['%d','%d','%0.8f','%0.8f','%0.8f','%0.8f','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d','%d']\
         ,header='Flow Mesh Element Information\nn = '+ str(nels) + '\n[n1 n2 l1 l2 A V type v1 v2 ... vn]')
     
+    delaun_elems[:,0:2] -= 1 # convert back to 0 base for later indexing
+
     return delaun_nodes, delaun_elems
 
 
@@ -1816,13 +1827,13 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     VTKvertices_hex_conn = np.vstack((VTKvertices,hex_conn_vertices))
     npt_total_vtk_hex_conn = VTKvertices_hex_conn.shape[0]
   
-# =============================================================================
+    # =============================================================================
     # Paraview Visualization File
     collocation_flag_vtk = np.concatenate((np.ones(ngrain),np.zeros(npt_per_layer_vtk*NURBS_degree-ngrain)))
     collocation_flag_vtk = np.concatenate((np.tile(collocation_flag_vtk, nconnector_t_per_beam-1),np.concatenate((np.ones(ngrain),np.zeros(npt_per_layer_vtk-ngrain)))))
     collocation_flag_vtk = np.tile(collocation_flag_vtk, nsegments)
 
-# =============================================================================
+    # =============================================================================
     # Paraview Flow File
     
     delaun_nodes_sorted = delaun_nodes[np.argsort(delaun_nodes[:,2]),:]
