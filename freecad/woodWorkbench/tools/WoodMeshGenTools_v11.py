@@ -1530,8 +1530,6 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         Meshdata[i,0:3] = IGAcopy[connector_t_bot_connectivity[i,0]-1,:] # xyz coords of first half
         Meshdata[i,3:6] = IGAcopy[connector_t_bot_connectivity[i,1]-1,:] # xyz coords of second half
         Meshdata[i,22] = height_connector_t # connector length
-        Meshdata[i,2] += height_connector_t/2
-        Meshdata[i,5] += height_connector_t/2
         Meshdata[i,24] = 1 # connector type
         if i in precrack_elem: # 
             Meshdata[i,26] = 1 # precrack flag
@@ -1548,8 +1546,6 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         Meshdata[i+offset,0:3] = IGAcopy[connector_t_top_connectivity[i,0]-1,:]
         Meshdata[i+offset,3:6] = IGAcopy[connector_t_top_connectivity[i,1]-1,:]
         Meshdata[i+offset,22] = height_connector_t
-        Meshdata[i+offset,2] += -height_connector_t/2
-        Meshdata[i+offset,5] += -height_connector_t/2
         Meshdata[i+offset,24] = 3
         if i in precrack_elem:
             Meshdata[i+offset,26] = 1 # precrack flag
