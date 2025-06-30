@@ -1614,14 +1614,17 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
     # Add radial rays in same manner as precrack
     if rayFlag == 'On':
         radii_rays = radii[2:]
-        zstart = np.arange(0,z_max,segment_length/2)
-        ds = 0.02 #arbitrary
+        zstart = np.arange(0,z_max,segment_length)
+        # https://link.springer.com/article/10.1007/s00468-015-1181-8/figures/2  
+        # can have 5/mm thus spacing once every half segment length for spruce gives 1 ray/1 mm is generous
+        ds = 0.5/(2*np.pi) #arbitrary radial spacing between rays for roughly 0.5/2pi mm, relates to above
         nthetas = np.array(radii_rays/ds,dtype='int')
         zmatrix = np.empty(len(radii_rays))
         # get an array of rays and corresponding height for each ring, with randomness
-        rands =  [np.random.random((th,1)) - 0.5 for th in nthetas]
+        # rands =  [(np.random.random((th,1)) - 0.5)/10 for th in nthetas]
+        rands =  [(np.random.random((th,1)) - 0.5)/50 for th in nthetas]
         zmatrix = [(np.tile(zstart,(th,1)) + rands[r]) for r, th in enumerate(nthetas)]
-        thmatrix = [np.linspace(np.random.random()*(np.pi/16),2*np.pi,th) for th in nthetas]
+        thmatrix = [np.linspace(np.random.random()*np.pi*ds/2,2*np.pi,th) for th in nthetas] # random starting point up to half the distance between rays
         # if close to a theta and z value picked by radii index
 
         # segment_length
