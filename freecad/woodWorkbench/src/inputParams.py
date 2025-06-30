@@ -59,7 +59,7 @@ def inputParams(form):
 
     # Geometry Parameters ------------------------
     box_shape = form[1].box_shape.currentText().lower().replace(' ','')
-    box_center = eval(form[1].box_center.text() or "(5.75,0.0)") # coordinates of clipping box center
+    box_center = eval(form[1].box_center.text() or "(15.75,0.0)") # coordinates of clipping box center
     generation_center = (0,0) # coordinates of generation domain center ??? - SA?
     x_notch_size = 0 # depth of notch
     y_notch_size = 0 # width of notch
