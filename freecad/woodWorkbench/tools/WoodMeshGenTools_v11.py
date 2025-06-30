@@ -273,122 +273,133 @@ def CellPlacement_Binary_Lloyd(nrings,width_heart,width_sparse,width_dense,\
     """
     packing cells by firstly placing new cells and then performing Lloyd's relaxation in the generation rings
     """
+    flag = False
+    while not flag:
+        # generate radii for rings
+        radii = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
+        # noise = np.random.normal(1,0.0,len(radii))
+        # noise = np.ones(len(radii))
+        # radii = np.multiply(radii,noise)
+        radii = np.concatenate(([0],np.cumsum(radii)))
 
-    # generate radii for rings
-    radii = np.concatenate(([width_heart],np.tile([width_sparse,width_dense],nrings)))
-    # noise = np.random.normal(1,0.0,len(radii))
-    # noise = np.ones(len(radii))
-    # radii = np.multiply(radii,noise)
-    radii = np.concatenate(([0],np.cumsum(radii)))
+        # generate perimeter points for heart region
+        PerimeterPoints = []
+        npoint = int(np.ceil(2*np.pi*radii[1]/(2*cellsize_dense)))
+        t = np.linspace(0, 2*np.pi, npoint, endpoint=False)
+        x = radii[1] * np.cos(t)
+        y = radii[1] * np.sin(t)
+        PerimeterPoints.append(np.c_[x, y])
+        PerimeterPointsSites = np.concatenate(PerimeterPoints, axis=0)
+        
+        #generate internal points for heart region
+        n_nonoverlapped_cells = int(2*np.floor((radii[1]/cellsize_dense)**2))
+        inside_cells = 1e-1*(np.random.rand(n_nonoverlapped_cells,2) - [0.5,0.5]) # add cell points in a very small area
+        # not too small or else flow mesh is too extreme at center, changed 1e-3 to 1e-1 -SA
+        
+        sites = np.vstack((PerimeterPointsSites,inside_cells))
 
-    # generate perimeter points for heart region
-    PerimeterPoints = []
-    npoint = int(np.ceil(2*np.pi*radii[1]/(2*cellsize_dense)))
-    t = np.linspace(0, 2*np.pi, npoint, endpoint=False)
-    x = radii[1] * np.cos(t)
-    y = radii[1] * np.sin(t)
-    PerimeterPoints.append(np.c_[x, y])
-    PerimeterPointsSites = np.concatenate(PerimeterPoints, axis=0)
-    
-    #generate internal points for heart region
-    n_nonoverlapped_cells = int(2*np.floor((radii[1]/cellsize_dense)**2))
-    inside_cells = 1e-1*(np.random.rand(n_nonoverlapped_cells,2) - [0.5,0.5]) # add cell points in a very small area
-    # not too small or else flow mesh is too extreme at center, changed 1e-3 to 1e-1 -SA
-    
-    sites = np.vstack((PerimeterPointsSites,inside_cells))
+        lloyd_iter = 0
+        while lloyd_iter < iter_max:
+            vor = Voronoi(sites)
+            sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
+            sites = np.vstack((PerimeterPointsSites,sites))
+            lloyd_iter += 1
 
-    lloyd_iter = 0
-    while lloyd_iter < iter_max:
-        vor = Voronoi(sites)
-        sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
-        sites = np.vstack((PerimeterPointsSites,sites))
-        lloyd_iter += 1
-
-    existing_sites = np.copy(sites[npoint:,:])
-    
-    # generate sites for each ring    
-    for i in range(1,len(radii)-1):
+        existing_sites = np.copy(sites[npoint:,:])
         
-        OuterPerimeterPoints = []
-        OuterPerimeter_radii = radii[i+1]
-        
-        if (i % 2) == 0: # if even, dense cells
-            cellradius = cellsize_dense/2
-            aspect = 1
-        else:
-            cellradius = cellsize_sparse/2
-            aspect = 1
-
-        OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellradius)))
-        
-        t = np.linspace(0, 2*np.pi, OuterPerimeter_npoint, endpoint=False)
-        x = OuterPerimeter_radii * np.cos(t)
-        y = OuterPerimeter_radii * np.sin(t)
-        OuterPerimeterPoints.append(np.c_[x, y])
-        OuterPerimeterPointsSites = np.concatenate(OuterPerimeterPoints, axis=0)
-        
-        # generate internal points
-        nsubrings = int(0.5*np.ceil((radii[i+1]-radii[i])/cellradius))
-        subradii = np.linspace(radii[i], radii[i+1], int(aspect*nsubrings), endpoint=False)
-        
-        subnpoints = np.ceil(2*np.pi*subradii/(2*cellradius)).astype(int)
-        # take minimum number of points for all subradii
-        subpoints = int(np.min(subnpoints))
-        
-        circles = []
-        radialwidthnoise = np.squeeze((np.random.rand(subpoints,1) - [0.5]))
-        for subr in subradii:
-            t = np.linspace(0, 2*np.pi, subpoints, endpoint=False)
-            dt = t[1] - t[0]
-            t = t + radialwidthnoise*dt
-            x = subr * np.cos(t)
-            y = subr * np.sin(t)
-            circles.append(np.c_[x, y])
+        # generate sites for each ring    
+        for i in range(1,len(radii)-1):
             
-        inside_cells = np.concatenate(circles, axis=0)
+            OuterPerimeterPoints = []
+            OuterPerimeter_radii = radii[i+1]
+            
+            if (i % 2) == 0: # if even, dense cells
+                cellradius = cellsize_dense/2
+                aspect = 1
+            else:
+                cellradius = cellsize_sparse/2
+                aspect = 1
+
+            OuterPerimeter_npoint = int(np.ceil(2*np.pi*OuterPerimeter_radii/(2*cellradius)))
+            
+            t = np.linspace(0, 2*np.pi, OuterPerimeter_npoint, endpoint=False)
+            x = OuterPerimeter_radii * np.cos(t)
+            y = OuterPerimeter_radii * np.sin(t)
+            OuterPerimeterPoints.append(np.c_[x, y])
+            OuterPerimeterPointsSites = np.concatenate(OuterPerimeterPoints, axis=0)
+            
+            # generate internal points
+            nsubrings = int(0.5*np.ceil((radii[i+1]-radii[i])/cellradius))
+            subradii = np.linspace(radii[i], radii[i+1], int(aspect*nsubrings), endpoint=False)
+            
+            subnpoints = np.ceil(2*np.pi*subradii/(2*cellradius)).astype(int)
+            # take minimum number of points for all subradii
+            subpoints = int(np.min(subnpoints))
+            
+            circles = []
+            radialwidthnoise = np.squeeze((np.random.rand(subpoints,1) - [0.5]))
+            for subr in subradii:
+                t = np.linspace(0, 2*np.pi, subpoints, endpoint=False)
+                dt = t[1] - t[0]
+                t = t + radialwidthnoise*dt
+                x = subr * np.cos(t)
+                y = subr * np.sin(t)
+                circles.append(np.c_[x, y])
+                
+            inside_cells = np.concatenate(circles, axis=0)
+            
+            # radial randomness 
+            noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellradius*2
+            noise = np.squeeze(noise)
+            r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
+            theta = np.arctan2(inside_cells[:,1],inside_cells[:,0])
+            inside_cells[:,0] = r*np.cos(theta)
+            inside_cells[:,1] = r*np.sin(theta)
+
+            sites = np.vstack((OuterPerimeterPointsSites,inside_cells))
+                        
+            existing_sites = np.vstack((sites,existing_sites))
+            PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
         
-        # radial randomness 
-        noise = (np.random.rand(len(inside_cells),1) - [0.5])*cellradius*2
-        noise = np.squeeze(noise)
-        r = np.sqrt(inside_cells[:,0]**2 + inside_cells[:,1]**2) + noise
-        theta = np.arctan2(inside_cells[:,1],inside_cells[:,0])
-        inside_cells[:,0] = r*np.cos(theta)
-        inside_cells[:,1] = r*np.sin(theta)
+        # cut sites to buffered boundary to make lloyd relaxation more efficient
+        existing_sites = existing_sites[check_isinside(existing_sites,boundary_points,0.2)]
 
-        sites = np.vstack((OuterPerimeterPointsSites,inside_cells))
-                    
-        existing_sites = np.vstack((sites,existing_sites))
-        PerimeterPointsSites = np.copy(OuterPerimeterPointsSites)
-    
-    # cut sites to buffered boundary to make lloyd relaxation more efficient
-    existing_sites = existing_sites[check_isinside(existing_sites,boundary_points,0.2)]
-
-    # try doing the full triangulation and getting the vertices back
-    num_bound = np.shape(boundary_points)[0]  # create boundary segements to enforce boundaries 
-    boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
-    boundary_region = np.array([[5.75,0,1,0]])
-
-    lloyd_iter = 0
-    for i in range(0,iter_max):
-        # print('iter')
-        vor = Voronoi(existing_sites)
-        existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
-        lloyd_iter += 1
-    
-    # check if sites are too close the the boundary 
-    if mergeFlag == 'On':
+        # try doing the full triangulation and getting the vertices back
         num_bound = np.shape(boundary_points)[0]  # create boundary segements to enforce boundaries 
         boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
-        boundary_region = np.array([[0,0,1,0]])
-        tri_inp = {'vertices': existing_sites,'segments':boundary_segments,'regions':boundary_region}
-        conform = tr.triangulate(tri_inp, 'peAq0D')
-        conform_sites = conform['vertices']
-        existing_sites[check_isinside(conform_sites,boundary_points,-1e-2)]
-        existing_sites = np.squeeze(existing_sites)
+        boundary_region = np.array([[5.75,0,1,0]])
+
+        lloyd_iter = 0
+        for i in range(0,iter_max):
+            # print('iter')
+            vor = Voronoi(existing_sites)
+            existing_sites = relax_points(vor,omega) # returns new sites which are relaxed centroids of vor based on old sites
+            # try triangulating after relax
+            delaunay_vertices = np.concatenate((boundary_points,np.array(existing_sites))) 
+            tri_inp = {'vertices': delaunay_vertices,'segments':boundary_segments,'regions':boundary_region}
+            conforming_delaunay = tr.triangulate(tri_inp, 'peq3D') 
+            existing_sites = np.array(conforming_delaunay['vertices']) # flow point coords
+        
+        path_in = check_isinside(existing_sites,boundary_points,0) # checks sites inside boundary using path
+        sites = existing_sites[path_in]
+        if np.shape(sites)[0] > 10: # what is the primary constraint
+            flag = True
+
+        # print('pass lloyd')
+        # # check if sites are too close the the boundary 
+        # if mergeFlag == 'On':
+        #     num_bound = np.shape(boundary_points)[0]  # create boundary segements to enforce boundaries 
+        #     boundary_segments = np.array([np.linspace(0,num_bound-1,num_bound),np.concatenate((np.linspace(1,num_bound-1,num_bound-1),np.array([0])))]).transpose()
+        #     boundary_region = np.array([[0,0,1,0]])
+        #     tri_inp = {'vertices': existing_sites,'segments':boundary_segments,'regions':boundary_region}
+        #     conform = tr.triangulate(tri_inp, 'peAq0D')
+        #     conform_sites = conform['vertices']
+        #     existing_sites[check_isinside(conform_sites,boundary_points,-1e-2)]
+        #     existing_sites = np.squeeze(existing_sites)
 
     # Clip again sites to be inside boundary
-    path_in = check_isinside(existing_sites,boundary_points,0) # checks sites inside boundary using path
-    sites = existing_sites[path_in]
+    # path_in = check_isinside(existing_sites,boundary_points,0) # checks sites inside boundary using path
+    # sites = existing_sites[path_in]  
 
 
     return sites, radii
