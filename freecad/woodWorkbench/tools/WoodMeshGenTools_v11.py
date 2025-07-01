@@ -1628,7 +1628,7 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         zstart = np.arange(0,z_max,segment_length)
         # https://link.springer.com/article/10.1007/s00468-015-1181-8/figures/2  
         # can have 5/mm thus spacing once every half segment length for spruce gives 1 ray/1 mm is generous
-        ds = 0.5/(2*np.pi) #arbitrary radial spacing between rays for roughly 0.5/2pi mm, relates to above
+        ds = 1/(2*np.pi) #arbitrary radial spacing between rays for roughly 0.5/2pi mm, relates to above
         nthetas = np.array(radii_rays/ds,dtype='int')
         zmatrix = np.empty(len(radii_rays))
         # get an array of rays and corresponding height for each ring, with randomness
