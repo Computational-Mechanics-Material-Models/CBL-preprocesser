@@ -719,7 +719,7 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
     with open(Path(outDir + '/' + geoName + '/' + geoName +'-flowMesh.inp'), 'w') as meshfile:
         meshfile.write('*Heading\n*Preprint, echo=NO, model=NO, history=NO, contact=NO\n*Part, name=')
         meshfile.write(geoName)
-        meshfile.write('\n*Node, nset=all\n')
+        meshfile.write('\n*Nodes, nset=all\n')
         i = 0
         for row in delaun_nodes:
             i += 1
@@ -728,7 +728,8 @@ def BuildFlowMesh(outDir, geoName,nsegments,long_connector_ratio,z_min,z_max,bou
         i = 0
         for row in delaun_elems:
             i += 1
-            meshfile.write(str(int(i)) + ', ' + ', '.join([str(int(a)) for a in row[0:2]]) + '\n')
+            # wrtie each el number and then node indices and then additional information
+            meshfile.write(str(int(i)) + ',' + ','.join([str(int(a)) for a in row[0:2]]) + str(',' + ','.join([str(a) for a in row[2:6]])) + str(',' + ','.join([str(int(a)) for a in row[6:]])) + '\n')
         meshfile.write('*End Part\n')
     
     # add node index for visualization
