@@ -1914,7 +1914,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     vtkfile_flow.close()
     
 
-# =============================================================================
+    # =============================================================================
     # Paraview Vertices File
     VTKcell_types_vertices = (np.ones(npt_total_vtk)).astype(int)
 
@@ -1994,7 +1994,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     
     vtkfile_vertices.close()
 
-# =============================================================================
+    # =============================================================================
     # Paraview Beam File
 
     Beam_width = np.copy(all_vertices_2D[:,12])
@@ -2084,7 +2084,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     
     vtkfile_beams.close()
     
-# =============================================================================
+    # =============================================================================
     # Paraview Connector (Axis + Center section) File
     VTKcell_types_conns = np.concatenate((3*np.ones(nconnector_t),3*np.ones(nconnector_l),9*np.ones(nconnector_t),9*np.ones(nconnector_l))).astype(int)
     ncell_conns = VTKcell_types_conns.shape[0]
@@ -2176,7 +2176,7 @@ def VisualizationFiles(geoName,NURBS_degree,nlayers,npt_per_layer_vtk,all_pts_3D
     
     vtkfile_conns.close()
     
-# =============================================================================
+    # =============================================================================
     # Paraview Connector (Volume) File
     VTKcell_types_conns_vol = np.concatenate((12*np.ones(nconnector_t),12*np.ones(nconnector_l),12*np.ones(nconnector_t),12*np.ones(nconnector_l))).astype(int)
     ncell_conns_vol = VTKcell_types_conns_vol.shape[0]

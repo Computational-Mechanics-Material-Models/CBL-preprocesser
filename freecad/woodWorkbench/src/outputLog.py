@@ -13,14 +13,14 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
     logfile = open(Path(outDir + '/' + geoName + '/' + geoName + '-input.cwPar'),'w')        
     logfile.write("""
         // ================================================================================
-        // CHRONO CBL WORKBENCH - github.com/Cusatis-Computational-Services/CBL-preprocesser
+        // CHRONO CBL WORKBENCH - github.com/Computational-Mechanics-Material-Models/CBL-preprocesser
         //
         // Copyright (c) 2025 
         // All rights reserved. 
         //
         // Use of the code that generated this file is governed by a BSD-style license that
         // can be found in the LICENSE file at the top level of the distribution and at
-        // github.com/Cusatis-Computational-Services/CBL-preprocesser/LICENSE
+        // github.com/Computational-Mechanics-Material-Models/CBL-preprocesser/LICENSE
         //
         // ================================================================================
         // CBL Workbench Parameter File
