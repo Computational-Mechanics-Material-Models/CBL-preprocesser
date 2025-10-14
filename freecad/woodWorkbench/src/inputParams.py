@@ -35,15 +35,15 @@ def inputParams(form):
             # Table 2: ring width 1.3-2.7 mm 
         # Samusevich, Alina, et al. "Comparison of methods for the demarcation between earlywood and latewood in tree rings of Norway spruce." Dendrochronologia 60 (2020): 125686.
             # EW/LW .2-.4
-        ring_width = float(form[0].ring_width.text() or np.random.uniform(1.3,2.7))
-        late_ratio = float(form[0].ring_ratio.text() or np.random.uniform(0.2,0.4))
+        ring_width = float(form[0].ring_width.text() or np.round(np.random.uniform(1.3,2.7),2))
+        late_ratio = float(form[0].ring_ratio.text() or np.round(np.random.uniform(0.2,0.4),3))
         width_early = (1-late_ratio)*ring_width # ring width for rings with early cells 0.85 
         width_late = late_ratio*ring_width # ring width for rings with late cells 0.15
-        cellsize_early = float(form[0].cellsize_early.text() or np.random.uniform(0.0327,0.0393))
-        cellsize_late = float(form[0].cellsize_late.text() or np.random.uniform(0.0131,0.0321))
-        cellwallthickness_early = float(form[0].cellwallthickness_early.text() or np.random.uniform(0.0029,0.00352))
-        cellwallthickness_late = float(form[0].cellwallthickness_late.text() or np.random.uniform(0.00469,0.00623))
-        cell_length = float(form[0].cell_length.text() or np.random.uniform(1.2,4.3))
+        cellsize_early = float(form[0].cellsize_early.text() or np.round(np.random.uniform(0.0327,0.0393),6))
+        cellsize_late = float(form[0].cellsize_late.text() or np.round(np.random.uniform(0.0131,0.0321),6))
+        cellwallthickness_early = float(form[0].cellwallthickness_early.text() or np.round(np.random.uniform(0.0029,0.00352),6))
+        cellwallthickness_late = float(form[0].cellwallthickness_late.text() or np.round(np.random.uniform(0.00469,0.00623),6))
+        cell_length = float(form[0].cell_length.text() or np.round(np.random.uniform(1.2,4.3),6))
     else: # default to custom inputs
         speciesShort = 'custom'
         width_heart = 0.15 # ring width for the innermost ring
