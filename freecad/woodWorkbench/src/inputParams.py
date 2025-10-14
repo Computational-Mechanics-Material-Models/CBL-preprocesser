@@ -12,6 +12,7 @@
 ## Primary Authors: Susan Alexis Brown, Hao Yin
 ## ===========================================================================
 from math import sqrt, ceil
+import numpy as np
 import os
 from pathlib import Path
 from freecad.woodWorkbench.src.outputLog import outputLog
@@ -22,20 +23,29 @@ def inputParams(form):
     # Cell Growth Parameters ------------------------
     radial_growth_rule = form[0].radial_growth_rule.currentText().lower().replace(' ','') #'binary'  
     species = form[0].species.currentText().lower().replace(' ','')  
+    # TODO: choose if average or random parameters for given species ******
     if species == 'norwayspruce':
         speciesShort = 'spruce'
         width_heart = 0.15 # ring width for the innermost ring
-        ring_width = float(form[0].ring_width.text() or 2)
-        late_ratio = float(form[0].ring_ratio.text() or 0.3)
+        # Keunecke thesis Table 5: length 1.2 - 2.8 - 4.3 mm; lumen 0.003 - 0.017 - 0.022 mm; wall 0.0035 EW 0.0107 LW mm
+        # Brändström, Jonas. "Micro-and ultrastructural aspects of Norway spruce tracheids: a review." IAWA journal 22.4 (2001): 333-353.
+            # in mature wood: length 2.8-4.29 mm; lumen diameter 0.0293-0.0397 mm; wall thickness 0.0021-0.00753 mm 
+            # R/T: thickness EW 0.0029-0.00352 LW 0.00469-0.00623; diameter EW 0.0327-0.0393 LW 0.0131-0.0321 mm
+        # D’Andrea, Giuseppe, et al. "Mismatch between annual tree-ring width growth and NDVI index in Norway spruce stands of Central Europe." Forests 13.9 (2022): 1417.
+            # Table 2: ring width 1.3-2.7 mm 
+        # Samusevich, Alina, et al. "Comparison of methods for the demarcation between earlywood and latewood in tree rings of Norway spruce." Dendrochronologia 60 (2020): 125686.
+            # EW/LW .2-.4
+        ring_width = float(form[0].ring_width.text() or np.random.uniform(1.3,2.7))
+        late_ratio = float(form[0].ring_ratio.text() or np.random.uniform(0.2,0.4))
         width_early = (1-late_ratio)*ring_width # ring width for rings with early cells 0.85 
         width_late = late_ratio*ring_width # ring width for rings with late cells 0.15
-        cellsize_early = float(form[0].cellsize_early.text() or 0.032)
-        cellsize_late = float(form[0].cellsize_late.text() or 0.017)
-        cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.0035)
-        cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.011)
-        cell_length = float(form[0].cell_length.text() or 3)
-    else: # default to generic
-        speciesShort = 'generic'
+        cellsize_early = float(form[0].cellsize_early.text() or np.random.uniform(0.0327,0.0393))
+        cellsize_late = float(form[0].cellsize_late.text() or np.random.uniform(0.0131,0.0321))
+        cellwallthickness_early = float(form[0].cellwallthickness_early.text() or np.random.uniform(0.0029,0.00352))
+        cellwallthickness_late = float(form[0].cellwallthickness_late.text() or np.random.uniform(0.00469,0.00623))
+        cell_length = float(form[0].cell_length.text() or np.random.uniform(1.2,4.3))
+    else: # default to custom inputs
+        speciesShort = 'custom'
         width_heart = 0.15 # ring width for the innermost ring
         ring_width = float(form[0].ring_width.text() or 2)
         late_ratio = float(form[0].ring_ratio.text() or 0.3)
