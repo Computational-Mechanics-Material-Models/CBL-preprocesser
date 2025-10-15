@@ -44,18 +44,25 @@ def inputParams(form):
         cellwallthickness_early = float(form[0].cellwallthickness_early.text() or np.round(np.random.uniform(0.0029,0.00352),6))
         cellwallthickness_late = float(form[0].cellwallthickness_late.text() or np.round(np.random.uniform(0.00469,0.00623),6))
         cell_length = float(form[0].cell_length.text() or np.round(np.random.uniform(1.2,4.3),6))
-    else: # default to custom inputs
-        speciesShort = 'custom'
-        width_heart = 0.15 # ring width for the innermost ring
-        ring_width = float(form[0].ring_width.text() or 2)
-        late_ratio = float(form[0].ring_ratio.text() or 0.3)
-        width_early = (1-late_ratio)*ring_width # ring width for rings with early cells 0.85 
-        width_late = late_ratio*ring_width # ring width for rings with late cells 0.15
-        cellsize_early = float(form[0].cellsize_early.text() or 0.03)
-        cellsize_late = float(form[0].cellsize_late.text() or 0.02)
-        cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.003)
-        cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
-        cell_length = float(form[0].cell_length.text() or 10)
+        ray_spacing = float(form[0].ray_spacing.text() or 0.2)
+    else:
+        error_msg = 'Species not recognized. Please select Norway Spruce or input custom parameters.'
+        form[0].stackedWidget.setCurrentIndex(3)
+        print(error_msg)
+        return
+    # TODO: implement other species
+    # else: # default to custom inputs
+    #     speciesShort = 'custom'
+    #     width_heart = 0.15 # ring width for the innermost ring
+    #     ring_width = float(form[0].ring_width.text() or 2)
+    #     late_ratio = float(form[0].ring_ratio.text() or 0.3)
+    #     width_early = (1-late_ratio)*ring_width # ring width for rings with early cells 0.85 
+    #     width_late = late_ratio*ring_width # ring width for rings with late cells 0.15
+    #     cellsize_early = float(form[0].cellsize_early.text() or 0.03)
+    #     cellsize_late = float(form[0].cellsize_late.text() or 0.02)
+    #     cellwallthickness_early = float(form[0].cellwallthickness_early.text() or 0.003)
+    #     cellwallthickness_late = float(form[0].cellwallthickness_late.text() or 0.006)
+    #     cell_length = float(form[0].cell_length.text() or 10)
         
     
     # random field parameters
