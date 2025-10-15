@@ -4,7 +4,7 @@ from datetime import datetime
 
 def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
               cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-                cell_length, randomFlag, randomParams, box_shape, box_center, box_size, box_height, \
+                cell_length, ray_spacing, randomFlag, randomParams, box_shape, box_center, box_size, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_start,precrack_end, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
                       boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir, geoFile):
@@ -49,6 +49,7 @@ def outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, lat
     logfile.write('cellwallthickness_early=' + str(cellwallthickness_early) + '\n')
     logfile.write('cellwallthickness_late=' + str(cellwallthickness_late) + '\n')
     logfile.write('cell_length=' + str(cell_length) + '\n')
+    logfile.write('ray_spacing=' + str(ray_spacing) + '\n')
                   
     # random field parameters
     logfile.write('randomFlag=' + str(randomFlag) + '\n')

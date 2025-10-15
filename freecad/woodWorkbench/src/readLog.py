@@ -28,6 +28,8 @@ def readLog(self):
                 cellwallthickness_late = line.split("=")[1].strip()
             elif "cell_length" in line:
                 cell_length = line.split("=")[1].strip()
+            elif "ray_spacing" in line:
+                ray_spacing = line.split("=")[1].strip()
 
             elif "randomFlag" in line:
                 randomFlag = line.split("=")[1].strip()
@@ -109,6 +111,7 @@ def readLog(self):
         self.form[0].cellwallthickness_early.setText(cellwallthickness_early)
         self.form[0].cellwallthickness_late.setText(cellwallthickness_late)
         self.form[0].cell_length.setText(cell_length)
+        self.form[0].ray_spacing.setText(ray_spacing)
 
         self.form[0].randomFlag.setCurrentText(randomFlag)
         self.form[0].dist_types.setCurrentText(dist_type)

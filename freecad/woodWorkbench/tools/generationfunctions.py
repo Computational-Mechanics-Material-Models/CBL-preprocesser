@@ -1476,11 +1476,12 @@ def InsertPrecrack(all_pts_2D,all_ridges,nridge,precrack_nodes,\
 
 
 def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
-                      connector_t_reg_connectivity,connector_t_top_connectivity,\
-                      connector_l_connectivity,all_vertices_2D,\
-                      max_wings,flattened_all_vertices_2D,nsegments,segment_length,long_connector_ratio,\
-                      nctrlpt_per_beam,theta,nridge,\
-                      randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthick,radii,z_max,rayFlag):
+                        connector_t_reg_connectivity,connector_t_top_connectivity,\
+                        connector_l_connectivity,all_vertices_2D,\
+                        max_wings,flattened_all_vertices_2D,nsegments,segment_length,long_connector_ratio,\
+                        nctrlpt_per_beam,theta,nridge,\
+                        randomFlag,random_field,knotParams,knotFlag,box_center,voronoi_vertices_2D,precrack_elem,cellwallthick,\
+                        radii,z_max,rayFlag,ray_spacing):
     # pr = cProfile.Profile()
     # pr.enable()
 
@@ -1629,16 +1630,15 @@ def ConnectorMeshFile(geoName,IGAvertices,connector_t_bot_connectivity,\
         radii_rays = radii[2:]
         zstart = np.arange(0,z_max+1,segment_length/2)
         # https://link.springer.com/article/10.1007/s00468-015-1181-8/figures/2  
-        # can have 5/mm thus spacing once every half segment length for spruce gives 1 ray/1 mm is generous
-        ds = 0.2/(2*np.pi) #arbitrary radial spacing between rays for roughly //0.5/2pi mm, relates to above
-        nthetas = np.array(radii_rays/ds,dtype='int')
+        # spacing of rays in the radial direction as input
+        ds = ray_spacing #mm
+        nthetas = np.array(radii_rays*2*np.pi/ds,dtype='int') # divide circumference by spacing to get number of rays
         zmatrix = np.empty(len(radii_rays))
         # get an array of rays and corresponding height for each ring, with randomness
         # rands =  [(np.random.random((th,1)) - 0.5)/10 for th in nthetas]
         rands =  [(np.random.random((th,1)) - 0.5)/5 for th in nthetas]
         zmatrix = [(np.tile(zstart,(th,1)) + rands[r]) for r, th in enumerate(nthetas)]
-        thmatrix = [np.linspace(np.random.random()*np.pi*ds/5,2*np.pi,th) for th in nthetas] # random starting point //up to the distance between rays
-        # if close to a theta and z value picked by radii index
+        thmatrix = [np.linspace(np.random.random()*ds/5,2*np.pi,th) for th in nthetas] # random starting point proportional to the spacing
 
         # segment_length
         widthvals = Meshdata[0:offset,21]

@@ -51,7 +51,6 @@ from freecad.woodWorkbench.src.inputParams                     import inputParam
 from freecad.woodWorkbench.src.readLog                         import readLog
 
 from freecad.woodWorkbench.util.cwloadUIfile                    import cwloadUIfile
-from freecad.woodWorkbench.util.cwloadUIicon                    import cwloadUIicon
 
 # from freecad.woodWorkbench.output.mkChronoInput                  import mkChronoInput
 # from freecad.woodWorkbench.output.mkAbaqusInput                  import mkAbaqusInput

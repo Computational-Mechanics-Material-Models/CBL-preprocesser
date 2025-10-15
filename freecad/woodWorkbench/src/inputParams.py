@@ -185,7 +185,7 @@ def inputParams(form):
     # Write input parameters to log file for repeated use
     outputLog(geoName, radial_growth_rule, species, width_heart, ring_width, late_ratio, \
               cellsize_early, cellsize_late, cellwallthickness_early, cellwallthickness_late, \
-                cell_length, randomFlag, randomParams, box_shape, box_center, box_size, box_height, \
+                cell_length, ray_spacing, randomFlag, randomParams, box_shape, box_center, box_size, box_height, \
                   box_width, box_depth, x_notch_size, y_notch_size, precrackFlag, precrack_start, precrack_end, \
                     iter_max, theta_min, long_connector_ratio, knotFlag, knotParams, \
                       boundaryFlag,flowFlag, mergeFlag, rayFlag, inpType, visFlag, outDir,geoFile)
@@ -198,4 +198,4 @@ def inputParams(form):
         x_notch_size, y_notch_size, precrack_start,precrack_end, \
         mergeFlag, merge_tol, precrackFlag, \
         inpType, randomFlag, randomParams, NURBS_degree, box_width, box_depth, visFlag, \
-        knotFlag, knotParams, outDir,flowFlag, rayFlag
+        knotFlag, knotParams, outDir,flowFlag, rayFlag, ray_spacing
